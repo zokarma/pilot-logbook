@@ -6,6 +6,8 @@
 <title>Pilot Logbook</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
   tailwind.config = {
     theme: {
@@ -25,6 +27,11 @@
   input,select,textarea{ outline:none; }
   .fade-in{ animation:fade .25s ease; }
   @keyframes fade{ from{opacity:0; transform:translateY(4px);} to{opacity:1; transform:none;} }
+  .leaflet-tooltip.route-airport-label{
+    background:rgba(255,255,255,0.9); border:1px solid #cbd5e1; box-shadow:none;
+    padding:1px 6px; font-size:11px; font-weight:600; color:#334155; border-radius:4px;
+  }
+  .leaflet-tooltip.route-airport-label:before{ display:none; }
 </style>
 </head>
 <body class="bg-slate-100 text-slate-800 min-h-screen">
@@ -285,11 +292,14 @@
     <section id="tab-routemap" class="tab-panel hidden fade-in">
       <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div class="lg:col-span-2 bg-white rounded-xl shadow-sm p-5">
-          <h3 class="font-semibold mb-3">Route Map</h3>
-          <div class="border border-slate-200 rounded-lg bg-slate-50 overflow-hidden">
-            <svg id="routeSvg" viewBox="0 0 800 500" class="w-full h-auto" preserveAspectRatio="xMidYMid meet"></svg>
+          <div class="flex items-center justify-between mb-3">
+            <h3 class="font-semibold">Route Map</h3>
+            <p id="routeMapEmpty" class="text-xs text-slate-400 hidden">No routes yet — log a flight with From/To airports.</p>
           </div>
-          <p class="text-xs text-slate-400 mt-2">Line thickness reflects how often a route is flown. Hover a dot for the airport code.</p>
+          <div class="border border-slate-200 rounded-lg overflow-hidden">
+            <div id="routeMap" style="height:500px;"></div>
+          </div>
+          <p class="text-xs text-slate-400 mt-2">Line thickness reflects how often a route is flown. Pan &amp; zoom freely. Click a red marker for the airport code.</p>
         </div>
         <div class="bg-white rounded-xl shadow-sm p-5">
           <h3 class="font-semibold mb-3">Route Statistics</h3>
@@ -1201,19 +1211,43 @@ function renderDashboard(){
 }
 
 /* ============================================================
-   ROUTE MAP (SVG)
+   ROUTE MAP (Leaflet + OpenStreetMap tiles)
    ============================================================ */
+let leafletMap = null;
+let leafletLayer = null;
+
+function ensureLeafletMap(){
+  if(leafletMap || typeof L === "undefined") return leafletMap;
+  leafletMap = L.map("routeMap", {
+    worldCopyJump: true,
+    zoomControl: true,
+    scrollWheelZoom: true
+  }).setView([45, -75], 3);
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    maxZoom: 18,
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+  }).addTo(leafletMap);
+  leafletLayer = L.layerGroup().addTo(leafletMap);
+  return leafletMap;
+}
+
 function renderRouteMap(){
-  const svg = $("#routeSvg");
-  const W=800, H=500, pad=60;
+  ensureLeafletMap();
+  // Invalidate size in case the tab was hidden when map was first initialized
+  if(leafletMap) setTimeout(() => leafletMap.invalidateSize(), 50);
+
   const pid = data.currentPilotId;
   const flights = data.flights.filter(x => (!pid || x.pilotId === pid) && x.from && x.to);
 
+  if(leafletLayer) leafletLayer.clearLayers();
+  const emptyHint = $("#routeMapEmpty");
+
   if(!flights.length){
-    svg.innerHTML = `<text x="${W/2}" y="${H/2}" text-anchor="middle" fill="#94a3b8" font-size="18">No routes to display. Log a flight with From/To airports.</text>`;
+    if(emptyHint) emptyHint.classList.remove("hidden");
     $("#routeStats").innerHTML = '<p class="text-slate-400 text-sm">No routes yet.</p>';
     return;
   }
+  if(emptyHint) emptyHint.classList.add("hidden");
 
   // Collect airports & route aggregates
   const codes = new Set();
@@ -1228,45 +1262,52 @@ function renderRouteMap(){
     if(!routes[key].last || d > routes[key].last) routes[key].last = d;
   });
 
-  // Projection (auto-fit bounds of used airports)
-  const pts = Array.from(codes).map(c => ({ code:c, coord:airportCoord(c) }));
-  const lats = pts.map(p=>p.coord[0]), lons = pts.map(p=>p.coord[1]);
-  let minLat=Math.min(...lats), maxLat=Math.max(...lats), minLon=Math.min(...lons), maxLon=Math.max(...lons);
-  let dLat=(maxLat-minLat)||1, dLon=(maxLon-minLon)||1;
-  const project = (lat,lon) => {
-    const x = pad + ((lon-minLon)/dLon)*(W-2*pad);
-    const y = pad + ((maxLat-lat)/dLat)*(H-2*pad);
-    return [x,y];
-  };
-  const pos = {};
-  pts.forEach(p => pos[p.code] = project(p.coord[0], p.coord[1]));
+  const maxCount = Math.max(...Object.values(routes).map(r => r.count));
+  const allLatLngs = [];
 
-  const maxCount = Math.max(...Object.values(routes).map(r=>r.count));
-  let svgStr = `<rect x="0" y="0" width="${W}" height="${H}" fill="#f8fafc"/>`;
-  // grid
-  for(let i=1;i<8;i++){ const x=i*W/8; svgStr += `<line x1="${x}" y1="0" x2="${x}" y2="${H}" stroke="#e2e8f0" stroke-width="1"/>`; }
-  for(let i=1;i<5;i++){ const y=i*H/5; svgStr += `<line x1="0" y1="${y}" x2="${W}" y2="${y}" stroke="#e2e8f0" stroke-width="1"/>`; }
-
-  // route lines
+  // Route polylines
   Object.values(routes).forEach(r => {
-    const p1 = pos[r.a], p2 = pos[r.b];
+    const c1 = airportCoord(r.a);
+    const c2 = airportCoord(r.b);
     const ratio = r.count / maxCount;
-    const width = 1.5 + ratio * 7;
-    const opacity = 0.3 + ratio * 0.6;
-    svgStr += `<line x1="${p1[0].toFixed(1)}" y1="${p1[1].toFixed(1)}" x2="${p2[0].toFixed(1)}" y2="${p2[1].toFixed(1)}" stroke="#1d4ed8" stroke-width="${width.toFixed(1)}" stroke-opacity="${opacity.toFixed(2)}" stroke-linecap="round"/>`;
+    L.polyline([c1, c2], {
+      color: "#1d4ed8",
+      weight: 1.5 + ratio * 6,
+      opacity: 0.4 + ratio * 0.5,
+      lineCap: "round"
+    }).addTo(leafletLayer);
+    allLatLngs.push(c1, c2);
   });
 
-  // airport markers
-  pts.forEach(p => {
-    const [x,y] = pos[p.code];
-    svgStr += `<g><circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="6" fill="#dc2626" stroke="#fff" stroke-width="1.5"><title>${esc(p.code)}</title></circle>`;
-    svgStr += `<text x="${x.toFixed(1)}" y="${(y-10).toFixed(1)}" text-anchor="middle" font-size="11" font-weight="600" fill="#334155">${esc(p.code)}</text></g>`;
+  // Airport markers with always-visible labels
+  Array.from(codes).forEach(code => {
+    const c = airportCoord(code);
+    const known = !!AIRPORTS[code];
+    const marker = L.circleMarker(c, {
+      radius: 6,
+      color: "#ffffff",
+      weight: 2,
+      fillColor: "#dc2626",
+      fillOpacity: 1
+    }).addTo(leafletLayer);
+    marker.bindTooltip(esc(code), {
+      permanent: true,
+      direction: "top",
+      offset: [0, -8],
+      className: "route-airport-label"
+    });
+    if(!known){
+      marker.bindPopup(`<b>${esc(code)}</b><br><span style="color:#94a3b8">Unknown ICAO — position estimated</span>`);
+    }
   });
 
-  svg.innerHTML = svgStr;
+  // Fit bounds to the routes
+  if(allLatLngs.length){
+    leafletMap.fitBounds(L.latLngBounds(allLatLngs), { padding:[40,40], maxZoom: 7 });
+  }
 
-  // stats panel
-  const sorted = Object.values(routes).sort((a,b)=>b.count-a.count);
+  // Stats panel (unchanged)
+  const sorted = Object.values(routes).sort((a,b) => b.count - a.count);
   $("#routeStats").innerHTML = sorted.map(r => `
     <div class="border border-slate-200 rounded-lg p-3">
       <div class="flex items-center justify-between">
