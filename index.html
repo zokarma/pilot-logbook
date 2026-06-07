@@ -382,6 +382,18 @@
         </form>
       </div>
 
+      <!-- Duplicate detection -->
+      <div id="pilotDupesPanel" class="bg-amber-50 border border-amber-200 rounded-xl shadow-sm p-5 mb-6 hidden">
+        <div class="flex items-start justify-between gap-3 mb-3">
+          <div>
+            <h3 class="font-semibold text-amber-900">Possible duplicate profiles</h3>
+            <p class="text-sm text-amber-800 mt-1">Pick which profile is the canonical one in each group, then click <b>Merge</b>. All flights from the others will be reassigned and the duplicates deleted.</p>
+          </div>
+          <button id="pilotDupesDismiss" class="text-xs text-amber-700 hover:text-amber-900">Dismiss</button>
+        </div>
+        <div id="pilotDupesGroups" class="space-y-3"></div>
+      </div>
+
       <div class="bg-white rounded-xl shadow-sm p-5">
         <div class="flex items-center justify-between mb-3">
           <h2 class="text-lg font-semibold">Pilot Profiles</h2>
@@ -2205,23 +2217,181 @@ function deletePilot(id){
   renderDashboard();
 }
 
+/* Per-pilot "duplicate key": initials of leading words + ":" + the longest word.
+   "B.Pearce" -> "b:pearce" ; "Ben Pearce" -> "b:pearce" ; "A. MOWBRAY" -> "a:mowbray".
+   Two pilots with the same key are flagged as candidate duplicates. */
+function pilotDupKey(p){
+  const full = `${p.firstName||""} ${p.lastName||""}`.toLowerCase();
+  const words = full.split(/[^a-z]+/).filter(Boolean);
+  if(!words.length) return "";
+  const last = words[words.length - 1];
+  const initials = words.slice(0, -1).map(w => w[0]).sort().join("");
+  return `${initials}:${last}`;
+}
+
+/* Move every reference from sourceId -> targetId, then delete the source profile.
+   Skips if either pilot is missing or source == target. Confirms with the user
+   before doing anything destructive. */
+function mergePilots(sourceId, targetId){
+  if(!sourceId || !targetId || sourceId === targetId) return false;
+  const src = pilotById(sourceId), tgt = pilotById(targetId);
+  if(!src || !tgt) return false;
+  const refs = data.flights.filter(f =>
+    f.pilotId === sourceId || f.picId === sourceId || f.sicId === sourceId || f.socId === sourceId
+  ).length;
+  if(!confirm(
+    `Merge "${pilotName(sourceId)}" into "${pilotName(targetId)}"?\n\n` +
+    `${refs} flight reference${refs===1?"":"s"} will be reassigned, then ` +
+    `"${pilotName(sourceId)}" will be deleted.\n\nThis cannot be undone.`
+  )) return false;
+  // Carry over optional metadata that the target is missing
+  if(!tgt.employeeNumber && src.employeeNumber) tgt.employeeNumber = src.employeeNumber;
+  if(!tgt.licenseNumber && src.licenseNumber) tgt.licenseNumber = src.licenseNumber;
+  // Reassign references on every flight
+  data.flights.forEach(f => {
+    if(f.pilotId === sourceId) f.pilotId = targetId;
+    if(f.picId === sourceId){ f.picId = targetId; f.pic = pilotName(targetId); }
+    if(f.sicId === sourceId){ f.sicId = targetId; f.sic = pilotName(targetId); }
+    if(f.socId === sourceId){ f.socId = targetId; f.soc = pilotName(targetId); }
+  });
+  data.pilots = data.pilots.filter(p => p.id !== sourceId);
+  if(data.currentPilotId === sourceId) data.currentPilotId = targetId;
+  saveData(currentUser, data);
+  refreshPilotDropdowns();
+  refreshRegistrationsList();
+  renderPilots();
+  renderFlightTable();
+  renderDashboard();
+  return true;
+}
+
+/* Merge an entire group of duplicates: every pilot in `sourceIds` is folded
+   into `targetId`. One confirm covers all. */
+function mergePilotsGroup(targetId, sourceIds){
+  if(!targetId || !sourceIds || !sourceIds.length) return;
+  const refs = data.flights.filter(f => sourceIds.some(id =>
+    f.pilotId === id || f.picId === id || f.sicId === id || f.socId === id
+  )).length;
+  const names = sourceIds.map(id => `"${pilotName(id)}"`).join(", ");
+  if(!confirm(
+    `Merge ${names} into "${pilotName(targetId)}"?\n\n` +
+    `${refs} flight reference${refs===1?"":"s"} will be reassigned, then ${sourceIds.length} ` +
+    `duplicate profile${sourceIds.length===1?"":"s"} will be deleted.\n\nThis cannot be undone.`
+  )) return;
+  const tgt = pilotById(targetId);
+  sourceIds.forEach(id => {
+    const src = pilotById(id);
+    if(!src || !tgt) return;
+    if(!tgt.employeeNumber && src.employeeNumber) tgt.employeeNumber = src.employeeNumber;
+    if(!tgt.licenseNumber && src.licenseNumber) tgt.licenseNumber = src.licenseNumber;
+  });
+  data.flights.forEach(f => {
+    if(sourceIds.includes(f.pilotId)) f.pilotId = targetId;
+    if(sourceIds.includes(f.picId)){ f.picId = targetId; f.pic = pilotName(targetId); }
+    if(sourceIds.includes(f.sicId)){ f.sicId = targetId; f.sic = pilotName(targetId); }
+    if(sourceIds.includes(f.socId)){ f.socId = targetId; f.soc = pilotName(targetId); }
+  });
+  data.pilots = data.pilots.filter(p => !sourceIds.includes(p.id));
+  if(sourceIds.includes(data.currentPilotId)) data.currentPilotId = targetId;
+  saveData(currentUser, data);
+  refreshPilotDropdowns();
+  refreshRegistrationsList();
+  renderPilots();
+  renderFlightTable();
+  renderDashboard();
+}
+
+/* User-facing wrapper for the per-row "Merge into…" dropdown so the select can
+   be reset whether the merge proceeds or the user cancels. */
+function handleMergeSelect(sourceId, sel){
+  const targetId = sel.value;
+  sel.value = "";
+  if(targetId) mergePilots(sourceId, targetId);
+}
+
+/* Build duplicate clusters: pilots sharing the same dup key. */
+function findDuplicateClusters(){
+  const groups = {};
+  data.pilots.forEach(p => {
+    const k = pilotDupKey(p);
+    if(!k) return;
+    (groups[k] = groups[k] || []).push(p);
+  });
+  return Object.values(groups).filter(g => g.length >= 2);
+}
+
+function renderDuplicatesPanel(){
+  const panel = $("#pilotDupesPanel");
+  const wrap  = $("#pilotDupesGroups");
+  if(!panel || !wrap) return;
+  const clusters = findDuplicateClusters();
+  if(!clusters.length || panel.dataset.dismissed === "1"){
+    panel.classList.add("hidden");
+    return;
+  }
+  panel.classList.remove("hidden");
+  wrap.innerHTML = clusters.map((group, gi) => {
+    // Pre-select the profile with the most flights as the canonical default
+    const counted = group.map(p => ({
+      p,
+      n: data.flights.filter(f => f.pilotId === p.id || f.picId === p.id || f.sicId === p.id || f.socId === p.id).length
+    }));
+    counted.sort((a,b) => b.n - a.n);
+    const defaultTargetId = counted[0].p.id;
+    const opts = counted.map(({p,n}) => {
+      const lbl = `${esc(pilotName(p.id) || '(unnamed)')} — ${n} flight${n===1?"":"s"}`;
+      return `<option value="${p.id}" ${p.id===defaultTargetId?"selected":""}>${lbl}</option>`;
+    }).join("");
+    const sourceIdsCsv = counted.map(c => c.p.id).join(",");
+    return `
+      <div class="bg-white rounded-lg p-3 border border-amber-100">
+        <div class="text-sm text-slate-600 mb-2">Group: <b>${esc(group.map(p => pilotName(p.id)).join(", "))}</b></div>
+        <div class="flex flex-wrap items-center gap-2">
+          <label class="text-sm text-slate-500">Keep:</label>
+          <select id="dupTarget_${gi}" class="text-sm border border-slate-300 rounded px-2 py-1 bg-white">${opts}</select>
+          <button onclick="mergeDuplicateGroup(${gi}, '${sourceIdsCsv}')"
+                  class="bg-amber-600 hover:bg-amber-700 text-white text-sm font-medium px-3 py-1.5 rounded transition">
+            Merge ${group.length - 1} duplicate${group.length-1===1?"":"s"}
+          </button>
+        </div>
+      </div>`;
+  }).join("");
+}
+
+function mergeDuplicateGroup(gi, sourceIdsCsv){
+  const sel = $("#dupTarget_" + gi);
+  if(!sel) return;
+  const targetId = sel.value;
+  const sourceIds = sourceIdsCsv.split(",").filter(id => id && id !== targetId);
+  mergePilotsGroup(targetId, sourceIds);
+}
+
 function renderPilots(){
   const body = $("#pilotTableBody");
   $("#pilotCountBadge").textContent = data.pilots.length + (data.pilots.length===1?" profile":" profiles");
   $("#noPilotsMsg").classList.toggle("hidden", data.pilots.length > 0);
   body.innerHTML = data.pilots.map(p => {
     const flightCount = data.flights.filter(f => f.pilotId === p.id).length;
+    const others = data.pilots.filter(x => x.id !== p.id);
+    const mergeSelect = others.length
+      ? `<select onchange="handleMergeSelect('${p.id}', this)" class="text-xs border border-slate-300 rounded px-1.5 py-1 mr-2 bg-white">
+           <option value="">Merge into…</option>
+           ${others.map(o => `<option value="${o.id}">${esc(pilotName(o.id))}</option>`).join("")}
+         </select>`
+      : "";
     return `<tr class="border-b border-slate-100 hover:bg-slate-50">
       <td class="py-2 pr-3 font-medium">${esc(pilotName(p.id)) || '(unnamed)'}</td>
       <td class="py-2 pr-3">${esc(p.employeeNumber) || '—'}</td>
       <td class="py-2 pr-3">${esc(p.licenseNumber) || '—'}</td>
       <td class="py-2 pr-3">${flightCount}</td>
       <td class="py-2 pr-3 text-right whitespace-nowrap">
+        ${mergeSelect}
         <button onclick="editPilot('${p.id}')" class="text-brand-600 hover:text-brand-800 font-medium mr-3">Edit</button>
         <button onclick="deletePilot('${p.id}')" class="text-red-500 hover:text-red-700 font-medium">Delete</button>
       </td>
     </tr>`;
   }).join("");
+  renderDuplicatesPanel();
 }
 
 /* ============================================================
@@ -2242,6 +2412,15 @@ window.deleteFlight = deleteFlight;
 window.openDutyModal = openDutyModal;
 window.editPilot = editPilot;
 window.deletePilot = deletePilot;
+window.handleMergeSelect = handleMergeSelect;
+window.mergeDuplicateGroup = mergeDuplicateGroup;
+
+// Dismiss the duplicate-detection banner for the rest of the session
+document.getElementById("pilotDupesDismiss")?.addEventListener("click", () => {
+  const panel = document.getElementById("pilotDupesPanel");
+  panel.dataset.dismissed = "1";
+  panel.classList.add("hidden");
+});
 
 /* ============================================================
    SUPABASE SYNC
