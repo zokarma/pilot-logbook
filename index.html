@@ -329,7 +329,8 @@
           <div class="flex items-center gap-4 mt-4 text-sm">
             <span class="flex items-center gap-1.5"><span class="w-4 h-4 rounded bg-brand-600 inline-block"></span> On duty (<span id="dutyOnCount">0</span>)</span>
             <span class="flex items-center gap-1.5"><span class="w-4 h-4 rounded bg-slate-200 inline-block"></span> Off (<span id="dutyOffCount">0</span>)</span>
-            <span class="text-slate-400">Click a day to toggle.</span>
+            <span id="dutyTotalHours" class="text-slate-500 text-xs"></span>
+            <span class="text-slate-400 ml-auto">Click a day to add start/end times &amp; op type.</span>
           </div>
         </div>
         <div class="bg-white rounded-xl shadow-sm p-5">
@@ -478,6 +479,55 @@ CREATE POLICY "anon_all" ON plb_pilot_profiles FOR ALL TO anon USING (true) WITH
       </div>
     </div>
   </div>
+
+  <!-- ===== DUTY DAY MODAL ===== -->
+  <div id="dutyModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md">
+      <div class="p-6">
+        <div class="flex items-center justify-between mb-1">
+          <h3 class="text-lg font-semibold">Duty Day</h3>
+          <button id="dutyModalClose" type="button" class="text-slate-400 hover:text-slate-600 text-2xl leading-none">&times;</button>
+        </div>
+        <p id="dutyModalDate" class="text-sm text-slate-500 mb-4"></p>
+        <div id="dutyModalFlightInfo" class="hidden mb-4 text-xs bg-brand-50 text-brand-700 border border-brand-100 rounded-lg p-2"></div>
+        <form id="dutyModalForm" class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-medium text-slate-500 mb-1">Start Time</label>
+            <input name="start" type="time" class="w-full px-3 py-2 border border-slate-300 rounded-lg" />
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-slate-500 mb-1">End Time</label>
+            <input name="end" type="time" class="w-full px-3 py-2 border border-slate-300 rounded-lg" />
+          </div>
+          <div class="col-span-2">
+            <label class="block text-xs font-medium text-slate-500 mb-1">Duty Hours</label>
+            <input name="hours" type="number" step="0.1" min="0" class="w-full px-3 py-2 border border-slate-300 rounded-lg" />
+            <p class="text-xs text-slate-400 mt-1">Auto-calculated from Start/End. Edit to override (e.g., add report/secure time).</p>
+          </div>
+          <div class="col-span-2">
+            <label class="block text-xs font-medium text-slate-500 mb-1">Operation Type (CARs Part VII)</label>
+            <select name="operationType" class="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white">
+              <option value="">— none —</option>
+              <option value="702">702 — Aerial Work</option>
+              <option value="703">703 — Air Taxi (≤9 pax)</option>
+              <option value="704">704 — Commuter (10–19 pax)</option>
+              <option value="705">705 — Airline (20+ pax)</option>
+              <option value="604">604 — Private Operator</option>
+              <option value="Training">Training</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+          <div class="col-span-2 flex items-center justify-between gap-2 pt-2">
+            <button type="button" id="dutyModalRemove" class="text-red-500 hover:text-red-700 text-sm">Remove duty</button>
+            <div class="flex gap-2">
+              <button type="button" id="dutyModalCancel" class="px-4 py-2 text-sm rounded-lg hover:bg-slate-100">Cancel</button>
+              <button type="submit" class="bg-brand-600 hover:bg-brand-700 text-white px-4 py-2 rounded-lg text-sm">Save</button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
 </div>
 
 <script>
@@ -576,6 +626,11 @@ function migrateData(d){
   if(typeof d.currentPilotId === "undefined") d.currentPilotId = null;
   if(!d.lastLoggedRole) d.lastLoggedRole = "Captain";
   if(!d.duty || typeof d.duty !== "object") d.duty = {};
+  // Upgrade legacy duty entries from `true` to `{on: true}`
+  Object.keys(d.duty).forEach(k => {
+    if(d.duty[k] === true) d.duty[k] = { on:true };
+    else if(d.duty[k] && typeof d.duty[k] === "object" && d.duty[k].on === undefined) d.duty[k].on = true;
+  });
   if(typeof d.pilotName !== "string") d.pilotName = "";
 
   // Build a quick name -> pilotId map; create profiles for any free-text PIC/SIC/SOC we find.
@@ -1582,44 +1637,135 @@ function renderDuty(){
 
   $("#dutyRangeLabel").textContent = label;
 
-  // counts within visible range — a day is "on" if manually toggled OR has a flight
+  // counts within visible range — a day is "on" if it has a duty entry OR a flight
   let on=0, off=0;
+  let totalHrs = 0;
   days.forEach(d => {
     if(!d) return;
     const k = dstr(d);
-    if(data.duty[k] || flightDateSet.has(k)) on++; else off++;
+    const entry = data.duty[k];
+    if((entry && entry.on) || flightDateSet.has(k)){
+      on++;
+      if(entry && entry.hours) totalHrs += +entry.hours;
+    } else off++;
   });
   $("#dutyOnCount").textContent = on;
   $("#dutyOffCount").textContent = off;
+  // Show total recorded duty hours alongside the on/off legend
+  const totalEl = $("#dutyTotalHours");
+  if(totalEl) totalEl.textContent = totalHrs > 0 ? `(${totalHrs.toFixed(1)} duty hrs)` : "";
 }
 
 function cellHtml(d){
   if(!d) return `<div></div>`;
   const key = dstr(d);
-  const manual = !!data.duty[key];
+  const entry = data.duty[key];
   const hasFlight = flightDateSet.has(key);
-  const on = manual || hasFlight;
+  const on = (entry && entry.on) || hasFlight;
   const isToday = key === dstr(new Date());
   const base = on ? "bg-brand-600 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200";
   const ring = isToday ? "ring-2 ring-amber-400" : "";
-  // Show a small ✈ when the "on" state comes from a flight (and not just a manual toggle)
+  // Bottom-line label: hours + op type if present, otherwise FLIGHT/ON/off
+  let bottom;
+  if(entry && (entry.hours || entry.operationType)){
+    const parts = [];
+    if(entry.hours) parts.push((+entry.hours).toFixed(1) + "h");
+    if(entry.operationType) parts.push(entry.operationType);
+    bottom = parts.join(" · ");
+  } else if(hasFlight){
+    bottom = "FLIGHT";
+  } else if(on){
+    bottom = "ON";
+  } else {
+    bottom = "off";
+  }
   const flightBadge = hasFlight ? '<span class="text-[10px] leading-none">✈</span>' : '';
-  const label = on ? (hasFlight ? 'FLIGHT' : 'ON') : 'off';
-  return `<button onclick="toggleDuty('${key}')" class="aspect-square rounded-lg text-sm font-medium flex flex-col items-center justify-center gap-0.5 ${base} ${ring} transition">
-      <span>${d.getDate()}</span>
+  return `<button onclick="openDutyModal('${key}')" class="aspect-square rounded-lg text-xs font-medium flex flex-col items-center justify-center gap-0.5 ${base} ${ring} transition px-1">
+      <span class="text-sm">${d.getDate()}</span>
       ${flightBadge}
-      <span class="text-[10px] opacity-80">${label}</span>
+      <span class="text-[10px] opacity-80 leading-tight text-center">${esc(bottom)}</span>
     </button>`;
 }
 
-function toggleDuty(key){
-  const isNowOn = !data.duty[key];
-  if(data.duty[key]) delete data.duty[key];
-  else data.duty[key] = true;
-  saveData(currentUser, data);
-  pushDutyDay(key, isNowOn);
-  renderDuty();
+/* ---------- Duty modal: per-day start/end/hours/op-type editor ---------- */
+function calcDutyHours(start, end){
+  if(!start || !end) return 0;
+  const [sh, sm] = start.split(":").map(Number);
+  const [eh, em] = end.split(":").map(Number);
+  if([sh,sm,eh,em].some(n => isNaN(n))) return 0;
+  let mins = (eh*60 + em) - (sh*60 + sm);
+  if(mins < 0) mins += 24*60; // overnight duty
+  return Math.round((mins / 60) * 100) / 100;
 }
+
+let dutyModalDateKey = null;
+let dutyHoursDirty = false; // becomes true when user manually overrides the auto-calc
+
+function openDutyModal(key){
+  dutyModalDateKey = key;
+  dutyHoursDirty = false;
+  const entry = data.duty[key] || {};
+  const f = $("#dutyModalForm");
+  f.start.value = entry.start || "";
+  f.end.value = entry.end || "";
+  f.hours.value = (entry.hours != null ? entry.hours : "");
+  f.operationType.value = entry.operationType || "";
+  // Header date
+  const [y,m,d] = key.split("-").map(Number);
+  const dt = new Date(y, m-1, d);
+  $("#dutyModalDate").textContent = dt.toLocaleDateString(undefined, { weekday:"long", year:"numeric", month:"long", day:"numeric" });
+  // Flight info banner
+  const flightsToday = data.flights.filter(fl => flightDateStr(fl) === key && (!data.currentPilotId || fl.pilotId === data.currentPilotId));
+  const banner = $("#dutyModalFlightInfo");
+  if(flightsToday.length){
+    const lines = flightsToday.map(fl => `${esc(fl.aircraftType||"")} ${esc(fl.registration||"")} ${esc(fl.from||"?")}→${esc(fl.to||"?")} (${(num(fl.se)+num(fl.me)).toFixed(1)}h)`);
+    banner.innerHTML = `<b>${flightsToday.length} flight${flightsToday.length===1?"":"s"} on this day:</b><br>${lines.join("<br>")}`;
+    banner.classList.remove("hidden");
+  } else {
+    banner.classList.add("hidden");
+  }
+  $("#dutyModalRemove").classList.toggle("hidden", !data.duty[key]);
+  $("#dutyModal").classList.remove("hidden");
+}
+
+function closeDutyModal(){ $("#dutyModal").classList.add("hidden"); dutyModalDateKey = null; }
+
+$("#dutyModalClose").addEventListener("click", closeDutyModal);
+$("#dutyModalCancel").addEventListener("click", closeDutyModal);
+$("#dutyModal").addEventListener("click", e => { if(e.target === $("#dutyModal")) closeDutyModal(); });
+
+// Auto-calc hours from start/end (only if user hasn't manually edited the field)
+$("#dutyModalForm").start.addEventListener("input", () => {
+  if(!dutyHoursDirty) $("#dutyModalForm").hours.value = calcDutyHours($("#dutyModalForm").start.value, $("#dutyModalForm").end.value) || "";
+});
+$("#dutyModalForm").end.addEventListener("input", () => {
+  if(!dutyHoursDirty) $("#dutyModalForm").hours.value = calcDutyHours($("#dutyModalForm").start.value, $("#dutyModalForm").end.value) || "";
+});
+$("#dutyModalForm").hours.addEventListener("input", () => { dutyHoursDirty = true; });
+
+$("#dutyModalForm").addEventListener("submit", e => {
+  e.preventDefault();
+  if(!dutyModalDateKey) return;
+  const f = e.target;
+  const start = f.start.value || "";
+  const end   = f.end.value || "";
+  const hours = f.hours.value ? +f.hours.value : (calcDutyHours(start, end) || 0);
+  const operationType = f.operationType.value || "";
+  data.duty[dutyModalDateKey] = { on: true, start, end, hours, operationType };
+  saveData(currentUser, data);
+  pushDutyDay(dutyModalDateKey, true);
+  closeDutyModal();
+  renderDuty();
+});
+
+$("#dutyModalRemove").addEventListener("click", () => {
+  if(!dutyModalDateKey) return;
+  delete data.duty[dutyModalDateKey];
+  saveData(currentUser, data);
+  pushDutyDay(dutyModalDateKey, false);
+  closeDutyModal();
+  renderDuty();
+});
 
 /* ============================================================
    PILOTS TAB
@@ -1734,7 +1880,7 @@ function renderAll(){
 // expose handlers used by inline onclick
 window.editFlight = editFlight;
 window.deleteFlight = deleteFlight;
-window.toggleDuty = toggleDuty;
+window.openDutyModal = openDutyModal;
 window.editPilot = editPilot;
 window.deletePilot = deletePilot;
 
