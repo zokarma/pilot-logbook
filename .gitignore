@@ -1,0 +1,26 @@
+# Machine-specific tooling config (paths contain local usernames)
+.claude/
+
+# Personal flight data — never commit logbook exports
+*.csv
+
+# OS junk
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editor / IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Secrets — never commit credentials
+.env
+.env.*
+*.key
+*.pem
+
+# Node (in case we add tooling later)
+node_modules/
+npm-debug.log*

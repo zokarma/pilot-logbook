@@ -1,0 +1,1201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Pilot Logbook</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        colors: {
+          brand: { 50:'#eef6ff',100:'#d9ebff',500:'#2563eb',600:'#1d4ed8',700:'#1e40af',900:'#172554' }
+        }
+      }
+    }
+  }
+</script>
+<style>
+  html,body{ -webkit-text-size-adjust:100%; }
+  .tab-btn.active{ background:#1d4ed8; color:#fff; }
+  .no-scrollbar::-webkit-scrollbar{ display:none; }
+  .no-scrollbar{ -ms-overflow-style:none; scrollbar-width:none; }
+  input,select,textarea{ outline:none; }
+  .fade-in{ animation:fade .25s ease; }
+  @keyframes fade{ from{opacity:0; transform:translateY(4px);} to{opacity:1; transform:none;} }
+</style>
+</head>
+<body class="bg-slate-100 text-slate-800 min-h-screen">
+
+<!-- ============ AUTH VIEW ============ -->
+<div id="authView" class="min-h-screen flex items-center justify-center p-4">
+  <div class="w-full max-w-md bg-white rounded-2xl shadow-xl p-8 fade-in">
+    <div class="text-center mb-6">
+      <div class="mx-auto w-14 h-14 rounded-2xl bg-brand-600 flex items-center justify-center mb-3">
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-8 h-8 text-white" viewBox="0 0 24 24" fill="currentColor"><path d="M21 16v-2l-8-5V3.5A1.5 1.5 0 0 0 11.5 2 1.5 1.5 0 0 0 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5L21 16z"/></svg>
+      </div>
+      <h1 class="text-2xl font-bold text-slate-900">Pilot Logbook</h1>
+      <p class="text-sm text-slate-500 mt-1">Offline flight time tracking</p>
+    </div>
+
+    <!-- Tab toggle -->
+    <div class="flex bg-slate-100 rounded-lg p-1 mb-5">
+      <button id="loginTabBtn" class="flex-1 py-2 text-sm font-medium rounded-md bg-white shadow-sm">Log In</button>
+      <button id="signupTabBtn" class="flex-1 py-2 text-sm font-medium rounded-md text-slate-500">Sign Up</button>
+    </div>
+
+    <!-- Login form -->
+    <form id="loginForm" class="space-y-4">
+      <div>
+        <label class="block text-sm font-medium mb-1">Username</label>
+        <input name="username" autocomplete="username" required class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500" />
+      </div>
+      <div>
+        <label class="block text-sm font-medium mb-1">Password</label>
+        <input name="password" type="password" autocomplete="current-password" required class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500" />
+      </div>
+      <button type="submit" class="w-full bg-brand-600 hover:bg-brand-700 text-white font-medium py-2.5 rounded-lg transition">Log In</button>
+    </form>
+
+    <!-- Signup form -->
+    <form id="signupForm" class="space-y-4 hidden">
+      <div>
+        <label class="block text-sm font-medium mb-1">Username</label>
+        <input name="username" autocomplete="username" required class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500" />
+      </div>
+      <div>
+        <label class="block text-sm font-medium mb-1">Password</label>
+        <input name="password" type="password" autocomplete="new-password" required minlength="4" class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500" />
+        <p class="text-xs text-slate-400 mt-1">Minimum 4 characters.</p>
+      </div>
+      <button type="submit" class="w-full bg-brand-600 hover:bg-brand-700 text-white font-medium py-2.5 rounded-lg transition">Create Account</button>
+    </form>
+
+    <p id="authMsg" class="text-center text-sm mt-4 min-h-[1.25rem]"></p>
+  </div>
+</div>
+
+<!-- ============ APP VIEW ============ -->
+<div id="appView" class="hidden min-h-screen flex flex-col">
+  <!-- Header -->
+  <header class="bg-brand-700 text-white shadow-md sticky top-0 z-20">
+    <div class="max-w-6xl mx-auto px-4">
+      <div class="flex items-center justify-between h-14">
+        <div class="flex items-center gap-2 font-semibold">
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" viewBox="0 0 24 24" fill="currentColor"><path d="M21 16v-2l-8-5V3.5A1.5 1.5 0 0 0 11.5 2 1.5 1.5 0 0 0 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5L21 16z"/></svg>
+          <span>Pilot Logbook</span>
+        </div>
+        <div class="flex items-center gap-3 text-sm">
+          <span id="syncStatus" class="hidden text-xs font-medium"></span>
+          <span class="hidden sm:inline opacity-90">Hi, <span id="currentUserLabel" class="font-medium"></span></span>
+          <button id="settingsBtn" title="Supabase / Cloud Sync Settings" class="opacity-70 hover:opacity-100 transition p-1 rounded-lg hover:bg-brand-600">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          </button>
+          <button id="logoutBtn" class="bg-brand-600 hover:bg-brand-500 px-3 py-1.5 rounded-lg transition">Log Out</button>
+        </div>
+      </div>
+      <!-- Tab nav -->
+      <nav class="flex gap-1 overflow-x-auto no-scrollbar -mb-px">
+        <button data-tab="logger" class="tab-btn active whitespace-nowrap px-4 py-2.5 text-sm font-medium rounded-t-lg">Flight Logger</button>
+        <button data-tab="dashboard" class="tab-btn whitespace-nowrap px-4 py-2.5 text-sm font-medium rounded-t-lg text-brand-100 hover:bg-brand-600">Dashboard</button>
+        <button data-tab="routemap" class="tab-btn whitespace-nowrap px-4 py-2.5 text-sm font-medium rounded-t-lg text-brand-100 hover:bg-brand-600">Route Map</button>
+        <button data-tab="duty" class="tab-btn whitespace-nowrap px-4 py-2.5 text-sm font-medium rounded-t-lg text-brand-100 hover:bg-brand-600">Duty Tracker</button>
+      </nav>
+    </div>
+  </header>
+
+  <main class="flex-1 max-w-6xl w-full mx-auto px-4 py-6">
+
+    <!-- ===== LOGGER TAB ===== -->
+    <section id="tab-logger" class="tab-panel fade-in">
+      <div class="bg-white rounded-xl shadow-sm p-5 mb-6">
+        <div class="flex items-center justify-between mb-4">
+          <h2 id="flightFormTitle" class="text-lg font-semibold">Log a Flight</h2>
+          <button id="cancelEditBtn" class="hidden text-sm text-slate-500 hover:text-slate-700">Cancel edit</button>
+        </div>
+        <form id="flightForm" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <input type="hidden" name="id" />
+          <div>
+            <label class="block text-xs font-medium text-slate-500 mb-1">Year</label>
+            <input name="year" type="number" required class="w-full px-3 py-2 border border-slate-300 rounded-lg" />
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-slate-500 mb-1">Month</label>
+            <input name="month" type="number" min="1" max="12" required class="w-full px-3 py-2 border border-slate-300 rounded-lg" />
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-slate-500 mb-1">Day</label>
+            <input name="day" type="number" min="1" max="31" required class="w-full px-3 py-2 border border-slate-300 rounded-lg" />
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-slate-500 mb-1">Aircraft Type</label>
+            <input name="aircraftType" required placeholder="e.g. C172" class="w-full px-3 py-2 border border-slate-300 rounded-lg" />
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-slate-500 mb-1">Civil Ident</label>
+            <input name="civilIdent" placeholder="e.g. C-GABC" class="w-full px-3 py-2 border border-slate-300 rounded-lg" />
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-slate-500 mb-1">PIC Name</label>
+            <input name="pic" class="w-full px-3 py-2 border border-slate-300 rounded-lg" />
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-slate-500 mb-1">SIC Name</label>
+            <input name="sic" class="w-full px-3 py-2 border border-slate-300 rounded-lg" />
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-slate-500 mb-1">SOC Name <span class="text-slate-400">(optional)</span></label>
+            <input name="soc" class="w-full px-3 py-2 border border-slate-300 rounded-lg" />
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-slate-500 mb-1">ICAO From</label>
+            <input name="from" maxlength="4" placeholder="CYYZ" class="w-full px-3 py-2 border border-slate-300 rounded-lg uppercase" />
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-slate-500 mb-1">ICAO To</label>
+            <input name="to" maxlength="4" placeholder="CYVR" class="w-full px-3 py-2 border border-slate-300 rounded-lg uppercase" />
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-slate-500 mb-1">Takeoff</label>
+            <select name="takeoff" class="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white">
+              <option value="Day">Day</option>
+              <option value="Night">Night</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-slate-500 mb-1">Landing</label>
+            <select name="landing" class="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white">
+              <option value="Day">Day</option>
+              <option value="Night">Night</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-slate-500 mb-1">Single Engine (hrs)</label>
+            <input name="se" type="number" step="0.1" min="0" value="0" class="w-full px-3 py-2 border border-slate-300 rounded-lg" />
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-slate-500 mb-1">Multi Engine (hrs)</label>
+            <input name="me" type="number" step="0.1" min="0" value="0" class="w-full px-3 py-2 border border-slate-300 rounded-lg" />
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-slate-500 mb-1">Cross Country (hrs)</label>
+            <input name="xc" type="number" step="0.1" min="0" value="0" class="w-full px-3 py-2 border border-slate-300 rounded-lg" />
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-slate-500 mb-1">IFR Actual (hrs)</label>
+            <input name="ifrActual" type="number" step="0.1" min="0" value="0" class="w-full px-3 py-2 border border-slate-300 rounded-lg" />
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-slate-500 mb-1">IFR Simulated (hrs)</label>
+            <input name="ifrSim" type="number" step="0.1" min="0" value="0" class="w-full px-3 py-2 border border-slate-300 rounded-lg" />
+          </div>
+          <div class="sm:col-span-2 lg:col-span-4">
+            <label class="block text-xs font-medium text-slate-500 mb-1">Notes / Remarks</label>
+            <textarea name="notes" rows="2" class="w-full px-3 py-2 border border-slate-300 rounded-lg"></textarea>
+          </div>
+          <div class="sm:col-span-2 lg:col-span-4 flex gap-3">
+            <button type="submit" id="flightSubmitBtn" class="bg-brand-600 hover:bg-brand-700 text-white font-medium px-5 py-2.5 rounded-lg transition">Add Flight</button>
+          </div>
+        </form>
+      </div>
+
+      <div class="bg-white rounded-xl shadow-sm p-5">
+        <div class="flex flex-wrap items-center justify-between gap-3 mb-3">
+          <div class="flex items-center gap-3">
+            <h2 class="text-lg font-semibold">Logged Flights</h2>
+            <span id="flightCountBadge" class="text-sm text-slate-500"></span>
+          </div>
+          <div class="flex items-center gap-2">
+            <button id="exportCsvBtn" class="text-sm bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium px-3 py-1.5 rounded-lg transition">Export CSV</button>
+            <button id="importCsvBtn" class="text-sm bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium px-3 py-1.5 rounded-lg transition">Import CSV</button>
+            <input id="csvFileInput" type="file" accept=".csv,text/csv" class="hidden" />
+          </div>
+        </div>
+        <p id="csvMsg" class="text-sm mb-3 min-h-[1.25rem] hidden"></p>
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="text-left text-slate-500 border-b border-slate-200">
+                <th class="py-2 pr-3 font-medium">Date</th>
+                <th class="py-2 pr-3 font-medium">Aircraft</th>
+                <th class="py-2 pr-3 font-medium">Ident</th>
+                <th class="py-2 pr-3 font-medium">Route</th>
+                <th class="py-2 pr-3 font-medium">PIC</th>
+                <th class="py-2 pr-3 font-medium">SE</th>
+                <th class="py-2 pr-3 font-medium">ME</th>
+                <th class="py-2 pr-3 font-medium">XC</th>
+                <th class="py-2 pr-3 font-medium">IFR</th>
+                <th class="py-2 pr-3 font-medium">T/O</th>
+                <th class="py-2 pr-3 font-medium">Ldg</th>
+                <th class="py-2 pr-3 font-medium text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="flightTableBody"></tbody>
+          </table>
+        </div>
+        <p id="noFlightsMsg" class="text-center text-slate-400 py-8 hidden">No flights logged yet. Add your first flight above.</p>
+      </div>
+    </section>
+
+    <!-- ===== DASHBOARD TAB ===== -->
+    <section id="tab-dashboard" class="tab-panel hidden fade-in">
+      <div id="dashCards" class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6"></div>
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div class="bg-white rounded-xl shadow-sm p-5">
+          <h3 class="font-semibold mb-4">Hours by Aircraft Type</h3>
+          <div id="aircraftBreakdown" class="space-y-3"></div>
+        </div>
+        <div class="bg-white rounded-xl shadow-sm p-5">
+          <h3 class="font-semibold mb-2">Pilot Attribution</h3>
+          <p class="text-sm text-slate-500 mb-3">PIC &amp; Dual hours count flights where this name matches the PIC / SIC field.</p>
+          <label class="block text-xs font-medium text-slate-500 mb-1">My pilot name</label>
+          <div class="flex gap-2">
+            <input id="pilotNameInput" placeholder="e.g. J. Smith" class="flex-1 px-3 py-2 border border-slate-300 rounded-lg" />
+            <button id="savePilotNameBtn" class="bg-brand-600 hover:bg-brand-700 text-white px-4 rounded-lg text-sm">Save</button>
+          </div>
+          <p id="pilotNameMsg" class="text-xs text-emerald-600 mt-2 min-h-[1rem]"></p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== ROUTE MAP TAB ===== -->
+    <section id="tab-routemap" class="tab-panel hidden fade-in">
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div class="lg:col-span-2 bg-white rounded-xl shadow-sm p-5">
+          <h3 class="font-semibold mb-3">Route Map</h3>
+          <div class="border border-slate-200 rounded-lg bg-slate-50 overflow-hidden">
+            <svg id="routeSvg" viewBox="0 0 800 500" class="w-full h-auto" preserveAspectRatio="xMidYMid meet"></svg>
+          </div>
+          <p class="text-xs text-slate-400 mt-2">Line thickness reflects how often a route is flown. Hover a dot for the airport code.</p>
+        </div>
+        <div class="bg-white rounded-xl shadow-sm p-5">
+          <h3 class="font-semibold mb-3">Route Statistics</h3>
+          <div id="routeStats" class="space-y-3 max-h-[460px] overflow-y-auto"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== DUTY TRACKER TAB ===== -->
+    <section id="tab-duty" class="tab-panel hidden fade-in">
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div class="lg:col-span-2 bg-white rounded-xl shadow-sm p-5">
+          <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+            <h3 class="font-semibold">Duty Schedule</h3>
+            <select id="dutyType" class="px-3 py-2 border border-slate-300 rounded-lg bg-white text-sm">
+              <option value="14">14-Day</option>
+              <option value="21">21-Day</option>
+              <option value="month">Monthly</option>
+            </select>
+          </div>
+          <div class="flex items-center justify-between mb-3">
+            <button id="dutyPrev" class="px-3 py-1.5 text-sm bg-slate-100 hover:bg-slate-200 rounded-lg">&larr; Prev</button>
+            <span id="dutyRangeLabel" class="text-sm font-medium text-slate-600"></span>
+            <button id="dutyNext" class="px-3 py-1.5 text-sm bg-slate-100 hover:bg-slate-200 rounded-lg">Next &rarr;</button>
+          </div>
+          <div id="dutyGrid" class="grid gap-1.5"></div>
+          <div class="flex items-center gap-4 mt-4 text-sm">
+            <span class="flex items-center gap-1.5"><span class="w-4 h-4 rounded bg-brand-600 inline-block"></span> On duty (<span id="dutyOnCount">0</span>)</span>
+            <span class="flex items-center gap-1.5"><span class="w-4 h-4 rounded bg-slate-200 inline-block"></span> Off (<span id="dutyOffCount">0</span>)</span>
+            <span class="text-slate-400">Click a day to toggle.</span>
+          </div>
+        </div>
+        <div class="bg-white rounded-xl shadow-sm p-5">
+          <h3 class="font-semibold mb-1">CARs Part VII Limits</h3>
+          <p class="text-xs text-slate-400 mb-4">Canadian Aviation Regulations — flight &amp; duty time reference.</p>
+          <div class="space-y-3 text-sm">
+            <div class="p-3 rounded-lg bg-amber-50 border border-amber-200"><div class="font-semibold text-amber-800">18 hours</div><div class="text-amber-700">Maximum flight duty period</div></div>
+            <div class="p-3 rounded-lg bg-amber-50 border border-amber-200"><div class="font-semibold text-amber-800">16 hours</div><div class="text-amber-700">Maximum single flight time</div></div>
+            <div class="p-3 rounded-lg bg-sky-50 border border-sky-200"><div class="font-semibold text-sky-800">2,200 hours</div><div class="text-sky-700">Maximum flight time per 365 days</div></div>
+            <div class="p-3 rounded-lg bg-sky-50 border border-sky-200"><div class="font-semibold text-sky-800">192 hours</div><div class="text-sky-700">Maximum flight time per 28 days</div></div>
+            <div class="p-3 rounded-lg bg-emerald-50 border border-emerald-200"><div class="font-semibold text-emerald-800">12 hours</div><div class="text-emerald-700">Minimum rest at home base</div></div>
+            <div class="p-3 rounded-lg bg-emerald-50 border border-emerald-200"><div class="font-semibold text-emerald-800">10 hours</div><div class="text-emerald-700">Minimum rest away from base</div></div>
+            <div class="p-3 rounded-lg bg-violet-50 border border-violet-200"><div class="font-semibold text-violet-800">15 minutes</div><div class="text-violet-700">Nutrition break every 6 hours of duty</div></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ===== SETTINGS MODAL ===== -->
+  <div id="settingsModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+      <div class="p-6">
+        <div class="flex items-center justify-between mb-1">
+          <h3 class="text-lg font-semibold">Cloud Sync (Supabase)</h3>
+          <button id="closeSettingsBtn" class="text-slate-400 hover:text-slate-600 text-2xl leading-none">&times;</button>
+        </div>
+        <p class="text-sm text-slate-500 mb-5">Connect to your Supabase project for multi-device sync. Data stays in localStorage for offline use and syncs automatically when online.</p>
+
+        <div class="space-y-3 mb-4">
+          <div>
+            <label class="block text-xs font-medium text-slate-500 mb-1">Supabase Project URL</label>
+            <input id="sbUrl" placeholder="https://xxxxxxxxxxxx.supabase.co" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm" />
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-slate-500 mb-1">Supabase Anon Key</label>
+            <input id="sbKey" type="password" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm" />
+          </div>
+        </div>
+        <div class="flex flex-wrap gap-2 mb-2">
+          <button id="testConnectionBtn" class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium px-4 py-2 rounded-lg text-sm transition">Test Connection</button>
+          <button id="saveSettingsBtn" class="bg-brand-600 hover:bg-brand-700 text-white font-medium px-4 py-2 rounded-lg text-sm transition">Save &amp; Sync Now</button>
+          <button id="clearSettingsBtn" class="text-red-500 hover:text-red-700 text-sm px-3 py-2 rounded-lg transition">Disconnect</button>
+        </div>
+        <p id="settingsMsg" class="text-sm min-h-[1.25rem]"></p>
+
+        <div class="mt-5 border-t border-slate-200 pt-5">
+          <h4 class="font-semibold text-sm mb-2">Database Setup (run once in Supabase SQL Editor)</h4>
+          <pre class="bg-slate-900 text-emerald-300 rounded-lg p-4 text-xs overflow-x-auto leading-relaxed whitespace-pre"><code>-- 1. Create tables
+CREATE TABLE plb_flights (
+  id TEXT PRIMARY KEY,
+  username TEXT NOT NULL,
+  year INT, month INT, day INT,
+  aircraft_type TEXT DEFAULT '',
+  civil_ident TEXT DEFAULT '',
+  pic TEXT DEFAULT '',
+  sic TEXT DEFAULT '',
+  soc TEXT DEFAULT '',
+  from_icao TEXT DEFAULT '',
+  to_icao TEXT DEFAULT '',
+  takeoff TEXT DEFAULT 'Day',
+  landing TEXT DEFAULT 'Day',
+  se NUMERIC DEFAULT 0,
+  me NUMERIC DEFAULT 0,
+  xc NUMERIC DEFAULT 0,
+  ifr_actual NUMERIC DEFAULT 0,
+  ifr_sim NUMERIC DEFAULT 0,
+  notes TEXT DEFAULT '',
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE TABLE plb_duty_days (
+  username TEXT,
+  date_str TEXT,
+  PRIMARY KEY (username, date_str)
+);
+CREATE TABLE plb_pilot_profiles (
+  username TEXT PRIMARY KEY,
+  pilot_name TEXT DEFAULT ''
+);
+
+-- 2. Enable Row Level Security + allow anon access
+ALTER TABLE plb_flights ENABLE ROW LEVEL SECURITY;
+ALTER TABLE plb_duty_days ENABLE ROW LEVEL SECURITY;
+ALTER TABLE plb_pilot_profiles ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "anon_all" ON plb_flights FOR ALL TO anon USING (true) WITH CHECK (true);
+CREATE POLICY "anon_all" ON plb_duty_days FOR ALL TO anon USING (true) WITH CHECK (true);
+CREATE POLICY "anon_all" ON plb_pilot_profiles FOR ALL TO anon USING (true) WITH CHECK (true);</code></pre>
+          <p class="text-xs text-slate-400 mt-2">Find this in your Supabase project → SQL Editor → New query. Run it once, then come back here to connect.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+
+/* ============================================================
+   STORAGE KEYS & HELPERS
+   ============================================================ */
+const USERS_KEY = "plb_users";
+const SESSION_KEY = "plb_session";
+const dataKey = (u) => "plb_data_" + u;
+
+function loadUsers(){ try { return JSON.parse(localStorage.getItem(USERS_KEY)) || {}; } catch(e){ return {}; } }
+function saveUsers(u){ localStorage.setItem(USERS_KEY, JSON.stringify(u)); }
+function loadData(user){
+  try { return JSON.parse(localStorage.getItem(dataKey(user))) || { flights:[], duty:{}, pilotName:"" }; }
+  catch(e){ return { flights:[], duty:{}, pilotName:"" }; }
+}
+function saveData(user, data){ localStorage.setItem(dataKey(user), JSON.stringify(data)); }
+
+// Simple non-cryptographic hash (offline personal app, not production security)
+function hashStr(s){ let h=5381; for(let i=0;i<s.length;i++){ h=((h<<5)+h)+s.charCodeAt(i); h|=0; } return String(h>>>0); }
+
+/* ============================================================
+   APP STATE
+   ============================================================ */
+let currentUser = null;
+let data = { flights:[], duty:{}, pilotName:"" };
+let editingId = null;
+let dutyType = "14";
+let dutyAnchor = new Date(); // reference date for the visible window
+
+/* ============================================================
+   AIRPORT COORDINATES (lat, lon) — used by Route Map projection
+   ============================================================ */
+const AIRPORTS = {
+  CYYZ:[43.6772,-79.6306], CYVR:[49.1939,-123.1844], CYUL:[45.4706,-73.7408], CYYC:[51.1139,-114.0203],
+  CYEG:[53.3097,-113.58], CYOW:[45.3225,-75.6692], CYWG:[49.91,-97.2399], CYHZ:[44.8808,-63.5086],
+  CYQB:[46.7911,-71.3933], CYYJ:[48.6469,-123.4258], CYQR:[50.4319,-104.6658], CYXE:[52.1708,-106.6997],
+  CYYT:[47.6186,-52.7519], CYQM:[46.1122,-64.6786], CYXX:[49.0253,-122.3606], CYKF:[43.4608,-80.3786],
+  CYHM:[43.1736,-79.935], CYTZ:[43.6275,-79.3962], CYLW:[49.9561,-119.3778], CYZF:[62.4628,-114.4403],
+  CYFB:[63.7564,-68.5558], CYXY:[60.7096,-135.0673], CYQT:[48.3719,-89.3239], CYXS:[53.8894,-122.6789],
+  CYMM:[56.6533,-111.2222], CYQX:[48.9369,-54.5681], CYSJ:[45.3161,-65.8903], CYDF:[49.2108,-57.3914],
+  KJFK:[40.6398,-73.7789], KLAX:[33.9425,-118.4081], KORD:[41.9786,-87.9048], KSFO:[37.6189,-122.375],
+  KSEA:[47.4502,-122.3088], KBOS:[42.3631,-71.0064], KATL:[33.6367,-84.4281], KDFW:[32.8968,-97.038],
+  KDEN:[39.8617,-104.6731], KMIA:[25.7932,-80.2906], KLAS:[36.084,-115.1537], KPHX:[33.4342,-112.0116],
+  KIAH:[29.9844,-95.3414], KEWR:[40.6925,-74.1687], KDTW:[42.2124,-83.3534], KMSP:[44.882,-93.2218],
+  KBUF:[42.9405,-78.7322],
+  EGLL:[51.47,-0.4543], LFPG:[49.0097,2.5479], EDDF:[50.0379,8.5622], EHAM:[52.3105,4.7683],
+  LEMD:[40.4839,-3.568], LIRF:[41.8003,12.2389], RJTT:[35.5494,139.7798], RJAA:[35.772,140.3929],
+  VHHH:[22.308,113.9185], WSSS:[1.3644,103.9915], YSSY:[-33.9461,151.1772], OMDB:[25.2532,55.3657],
+  ZBAA:[40.0799,116.6031], VIDP:[28.5562,77.1], SBGR:[-23.4356,-46.4731], MMMX:[19.4363,-99.0721],
+  FAOR:[-26.1392,28.246], UUEE:[55.9726,37.4146], LTFM:[41.2753,28.7519]
+};
+
+// Deterministic fallback coords for unknown ICAO codes
+function airportCoord(code){
+  if(AIRPORTS[code]) return AIRPORTS[code];
+  let h = parseInt(hashStr(code));
+  const lat = ((h % 12000) / 100) - 60;      // -60 .. 60
+  const lon = (((h >> 7) % 34000) / 100) - 170; // -170 .. 170
+  return [lat, lon];
+}
+
+/* ============================================================
+   DOM SHORTCUTS
+   ============================================================ */
+const $ = (sel) => document.querySelector(sel);
+const $$ = (sel) => Array.from(document.querySelectorAll(sel));
+const esc = (s) => String(s==null?"":s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+/* ============================================================
+   AUTH
+   ============================================================ */
+function showAuthMsg(text, ok){
+  const el = $("#authMsg");
+  el.textContent = text;
+  el.className = "text-center text-sm mt-4 min-h-[1.25rem] " + (ok ? "text-emerald-600" : "text-red-500");
+}
+
+$("#loginTabBtn").addEventListener("click", () => switchAuthTab("login"));
+$("#signupTabBtn").addEventListener("click", () => switchAuthTab("signup"));
+function switchAuthTab(which){
+  const login = which === "login";
+  $("#loginForm").classList.toggle("hidden", !login);
+  $("#signupForm").classList.toggle("hidden", login);
+  $("#loginTabBtn").className = "flex-1 py-2 text-sm font-medium rounded-md " + (login ? "bg-white shadow-sm" : "text-slate-500");
+  $("#signupTabBtn").className = "flex-1 py-2 text-sm font-medium rounded-md " + (!login ? "bg-white shadow-sm" : "text-slate-500");
+  showAuthMsg("");
+}
+
+$("#signupForm").addEventListener("submit", (e) => {
+  e.preventDefault();
+  const f = e.target;
+  const username = f.username.value.trim();
+  const password = f.password.value;
+  if(!username || !password) return;
+  const users = loadUsers();
+  if(users[username]){ showAuthMsg("Username already exists. Try logging in.", false); return; }
+  users[username] = { pass: hashStr(password) };
+  saveUsers(users);
+  saveData(username, { flights:[], duty:{}, pilotName:"" });
+  f.reset();
+  showAuthMsg("Account created! Logging you in…", true);
+  setTimeout(() => startSession(username), 400);
+});
+
+$("#loginForm").addEventListener("submit", (e) => {
+  e.preventDefault();
+  const f = e.target;
+  const username = f.username.value.trim();
+  const password = f.password.value;
+  const users = loadUsers();
+  if(!users[username]){ showAuthMsg("No such user. Please sign up.", false); return; }
+  if(users[username].pass !== hashStr(password)){ showAuthMsg("Incorrect password.", false); return; }
+  f.reset();
+  startSession(username);
+});
+
+$("#logoutBtn").addEventListener("click", () => {
+  localStorage.removeItem(SESSION_KEY);
+  currentUser = null;
+  $("#appView").classList.add("hidden");
+  $("#authView").classList.remove("hidden");
+  showAuthMsg("");
+});
+
+function startSession(username){
+  currentUser = username;
+  localStorage.setItem(SESSION_KEY, username);
+  data = loadData(username);
+  if(!data.duty) data.duty = {};
+  if(!Array.isArray(data.flights)) data.flights = [];
+  if(data.pilotName == null) data.pilotName = "";
+  $("#currentUserLabel").textContent = username;
+  $("#pilotNameInput").value = data.pilotName || "";
+  $("#authView").classList.add("hidden");
+  $("#appView").classList.remove("hidden");
+  switchTab("logger");
+  renderAll();
+  syncOnLogin(); // async — non-blocking
+}
+
+/* ============================================================
+   TAB NAVIGATION
+   ============================================================ */
+$$(".tab-btn").forEach(btn => btn.addEventListener("click", () => switchTab(btn.dataset.tab)));
+function switchTab(tab){
+  $$(".tab-panel").forEach(p => p.classList.add("hidden"));
+  $("#tab-" + tab).classList.remove("hidden");
+  $$(".tab-btn").forEach(b => {
+    const active = b.dataset.tab === tab;
+    b.classList.toggle("active", active);
+    b.classList.toggle("text-brand-100", !active);
+  });
+  if(tab === "dashboard") renderDashboard();
+  if(tab === "routemap") renderRouteMap();
+  if(tab === "duty") renderDuty();
+}
+
+/* ============================================================
+   FLIGHT LOGGER
+   ============================================================ */
+const num = (v) => { const n = parseFloat(v); return isNaN(n) ? 0 : n; };
+const totalHours = (fl) => num(fl.se) + num(fl.me);
+const ifrHours = (fl) => num(fl.ifrActual) + num(fl.ifrSim);
+function flightDate(fl){ return new Date(fl.year, (fl.month||1)-1, fl.day||1); }
+function fmtDate(fl){
+  const m = String(fl.month).padStart(2,"0"), d = String(fl.day).padStart(2,"0");
+  return `${fl.year}-${m}-${d}`;
+}
+
+$("#flightForm").addEventListener("submit", (e) => {
+  e.preventDefault();
+  const f = e.target;
+  const flight = {
+    id: editingId || ("f" + Date.now() + Math.random().toString(36).slice(2,6)),
+    year: parseInt(f.year.value), month: parseInt(f.month.value), day: parseInt(f.day.value),
+    aircraftType: f.aircraftType.value.trim(),
+    civilIdent: f.civilIdent.value.trim(),
+    pic: f.pic.value.trim(), sic: f.sic.value.trim(), soc: f.soc.value.trim(),
+    from: f.from.value.trim().toUpperCase(), to: f.to.value.trim().toUpperCase(),
+    takeoff: f.takeoff.value, landing: f.landing.value,
+    se: num(f.se.value), me: num(f.me.value), xc: num(f.xc.value),
+    ifrActual: num(f.ifrActual.value), ifrSim: num(f.ifrSim.value),
+    notes: f.notes.value.trim(),
+    updated_at: new Date().toISOString()
+  };
+  if(editingId){
+    const i = data.flights.findIndex(x => x.id === editingId);
+    if(i > -1) data.flights[i] = flight;
+  } else {
+    data.flights.push(flight);
+  }
+  saveData(currentUser, data);
+  pushFlight(flight);
+  resetFlightForm();
+  renderFlightTable();
+});
+
+function resetFlightForm(){
+  editingId = null;
+  $("#flightForm").reset();
+  $("#flightFormTitle").textContent = "Log a Flight";
+  $("#flightSubmitBtn").textContent = "Add Flight";
+  $("#cancelEditBtn").classList.add("hidden");
+  const t = new Date();
+  $("#flightForm").year.value = t.getFullYear();
+  $("#flightForm").month.value = t.getMonth()+1;
+  $("#flightForm").day.value = t.getDate();
+}
+
+$("#cancelEditBtn").addEventListener("click", resetFlightForm);
+
+function editFlight(id){
+  const fl = data.flights.find(x => x.id === id);
+  if(!fl) return;
+  editingId = id;
+  const f = $("#flightForm");
+  f.year.value=fl.year; f.month.value=fl.month; f.day.value=fl.day;
+  f.aircraftType.value=fl.aircraftType; f.civilIdent.value=fl.civilIdent;
+  f.pic.value=fl.pic; f.sic.value=fl.sic; f.soc.value=fl.soc;
+  f.from.value=fl.from; f.to.value=fl.to;
+  f.takeoff.value=fl.takeoff; f.landing.value=fl.landing;
+  f.se.value=fl.se; f.me.value=fl.me; f.xc.value=fl.xc;
+  f.ifrActual.value=fl.ifrActual; f.ifrSim.value=fl.ifrSim;
+  f.notes.value=fl.notes;
+  $("#flightFormTitle").textContent = "Edit Flight";
+  $("#flightSubmitBtn").textContent = "Save Changes";
+  $("#cancelEditBtn").classList.remove("hidden");
+  switchTab("logger");
+  window.scrollTo({ top:0, behavior:"smooth" });
+}
+
+function deleteFlight(id){
+  if(!confirm("Delete this flight? This cannot be undone.")) return;
+  data.flights = data.flights.filter(x => x.id !== id);
+  saveData(currentUser, data);
+  deleteCloudFlight(id);
+  if(editingId === id) resetFlightForm();
+  renderFlightTable();
+}
+
+function renderFlightTable(){
+  const body = $("#flightTableBody");
+  const flights = [...data.flights].sort((a,b) => flightDate(b) - flightDate(a));
+  $("#flightCountBadge").textContent = flights.length + (flights.length===1?" flight":" flights");
+  $("#noFlightsMsg").classList.toggle("hidden", flights.length > 0);
+  body.innerHTML = flights.map(fl => `
+    <tr class="border-b border-slate-100 hover:bg-slate-50">
+      <td class="py-2 pr-3 whitespace-nowrap">${esc(fmtDate(fl))}</td>
+      <td class="py-2 pr-3">${esc(fl.aircraftType)}</td>
+      <td class="py-2 pr-3">${esc(fl.civilIdent)||'—'}</td>
+      <td class="py-2 pr-3 whitespace-nowrap font-medium">${esc(fl.from)||'?'} → ${esc(fl.to)||'?'}</td>
+      <td class="py-2 pr-3">${esc(fl.pic)||'—'}</td>
+      <td class="py-2 pr-3">${num(fl.se).toFixed(1)}</td>
+      <td class="py-2 pr-3">${num(fl.me).toFixed(1)}</td>
+      <td class="py-2 pr-3">${num(fl.xc).toFixed(1)}</td>
+      <td class="py-2 pr-3">${ifrHours(fl).toFixed(1)}</td>
+      <td class="py-2 pr-3">${esc(fl.takeoff)}</td>
+      <td class="py-2 pr-3">${esc(fl.landing)}</td>
+      <td class="py-2 pr-3 text-right whitespace-nowrap">
+        <button onclick="editFlight('${fl.id}')" class="text-brand-600 hover:text-brand-800 font-medium mr-3">Edit</button>
+        <button onclick="deleteFlight('${fl.id}')" class="text-red-500 hover:text-red-700 font-medium">Delete</button>
+      </td>
+    </tr>`).join("");
+}
+
+/* ============================================================
+   CSV EXPORT / IMPORT
+   ============================================================ */
+const CSV_FIELDS = ['year','month','day','aircraftType','civilIdent','pic','sic','soc','from','to','takeoff','landing','se','me','xc','ifrActual','ifrSim','notes'];
+const CSV_HEADERS = ['Year','Month','Day','Aircraft Type','Civil Ident','PIC','SIC','SOC','ICAO From','ICAO To','Takeoff','Landing','Single Engine','Multi Engine','Cross Country','IFR Actual','IFR Simulated','Notes'];
+
+function csvCell(v){
+  v = (v == null ? "" : String(v));
+  return /[",\r\n]/.test(v) ? '"' + v.replace(/"/g,'""') + '"' : v;
+}
+function toCSV(flights){
+  const lines = [ CSV_HEADERS.map(csvCell).join(",") ];
+  flights.forEach(fl => lines.push(CSV_FIELDS.map(f => csvCell(fl[f])).join(",")));
+  return lines.join("\r\n");
+}
+// RFC-4180-ish parser: handles quoted fields, embedded commas/quotes/newlines, CRLF & LF
+function parseCSV(text){
+  const rows = []; let row = [], field = "", inQuotes = false, i = 0;
+  while(i < text.length){
+    const c = text[i];
+    if(inQuotes){
+      if(c === '"'){
+        if(text[i+1] === '"'){ field += '"'; i += 2; continue; }
+        inQuotes = false; i++; continue;
+      }
+      field += c; i++; continue;
+    }
+    if(c === '"'){ inQuotes = true; i++; continue; }
+    if(c === ","){ row.push(field); field = ""; i++; continue; }
+    if(c === "\r"){ i++; continue; }
+    if(c === "\n"){ row.push(field); rows.push(row); row = []; field = ""; i++; continue; }
+    field += c; i++;
+  }
+  if(field !== "" || row.length){ row.push(field); rows.push(row); }
+  return rows.filter(r => r.some(c => c.trim() !== ""));
+}
+
+function showCsvMsg(text, kind){
+  const el = $("#csvMsg");
+  el.textContent = text;
+  const color = kind === "error" ? "text-red-500" : kind === "ok" ? "text-emerald-600" : "text-slate-500";
+  el.className = "text-sm mb-3 min-h-[1.25rem] " + color;
+  el.classList.remove("hidden");
+}
+
+function exportCSV(){
+  if(!data.flights.length){ showCsvMsg("No flights to export.", "error"); return; }
+  const csv = toCSV([...data.flights].sort((a,b) => flightDate(b) - flightDate(a)));
+  const blob = new Blob(["﻿" + csv], { type:"text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `logbook_${currentUser}_${new Date().toISOString().slice(0,10)}.csv`;
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+  showCsvMsg(`Exported ${data.flights.length} flight${data.flights.length===1?"":"s"}.`, "ok");
+}
+
+function importCSV(text){
+  const rows = parseCSV(text);
+  if(rows.length < 2) return { error:"File has no data rows." };
+  const header = rows[0].map(h => h.trim().toLowerCase());
+  const idx = {};
+  CSV_FIELDS.forEach((f, fi) => {
+    let col = header.indexOf(f.toLowerCase());
+    if(col === -1) col = header.indexOf(CSV_HEADERS[fi].toLowerCase());
+    if(col !== -1) idx[f] = col;
+  });
+  if(idx.year == null || idx.month == null || idx.day == null)
+    return { error:"CSV must include Year, Month and Day columns." };
+
+  let added = 0, skipped = 0;
+  for(let r = 1; r < rows.length; r++){
+    const cells = rows[r];
+    const get = (f) => idx[f] != null ? (cells[idx[f]] || "").trim() : "";
+    const y = parseInt(get("year")), m = parseInt(get("month")), d = parseInt(get("day"));
+    if(isNaN(y) || isNaN(m) || isNaN(d) || m < 1 || m > 12 || d < 1 || d > 31){ skipped++; continue; }
+    data.flights.push({
+      id: "f" + Date.now() + Math.random().toString(36).slice(2,6),
+      year:y, month:m, day:d,
+      aircraftType:get("aircraftType"), civilIdent:get("civilIdent"),
+      pic:get("pic"), sic:get("sic"), soc:get("soc"),
+      from:get("from").toUpperCase(), to:get("to").toUpperCase(),
+      takeoff: get("takeoff").toLowerCase() === "night" ? "Night" : "Day",
+      landing: get("landing").toLowerCase() === "night" ? "Night" : "Day",
+      se:num(get("se")), me:num(get("me")), xc:num(get("xc")),
+      ifrActual:num(get("ifrActual")), ifrSim:num(get("ifrSim")),
+      notes:get("notes")
+    });
+    added++;
+  }
+  if(added){ saveData(currentUser, data); renderFlightTable(); renderDashboard(); }
+  return { added, skipped };
+}
+
+$("#exportCsvBtn").addEventListener("click", exportCSV);
+$("#importCsvBtn").addEventListener("click", () => $("#csvFileInput").click());
+$("#csvFileInput").addEventListener("change", (e) => {
+  const file = e.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    const res = importCSV(reader.result);
+    if(res.error){ showCsvMsg("Import failed: " + res.error, "error"); }
+    else {
+      showCsvMsg(`Imported ${res.added} flight${res.added===1?"":"s"}` + (res.skipped ? `, skipped ${res.skipped} invalid row${res.skipped===1?"":"s"}.` : "."), res.added ? "ok" : "error");
+    }
+  };
+  reader.onerror = () => showCsvMsg("Could not read file.", "error");
+  reader.readAsText(file);
+  e.target.value = ""; // allow re-importing the same file
+});
+
+/* ============================================================
+   DASHBOARD
+   ============================================================ */
+$("#savePilotNameBtn").addEventListener("click", () => {
+  data.pilotName = $("#pilotNameInput").value.trim();
+  saveData(currentUser, data);
+  pushPilotName(data.pilotName);
+  const msg = $("#pilotNameMsg");
+  msg.textContent = "Saved.";
+  renderDashboard();
+  setTimeout(() => msg.textContent = "", 1500);
+});
+
+function renderDashboard(){
+  const fl = data.flights;
+  const total = fl.reduce((s,x)=>s+totalHours(x),0);
+  const xc = fl.reduce((s,x)=>s+num(x.xc),0);
+  const ifr = fl.reduce((s,x)=>s+ifrHours(x),0);
+  const pname = (data.pilotName||"").trim().toLowerCase();
+  const pic = pname ? fl.filter(x=>(x.pic||"").trim().toLowerCase()===pname).reduce((s,x)=>s+totalHours(x),0) : 0;
+  const dual = pname ? fl.filter(x=>(x.sic||"").trim().toLowerCase()===pname).reduce((s,x)=>s+totalHours(x),0) : 0;
+  const routes = new Set(fl.filter(x=>x.from&&x.to).map(x=>x.from+"-"+x.to));
+
+  const cards = [
+    ["Total Flight Hours", total.toFixed(1), "bg-brand-600"],
+    ["PIC Hours", pic.toFixed(1), "bg-emerald-600"],
+    ["Dual (SIC) Hours", dual.toFixed(1), "bg-violet-600"],
+    ["Cross Country Hours", xc.toFixed(1), "bg-amber-500"],
+    ["IFR Hours", ifr.toFixed(1), "bg-sky-600"],
+    ["Total Flights", String(fl.length), "bg-rose-600"],
+    ["Unique Routes", String(routes.size), "bg-teal-600"],
+  ];
+  $("#dashCards").innerHTML = cards.map(([label,val,bg]) => `
+    <div class="rounded-xl shadow-sm p-4 text-white ${bg}">
+      <div class="text-2xl font-bold">${val}</div>
+      <div class="text-xs opacity-90 mt-1">${label}</div>
+    </div>`).join("");
+
+  // Hours by aircraft type
+  const byType = {};
+  fl.forEach(x => { const t = x.aircraftType||"Unknown"; byType[t] = (byType[t]||0) + totalHours(x); });
+  const entries = Object.entries(byType).sort((a,b)=>b[1]-a[1]);
+  const max = entries.length ? entries[0][1] : 1;
+  const wrap = $("#aircraftBreakdown");
+  if(!entries.length){
+    wrap.innerHTML = '<p class="text-slate-400 text-sm">No flights logged yet.</p>';
+  } else {
+    wrap.innerHTML = entries.map(([t,h]) => `
+      <div>
+        <div class="flex justify-between text-sm mb-1"><span class="font-medium">${esc(t)}</span><span class="text-slate-500">${h.toFixed(1)} hrs</span></div>
+        <div class="h-2.5 bg-slate-100 rounded-full overflow-hidden"><div class="h-full bg-brand-500 rounded-full" style="width:${max?(h/max*100):0}%"></div></div>
+      </div>`).join("");
+  }
+}
+
+/* ============================================================
+   ROUTE MAP (SVG)
+   ============================================================ */
+function renderRouteMap(){
+  const svg = $("#routeSvg");
+  const W=800, H=500, pad=60;
+  const flights = data.flights.filter(x=>x.from && x.to);
+
+  if(!flights.length){
+    svg.innerHTML = `<text x="${W/2}" y="${H/2}" text-anchor="middle" fill="#94a3b8" font-size="18">No routes to display. Log a flight with From/To airports.</text>`;
+    $("#routeStats").innerHTML = '<p class="text-slate-400 text-sm">No routes yet.</p>';
+    return;
+  }
+
+  // Collect airports & route aggregates
+  const codes = new Set();
+  const routes = {}; // key "A-B" canonical (sorted) -> {count, aircraft:Set, last:Date, a,b}
+  flights.forEach(fl => {
+    codes.add(fl.from); codes.add(fl.to);
+    const key = [fl.from, fl.to].sort().join("-");
+    if(!routes[key]) routes[key] = { count:0, aircraft:new Set(), last:null, a:fl.from, b:fl.to };
+    routes[key].count++;
+    if(fl.aircraftType) routes[key].aircraft.add(fl.aircraftType);
+    const d = flightDate(fl);
+    if(!routes[key].last || d > routes[key].last) routes[key].last = d;
+  });
+
+  // Projection (auto-fit bounds of used airports)
+  const pts = Array.from(codes).map(c => ({ code:c, coord:airportCoord(c) }));
+  const lats = pts.map(p=>p.coord[0]), lons = pts.map(p=>p.coord[1]);
+  let minLat=Math.min(...lats), maxLat=Math.max(...lats), minLon=Math.min(...lons), maxLon=Math.max(...lons);
+  let dLat=(maxLat-minLat)||1, dLon=(maxLon-minLon)||1;
+  const project = (lat,lon) => {
+    const x = pad + ((lon-minLon)/dLon)*(W-2*pad);
+    const y = pad + ((maxLat-lat)/dLat)*(H-2*pad);
+    return [x,y];
+  };
+  const pos = {};
+  pts.forEach(p => pos[p.code] = project(p.coord[0], p.coord[1]));
+
+  const maxCount = Math.max(...Object.values(routes).map(r=>r.count));
+  let svgStr = `<rect x="0" y="0" width="${W}" height="${H}" fill="#f8fafc"/>`;
+  // grid
+  for(let i=1;i<8;i++){ const x=i*W/8; svgStr += `<line x1="${x}" y1="0" x2="${x}" y2="${H}" stroke="#e2e8f0" stroke-width="1"/>`; }
+  for(let i=1;i<5;i++){ const y=i*H/5; svgStr += `<line x1="0" y1="${y}" x2="${W}" y2="${y}" stroke="#e2e8f0" stroke-width="1"/>`; }
+
+  // route lines
+  Object.values(routes).forEach(r => {
+    const p1 = pos[r.a], p2 = pos[r.b];
+    const ratio = r.count / maxCount;
+    const width = 1.5 + ratio * 7;
+    const opacity = 0.3 + ratio * 0.6;
+    svgStr += `<line x1="${p1[0].toFixed(1)}" y1="${p1[1].toFixed(1)}" x2="${p2[0].toFixed(1)}" y2="${p2[1].toFixed(1)}" stroke="#1d4ed8" stroke-width="${width.toFixed(1)}" stroke-opacity="${opacity.toFixed(2)}" stroke-linecap="round"/>`;
+  });
+
+  // airport markers
+  pts.forEach(p => {
+    const [x,y] = pos[p.code];
+    svgStr += `<g><circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="6" fill="#dc2626" stroke="#fff" stroke-width="1.5"><title>${esc(p.code)}</title></circle>`;
+    svgStr += `<text x="${x.toFixed(1)}" y="${(y-10).toFixed(1)}" text-anchor="middle" font-size="11" font-weight="600" fill="#334155">${esc(p.code)}</text></g>`;
+  });
+
+  svg.innerHTML = svgStr;
+
+  // stats panel
+  const sorted = Object.values(routes).sort((a,b)=>b.count-a.count);
+  $("#routeStats").innerHTML = sorted.map(r => `
+    <div class="border border-slate-200 rounded-lg p-3">
+      <div class="flex items-center justify-between">
+        <span class="font-semibold">${esc(r.a)} ↔ ${esc(r.b)}</span>
+        <span class="text-xs bg-brand-100 text-brand-700 px-2 py-0.5 rounded-full">${r.count}×</span>
+      </div>
+      <div class="text-xs text-slate-500 mt-1">Aircraft: ${esc(Array.from(r.aircraft).join(", ")) || "—"}</div>
+      <div class="text-xs text-slate-500">Last flown: ${r.last ? dstr(r.last) : "—"}</div>
+    </div>`).join("");
+}
+
+/* ============================================================
+   DUTY TRACKER
+   ============================================================ */
+$("#dutyType").addEventListener("change", (e) => { dutyType = e.target.value; dutyAnchor = new Date(); renderDuty(); });
+$("#dutyPrev").addEventListener("click", () => { shiftDuty(-1); });
+$("#dutyNext").addEventListener("click", () => { shiftDuty(1); });
+
+function shiftDuty(dir){
+  if(dutyType === "month"){
+    dutyAnchor = new Date(dutyAnchor.getFullYear(), dutyAnchor.getMonth()+dir, 1);
+  } else {
+    const n = parseInt(dutyType);
+    dutyAnchor = new Date(dutyAnchor.getFullYear(), dutyAnchor.getMonth(), dutyAnchor.getDate()+dir*n);
+  }
+  renderDuty();
+}
+
+const dstr = (d) => {
+  const m = String(d.getMonth()+1).padStart(2,"0");
+  const day = String(d.getDate()).padStart(2,"0");
+  return `${d.getFullYear()}-${m}-${day}`;
+};
+
+function renderDuty(){
+  const grid = $("#dutyGrid");
+  let days = []; // array of Date or null (for month padding)
+  let label = "";
+
+  if(dutyType === "month"){
+    const y = dutyAnchor.getFullYear(), m = dutyAnchor.getMonth();
+    label = dutyAnchor.toLocaleDateString(undefined, { month:"long", year:"numeric" });
+    grid.className = "grid grid-cols-7 gap-1.5";
+    const first = new Date(y, m, 1);
+    const startPad = first.getDay();
+    const daysInMonth = new Date(y, m+1, 0).getDate();
+    // weekday headers
+    let head = ["Su","Mo","Tu","We","Th","Fr","Sa"].map(d=>`<div class="text-center text-xs font-medium text-slate-400 pb-1">${d}</div>`).join("");
+    for(let i=0;i<startPad;i++) days.push(null);
+    for(let d=1; d<=daysInMonth; d++) days.push(new Date(y, m, d));
+    grid.innerHTML = head + days.map(cellHtml).join("");
+  } else {
+    const n = parseInt(dutyType);
+    grid.className = "grid grid-cols-7 gap-1.5";
+    const start = new Date(dutyAnchor.getFullYear(), dutyAnchor.getMonth(), dutyAnchor.getDate());
+    for(let i=0;i<n;i++){
+      const d = new Date(start.getFullYear(), start.getMonth(), start.getDate()+i);
+      days.push(d);
+    }
+    const end = days[days.length-1];
+    label = `${dstr(start)} → ${dstr(end)} (${n} days)`;
+    grid.innerHTML = days.map(cellHtml).join("");
+  }
+
+  $("#dutyRangeLabel").textContent = label;
+
+  // counts within visible range
+  let on=0, off=0;
+  days.forEach(d => { if(!d) return; if(data.duty[dstr(d)]) on++; else off++; });
+  $("#dutyOnCount").textContent = on;
+  $("#dutyOffCount").textContent = off;
+}
+
+function cellHtml(d){
+  if(!d) return `<div></div>`;
+  const key = dstr(d);
+  const on = !!data.duty[key];
+  const isToday = key === dstr(new Date());
+  const base = on ? "bg-brand-600 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200";
+  const ring = isToday ? "ring-2 ring-amber-400" : "";
+  return `<button onclick="toggleDuty('${key}')" class="aspect-square rounded-lg text-sm font-medium flex flex-col items-center justify-center ${base} ${ring} transition">
+      <span>${d.getDate()}</span>
+      <span class="text-[10px] opacity-70">${on?'ON':'off'}</span>
+    </button>`;
+}
+
+function toggleDuty(key){
+  const isNowOn = !data.duty[key];
+  if(data.duty[key]) delete data.duty[key];
+  else data.duty[key] = true;
+  saveData(currentUser, data);
+  pushDutyDay(key, isNowOn);
+  renderDuty();
+}
+
+/* ============================================================
+   RENDER ALL
+   ============================================================ */
+function renderAll(){
+  resetFlightForm();
+  renderFlightTable();
+  renderDashboard();
+}
+
+// expose handlers used by inline onclick
+window.editFlight = editFlight;
+window.deleteFlight = deleteFlight;
+window.toggleDuty = toggleDuty;
+
+/* ============================================================
+   SUPABASE SYNC
+   ============================================================ */
+const SB_URL_KEY = "plb_sb_url";
+const SB_KEY_KEY = "plb_sb_key";
+let sb = null; // Supabase client
+
+function initSupabase(){
+  const url = localStorage.getItem(SB_URL_KEY);
+  const key = localStorage.getItem(SB_KEY_KEY);
+  if(url && key && window.supabase){
+    sb = window.supabase.createClient(url, key);
+  } else {
+    sb = null;
+    hideSyncStatus();
+  }
+}
+
+const SYNC_STATES = {
+  syncing: { text:"↻ Syncing…",   cls:"text-sky-300" },
+  ok:      { text:"☁ Synced",     cls:"text-emerald-300" },
+  offline: { text:"⚡ Offline",   cls:"text-amber-300" },
+  error:   { text:"✗ Sync Error", cls:"text-red-400" }
+};
+function showSyncStatus(state){
+  const el = $("#syncStatus");
+  const s = SYNC_STATES[state] || SYNC_STATES.ok;
+  el.textContent = s.text;
+  el.className = "text-xs font-medium " + s.cls;
+  el.classList.remove("hidden");
+}
+function hideSyncStatus(){ $("#syncStatus").classList.add("hidden"); }
+
+function localToCloud(fl){
+  return {
+    id: fl.id, username: currentUser,
+    year: fl.year, month: fl.month, day: fl.day,
+    aircraft_type: fl.aircraftType||"", civil_ident: fl.civilIdent||"",
+    pic: fl.pic||"", sic: fl.sic||"", soc: fl.soc||"",
+    from_icao: fl.from||"", to_icao: fl.to||"",
+    takeoff: fl.takeoff||"Day", landing: fl.landing||"Day",
+    se: fl.se||0, me: fl.me||0, xc: fl.xc||0,
+    ifr_actual: fl.ifrActual||0, ifr_sim: fl.ifrSim||0,
+    notes: fl.notes||"",
+    updated_at: fl.updated_at || new Date().toISOString()
+  };
+}
+function cloudToLocal(row){
+  return {
+    id: row.id, year: row.year, month: row.month, day: row.day,
+    aircraftType: row.aircraft_type||"", civilIdent: row.civil_ident||"",
+    pic: row.pic||"", sic: row.sic||"", soc: row.soc||"",
+    from: row.from_icao||"", to: row.to_icao||"",
+    takeoff: row.takeoff||"Day", landing: row.landing||"Day",
+    se: parseFloat(row.se)||0, me: parseFloat(row.me)||0, xc: parseFloat(row.xc)||0,
+    ifrActual: parseFloat(row.ifr_actual)||0, ifrSim: parseFloat(row.ifr_sim)||0,
+    notes: row.notes||"", updated_at: row.updated_at
+  };
+}
+
+async function syncOnLogin(){
+  if(!sb || !currentUser) return;
+  showSyncStatus("syncing");
+  try {
+    // --- flights ---
+    const { data: cloudRows, error } = await sb.from("plb_flights")
+      .select("*").eq("username", currentUser);
+    if(error){ showSyncStatus("error"); return; }
+
+    const localById  = Object.fromEntries(data.flights.map(f=>[f.id, f]));
+    const cloudById  = Object.fromEntries(cloudRows.map(r=>[r.id, r]));
+    const merged = {};
+    cloudRows.forEach(cr => {
+      const lf = localById[cr.id];
+      const cloudNewer = !lf || new Date(cr.updated_at) >= new Date(lf.updated_at||0);
+      merged[cr.id] = cloudNewer ? cloudToLocal(cr) : lf;
+    });
+    data.flights.forEach(lf => { if(!cloudById[lf.id]) merged[lf.id] = lf; });
+    data.flights = Object.values(merged);
+    saveData(currentUser, data);
+    renderFlightTable();
+
+    // push any local-only flights up to cloud
+    const localOnly = data.flights.filter(f => !cloudById[f.id]);
+    if(localOnly.length) await sb.from("plb_flights").upsert(localOnly.map(localToCloud));
+
+    // --- profile ---
+    const { data: profile } = await sb.from("plb_pilot_profiles")
+      .select("pilot_name").eq("username", currentUser).maybeSingle();
+    if(profile && profile.pilot_name && !data.pilotName){
+      data.pilotName = profile.pilot_name;
+      $("#pilotNameInput").value = data.pilotName;
+      saveData(currentUser, data);
+    }
+
+    // --- duty ---
+    const { data: dutyRows } = await sb.from("plb_duty_days")
+      .select("date_str").eq("username", currentUser);
+    if(dutyRows){
+      data.duty = {};
+      dutyRows.forEach(r => { data.duty[r.date_str] = true; });
+      saveData(currentUser, data);
+    }
+
+    showSyncStatus("ok");
+    renderDashboard();
+  } catch(e){ showSyncStatus("offline"); }
+}
+
+async function pushFlight(fl){
+  if(!sb) return;
+  showSyncStatus("syncing");
+  const { error } = await sb.from("plb_flights").upsert([localToCloud(fl)]);
+  showSyncStatus(error ? "error" : "ok");
+}
+async function deleteCloudFlight(id){
+  if(!sb) return;
+  showSyncStatus("syncing");
+  const { error } = await sb.from("plb_flights").delete().eq("id", id).eq("username", currentUser);
+  showSyncStatus(error ? "error" : "ok");
+}
+async function pushDutyDay(key, isOn){
+  if(!sb) return;
+  if(isOn){ await sb.from("plb_duty_days").upsert([{username:currentUser, date_str:key}]); }
+  else     { await sb.from("plb_duty_days").delete().eq("username",currentUser).eq("date_str",key); }
+}
+async function pushPilotName(name){
+  if(!sb) return;
+  await sb.from("plb_pilot_profiles").upsert([{username:currentUser, pilot_name:name}]);
+}
+
+// Settings modal handlers
+function setSettingsMsg(text, kind){
+  const el = $("#settingsMsg");
+  el.textContent = text;
+  el.className = "text-sm min-h-[1.25rem] " + (kind==="ok"?"text-emerald-600":kind==="error"?"text-red-500":"text-slate-500");
+}
+$("#settingsBtn").addEventListener("click", () => {
+  $("#sbUrl").value = localStorage.getItem(SB_URL_KEY)||"";
+  $("#sbKey").value = localStorage.getItem(SB_KEY_KEY)||"";
+  setSettingsMsg("","");
+  $("#settingsModal").classList.remove("hidden");
+});
+$("#closeSettingsBtn").addEventListener("click", () => $("#settingsModal").classList.add("hidden"));
+$("#settingsModal").addEventListener("click", e => { if(e.target === $("#settingsModal")) $("#settingsModal").classList.add("hidden"); });
+
+$("#testConnectionBtn").addEventListener("click", async () => {
+  const url = $("#sbUrl").value.trim(), key = $("#sbKey").value.trim();
+  if(!url||!key){ setSettingsMsg("Enter both the Project URL and Anon Key.", "error"); return; }
+  setSettingsMsg("Testing…", "info");
+  try {
+    const client = window.supabase.createClient(url, key);
+    const { error } = await client.from("plb_flights").select("id").limit(1);
+    if(error && error.code !== "PGRST116"){
+      setSettingsMsg("Error: " + error.message + " — Have you run the setup SQL?", "error");
+    } else {
+      setSettingsMsg("✓ Connection successful!", "ok");
+    }
+  } catch(e){ setSettingsMsg("✗ Failed: " + e.message, "error"); }
+});
+
+$("#saveSettingsBtn").addEventListener("click", async () => {
+  const url = $("#sbUrl").value.trim(), key = $("#sbKey").value.trim();
+  if(!url||!key){ setSettingsMsg("Enter both the Project URL and Anon Key.", "error"); return; }
+  localStorage.setItem(SB_URL_KEY, url);
+  localStorage.setItem(SB_KEY_KEY, key);
+  initSupabase();
+  setSettingsMsg("Saved. Syncing your data…", "info");
+  await syncOnLogin();
+  setSettingsMsg("✓ Connected and synced!", "ok");
+  renderFlightTable();
+  setTimeout(() => $("#settingsModal").classList.add("hidden"), 800);
+});
+
+$("#clearSettingsBtn").addEventListener("click", () => {
+  if(!confirm("Disconnect from Supabase? Local data is kept, cloud is unchanged.")) return;
+  localStorage.removeItem(SB_URL_KEY);
+  localStorage.removeItem(SB_KEY_KEY);
+  sb = null;
+  hideSyncStatus();
+  setSettingsMsg("Disconnected.", "info");
+});
+
+/* ============================================================
+   BOOTSTRAP
+   ============================================================ */
+(function init(){
+  initSupabase();
+  const session = localStorage.getItem(SESSION_KEY);
+  const users = loadUsers();
+  if(session && users[session]){ startSession(session); }
+  else { switchAuthTab("login"); }
+})();
+</script>
+</body>
+</html>
