@@ -1486,7 +1486,26 @@ function mapLogbookHeader(h){
   return null;
 }
 
-function importStructuredLogbook(rows, groupRowIdx){
+/* Normalize a name for fuzzy comparison: lowercase, strip dots/commas/spaces */
+function normalizeName(s){
+  return String(s||"").toLowerCase().replace(/[.,\s]+/g, "");
+}
+/* Decide which crew slot the owner sat in for this row.
+   Returns "Captain" if owner is in PIC, "Student" if in Student/Passenger column,
+   or null if neither match — caller falls back to the default. */
+function ownerRoleForRow(picRaw, sicRaw, ownerNames){
+  if(!ownerNames || !ownerNames.length) return null;
+  const picN = normalizeName(picRaw);
+  const sicN = normalizeName(sicRaw);
+  for(const n of ownerNames){
+    if(!n) continue;
+    if(picN && (picN === n || picN.includes(n) || n.includes(picN))) return "Captain";
+    if(sicN && (sicN === n || sicN.includes(n) || n.includes(sicN))) return "Student";
+  }
+  return null;
+}
+
+function importStructuredLogbook(rows, groupRowIdx, ownerNames){
   // Year/Date/Type/etc. live on the group row (row 1 of the header block)
   const combined = buildCombinedHeaders(rows, groupRowIdx);
   const colMap = combined.map(mapLogbookHeader);
@@ -1540,6 +1559,12 @@ function importStructuredLogbook(rows, groupRowIdx){
       else fieldVals[mp] = raw;
     }
 
+    // Decide the owner's role on this flight based on which column their name appears in
+    const role = ownerRoleForRow(fieldVals.pic, fieldVals.sic, ownerNames) || "Captain";
+    let roleCounts;
+    if(!data._importRoleCounts) data._importRoleCounts = { Captain:0, Student:0 };
+    data._importRoleCounts[role] = (data._importRoleCounts[role]||0) + 1;
+
     data.flights.push({
       id: "f" + Date.now() + Math.random().toString(36).slice(2,6),
       year:y, month:m, day:d,
@@ -1556,13 +1581,33 @@ function importStructuredLogbook(rows, groupRowIdx){
       se: +se.toFixed(2), me: +me.toFixed(2), xc: +xc.toFixed(2),
       dayHours: +dayH.toFixed(2), nightHours: +nightH.toFixed(2),
       ifrActual: +ifrAct.toFixed(2), ifrSim: +ifrSim.toFixed(2),
-      loggedRole: "Captain",
+      loggedRole: role,
       notes: fieldVals.notes || ""
     });
     added++;
   }
+  const roleCounts = data._importRoleCounts || { Captain: added, Student: 0 };
+  delete data._importRoleCounts;
   if(added){
     data = migrateData(data);
+    // For rows where the owner was the Student, also re-link picId/sicId so the
+    // current pilot is in the sicId slot and the listed PIC is in the picId slot.
+    if(ownerNames && ownerNames.length && data.currentPilotId){
+      const myId = data.currentPilotId;
+      for(let i = data.flights.length - 1; i >= Math.max(0, data.flights.length - added); i--){
+        const fl = data.flights[i];
+        if(fl.loggedRole === "Student"){
+          // Owner is the student — the PIC string maps to picId via migration; ensure I'm the sicId
+          fl.sicId = myId;
+          fl.sic = pilotName(myId);
+        } else if(fl.loggedRole === "Captain" && ownerRoleForRow(fl.pic, fl.sic, ownerNames) === "Captain"){
+          // Owner is the captain — ensure I'm the picId, listed Student stays as sicId
+          fl.picId = myId;
+          fl.pic = pilotName(myId);
+        }
+        fl.pilotId = myId;
+      }
+    }
     saveData(currentUser, data);
     refreshPilotDropdowns();
     refreshRegistrationsList();
@@ -1570,17 +1615,17 @@ function importStructuredLogbook(rows, groupRowIdx){
     renderFlightTable();
     renderDashboard();
   }
-  return { added, skipped, format: "structured-logbook" };
+  return { added, skipped, format: "structured-logbook", roleCounts };
 }
 
-function importCSV(text){
+function importCSV(text, ownerNames){
   const rows = parseCSV(text);
   if(rows.length < 2) return { error:"File has no data rows." };
 
   // Branch: structured Transport-Canada-style logbook with grouped headers?
   const structIdx = detectStructuredLogbook(rows);
   if(structIdx >= 0){
-    return importStructuredLogbook(rows, structIdx);
+    return importStructuredLogbook(rows, structIdx, ownerNames);
   }
 
   const header = rows[0].map(h => h.trim().toLowerCase());
@@ -1649,10 +1694,45 @@ $("#csvFileInput").addEventListener("change", (e) => {
   if(!file) return;
   const reader = new FileReader();
   reader.onload = () => {
-    const res = importCSV(reader.result);
+    const text = reader.result;
+    // If this looks like a Transport Canada-style structured logbook, ask the user
+    // which name(s) represent THEM in the PIC / Student column so we can assign the
+    // correct role (Captain vs Student) per row instead of always defaulting to Captain.
+    let ownerNames = [];
+    const peek = parseCSV(text);
+    if(detectStructuredLogbook(peek) >= 0){
+      if(!data.pilots.length){
+        showCsvMsg("Add a Pilot Profile first — your logbook needs a pilot to own these flights.", "error");
+        return;
+      }
+      const cp = currentPilot();
+      const suggested = cp ? `${(cp.firstName||"").charAt(0)}.${cp.lastName||""}`.replace(/^\.|\.$/g, "") : "";
+      const reply = window.prompt(
+        "This looks like a multi-column logbook with PIC and Student columns.\n\n" +
+        "What name represents YOU in the spreadsheet?\n\n" +
+        "Examples:  B.Pearce   |   Smith, J   |   John Smith\n" +
+        "If your name appears in more than one form, separate variations with commas.",
+        suggested
+      );
+      if(reply === null){ e.target.value = ""; return; } // cancelled
+      ownerNames = reply.split(",").map(s => normalizeName(s.trim())).filter(Boolean);
+      if(!ownerNames.length){
+        const ok = confirm("No name entered — every flight will be imported as Captain by default. Continue?");
+        if(!ok){ e.target.value = ""; return; }
+      }
+    }
+    const res = importCSV(text, ownerNames);
     if(res.error){ showCsvMsg("Import failed: " + res.error, "error"); }
     else {
-      showCsvMsg(`Imported ${res.added} flight${res.added===1?"":"s"}` + (res.skipped ? `, skipped ${res.skipped} invalid row${res.skipped===1?"":"s"}.` : "."), res.added ? "ok" : "error");
+      let msg = `Imported ${res.added} flight${res.added===1?"":"s"}`;
+      if(res.roleCounts && (res.roleCounts.Captain || res.roleCounts.Student)){
+        const cap = res.roleCounts.Captain || 0;
+        const stu = res.roleCounts.Student || 0;
+        msg += ` — ${cap} as Captain, ${stu} as Student`;
+      }
+      if(res.skipped) msg += `, skipped ${res.skipped} invalid row${res.skipped===1?"":"s"}`;
+      msg += ".";
+      showCsvMsg(msg, res.added ? "ok" : "error");
     }
   };
   reader.onerror = () => showCsvMsg("Could not read file.", "error");
