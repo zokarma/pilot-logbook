@@ -1063,9 +1063,192 @@ function exportCSV(){
   showCsvMsg(`Exported ${data.flights.length} flight${data.flights.length===1?"":"s"}.`, "ok");
 }
 
+/* Parse many common date string shapes into [y,m,d] or null. Hoisted so the
+   structured-logbook parser can use it too. */
+const MONTH_ABBR = {jan:1,feb:2,mar:3,apr:4,may:5,jun:6,jul:7,aug:8,sep:9,oct:10,nov:11,dec:12};
+function parseAnyDate(s, fallbackYear){
+  if(!s) return null;
+  s = String(s).trim();
+  if(!s) return null;
+  // ISO-ish: 2026-06-17, 2026/06/17, 2026.06.17
+  let mt = s.match(/^(\d{4})[-\/.](\d{1,2})[-\/.](\d{1,2})$/);
+  if(mt) return [+mt[1], +mt[2], +mt[3]];
+  // M/D/Y or D/M/Y (4-digit year on the right)
+  mt = s.match(/^(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{4})$/);
+  if(mt){
+    const a = +mt[1], b = +mt[2], y = +mt[3];
+    if(a > 12) return [y, b, a];   // D/M/Y
+    return [y, a, b];               // assume M/D/Y
+  }
+  // "31-Aug", "Aug-31", "31 Aug" — needs a fallback year supplied by the caller
+  mt = s.match(/^(\d{1,2})[-\/\s]([A-Za-z]{3,9})$/);
+  if(mt && fallbackYear){
+    const m = MONTH_ABBR[mt[2].slice(0,3).toLowerCase()];
+    if(m) return [fallbackYear, m, +mt[1]];
+  }
+  mt = s.match(/^([A-Za-z]{3,9})[-\/\s](\d{1,2})$/);
+  if(mt && fallbackYear){
+    const m = MONTH_ABBR[mt[1].slice(0,3).toLowerCase()];
+    if(m) return [fallbackYear, m, +mt[2]];
+  }
+  // Last resort: native Date parser
+  const t = new Date(s);
+  if(!isNaN(t.getTime())) return [t.getFullYear(), t.getMonth()+1, t.getDate()];
+  return null;
+}
+
+/* ============================================================
+   STRUCTURED LOGBOOK CSV (multi-row headers w/ Single/Multi/XC groups)
+   ============================================================ */
+function detectStructuredLogbook(rows){
+  // Find a row that contains "Single Engine" as a header group label
+  for(let i = 0; i < Math.min(8, rows.length); i++){
+    if(rows[i].some(c => /single\s*engine/i.test(c||""))) return i;
+  }
+  return -1;
+}
+
+function buildCombinedHeaders(rows, groupRowIdx){
+  const h1 = rows[groupRowIdx] || [];
+  const h2 = rows[groupRowIdx+1] || [];
+  const h3 = rows[groupRowIdx+2] || [];
+  const ncols = Math.max(h1.length, h2.length, h3.length);
+  // Carry-forward row1 only where row2 or row3 has content (i.e., we're inside a merged group cell)
+  const h1Filled = [];
+  let last1 = "";
+  for(let i = 0; i < ncols; i++){
+    const v1 = (h1[i]||"").trim();
+    const v2 = (h2[i]||"").trim();
+    const v3 = (h3[i]||"").trim();
+    if(v1) last1 = v1;
+    h1Filled[i] = (v2 || v3) ? last1 : v1;
+  }
+  // Carry-forward row2 only where row3 has content
+  const h2Filled = [];
+  let last2 = "";
+  for(let i = 0; i < ncols; i++){
+    const v2 = (h2[i]||"").trim();
+    const v3 = (h3[i]||"").trim();
+    if(v2) last2 = v2;
+    h2Filled[i] = v3 ? last2 : v2;
+  }
+  const combined = [];
+  for(let i = 0; i < ncols; i++){
+    combined[i] = [h1Filled[i], h2Filled[i], (h3[i]||"").trim()].filter(Boolean).join(" ").trim();
+  }
+  return combined;
+}
+
+function mapLogbookHeader(h){
+  const s = (h||"").toLowerCase();
+  if(/^year$/.test(s)) return "year";
+  if(/^date$/.test(s)) return "logdate";
+  if(/^type$/.test(s)) return "aircraftType";
+  if(/^ident|registration/.test(s)) return "registration";
+  if(/^pic$/.test(s)) return "pic";
+  if(/student|passenger|^sic$|first\s*officer/.test(s)) return "sic";
+  if(/^from$/.test(s)) return "from";
+  if(/^to$/.test(s)) return "to";
+  if(/^info$|notes|remarks/.test(s)) return "notes";
+  if(/single\s*engine.*day/.test(s))  return "se_day";
+  if(/single\s*engine.*night/.test(s)) return "se_night";
+  if(/multi\s*engine.*day/.test(s))   return "me_day";
+  if(/multi\s*engine.*night/.test(s)) return "me_night";
+  if(/cross\s*country.*day/.test(s))  return "xc_day";
+  if(/cross\s*country.*night/.test(s)) return "xc_night";
+  if(/ifr.*actual/.test(s) || /^ifr$/.test(s)) return "ifrActual";
+  if(/ifr.*sim/.test(s)) return "ifrSim";
+  return null;
+}
+
+function importStructuredLogbook(rows, groupRowIdx){
+  // Year/Date/Type/etc. live on the group row (row 1 of the header block)
+  const combined = buildCombinedHeaders(rows, groupRowIdx);
+  const colMap = combined.map(mapLogbookHeader);
+
+  if(!colMap.includes("year") || !colMap.includes("logdate")){
+    return { error: "Couldn't find Year and Date columns in this logbook." };
+  }
+
+  // Find data start: first row AFTER any header row with non-trivial content.
+  // We treat rows whose Year column parses as an integer as data; everything else (subheaders, page markers, blanks) is skipped.
+  const yearCol = colMap.indexOf("year");
+  const dateCol = colMap.indexOf("logdate");
+
+  let added = 0, skipped = 0;
+  for(let r = groupRowIdx + 1; r < rows.length; r++){
+    const row = rows[r];
+    const yearRaw = (row[yearCol]||"").trim();
+    const year = parseInt(yearRaw, 10);
+    if(!year || year < 1900 || year > 3000){ continue; } // header, blank, or "Page N"
+    const dateRaw = (row[dateCol]||"").trim();
+    const parsed = parseAnyDate(dateRaw, year);
+    if(!parsed){ skipped++; continue; }
+    const [y,m,d] = parsed;
+    if(isNaN(y)||isNaN(m)||isNaN(d)){ skipped++; continue; }
+
+    let se=0, me=0, xc=0, dayH=0, nightH=0;
+    let ifrAct=0, ifrSim=0;
+    const fieldVals = {};
+    for(let i = 0; i < colMap.length; i++){
+      const mp = colMap[i];
+      if(!mp) continue;
+      const raw = (row[i]||"").trim();
+      const v = parseFloat(raw);
+      if(mp === "se_day"   && !isNaN(v)){ se += v; dayH += v; }
+      else if(mp === "se_night" && !isNaN(v)){ se += v; nightH += v; }
+      else if(mp === "me_day"   && !isNaN(v)){ me += v; dayH += v; }
+      else if(mp === "me_night" && !isNaN(v)){ me += v; nightH += v; }
+      else if(mp === "xc_day"   && !isNaN(v)) xc += v;
+      else if(mp === "xc_night" && !isNaN(v)) xc += v;
+      else if(mp === "ifrActual" && !isNaN(v)) ifrAct += v;
+      else if(mp === "ifrSim"    && !isNaN(v)) ifrSim += v;
+      else fieldVals[mp] = raw;
+    }
+
+    data.flights.push({
+      id: "f" + Date.now() + Math.random().toString(36).slice(2,6),
+      year:y, month:m, day:d,
+      date: `${y}-${String(m).padStart(2,"0")}-${String(d).padStart(2,"0")}`,
+      aircraftType: fieldVals.aircraftType || "",
+      civilIdent: (fieldVals.registration || "").toUpperCase(),
+      registration: (fieldVals.registration || "").toUpperCase(),
+      pic: fieldVals.pic || "",
+      sic: fieldVals.sic || "",
+      soc: "",
+      from: (fieldVals.from || "").toUpperCase(),
+      to: (fieldVals.to || "").toUpperCase(),
+      takeoff: "Day", landing: "Day",
+      se: +se.toFixed(2), me: +me.toFixed(2), xc: +xc.toFixed(2),
+      dayHours: +dayH.toFixed(2), nightHours: +nightH.toFixed(2),
+      ifrActual: +ifrAct.toFixed(2), ifrSim: +ifrSim.toFixed(2),
+      loggedRole: "Captain",
+      notes: fieldVals.notes || ""
+    });
+    added++;
+  }
+  if(added){
+    data = migrateData(data);
+    saveData(currentUser, data);
+    refreshPilotDropdowns();
+    refreshRegistrationsList();
+    renderPilots();
+    renderFlightTable();
+    renderDashboard();
+  }
+  return { added, skipped, format: "structured-logbook" };
+}
+
 function importCSV(text){
   const rows = parseCSV(text);
   if(rows.length < 2) return { error:"File has no data rows." };
+
+  // Branch: structured Transport-Canada-style logbook with grouped headers?
+  const structIdx = detectStructuredLogbook(rows);
+  if(structIdx >= 0){
+    return importStructuredLogbook(rows, structIdx);
+  }
+
   const header = rows[0].map(h => h.trim().toLowerCase());
   const idx = {};
   CSV_FIELDS.forEach((f, fi) => {
@@ -1078,27 +1261,7 @@ function importCSV(text){
   if(!hasDate && !hasYMD)
     return { error:"CSV must include a Date column (YYYY-MM-DD) OR Year/Month/Day columns." };
 
-  // Parse many common date string shapes into [y,m,d] or null
-  function parseDate(s){
-    if(!s) return null;
-    s = s.trim();
-    if(!s) return null;
-    // ISO: 2026-06-17 (also accepts 2026/06/17, 2026.06.17)
-    let mt = s.match(/^(\d{4})[-\/.](\d{1,2})[-\/.](\d{1,2})$/);
-    if(mt) return [+mt[1], +mt[2], +mt[3]];
-    // US/EU short: 6/17/2026, 17-06-2026, 06.17.2026 — pick last 4-digit group as year
-    mt = s.match(/^(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{4})$/);
-    if(mt){
-      // Ambiguous: could be M/D/Y or D/M/Y. If first > 12 it must be D/M/Y; otherwise assume M/D/Y (US-style, matches Excel default).
-      const a = +mt[1], b = +mt[2], y = +mt[3];
-      if(a > 12) return [y, b, a];   // D/M/Y
-      return [y, a, b];               // assume M/D/Y
-    }
-    // Fallback: let Date.parse try
-    const t = new Date(s);
-    if(!isNaN(t.getTime())) return [t.getFullYear(), t.getMonth()+1, t.getDate()];
-    return null;
-  }
+  const parseDate = (s) => parseAnyDate(s);
 
   let added = 0, skipped = 0;
   for(let r = 1; r < rows.length; r++){
