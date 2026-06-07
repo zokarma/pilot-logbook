@@ -1008,8 +1008,8 @@ function renderFlightTable(){
 /* ============================================================
    CSV EXPORT / IMPORT
    ============================================================ */
-const CSV_FIELDS = ['year','month','day','aircraftType','civilIdent','pic','sic','soc','from','to','takeoff','landing','se','me','xc','dayHours','nightHours','ifrActual','ifrSim','loggedRole','notes'];
-const CSV_HEADERS = ['Year','Month','Day','Aircraft Type','Registration','PIC','SIC','SOC','ICAO From','ICAO To','Takeoff','Landing','Single Engine','Multi Engine','Cross Country','Day Hours','Night Hours','IFR Actual','IFR Simulated','Logged Role','Notes'];
+const CSV_FIELDS = ['date','year','month','day','aircraftType','civilIdent','pic','sic','soc','from','to','takeoff','landing','se','me','xc','dayHours','nightHours','ifrActual','ifrSim','loggedRole','notes'];
+const CSV_HEADERS = ['Date','Year','Month','Day','Aircraft Type','Registration','PIC','SIC','SOC','ICAO From','ICAO To','Takeoff','Landing','Single Engine','Multi Engine','Cross Country','Day Hours','Night Hours','IFR Actual','IFR Simulated','Logged Role','Notes'];
 
 function csvCell(v){
   v = (v == null ? "" : String(v));
@@ -1073,14 +1073,45 @@ function importCSV(text){
     if(col === -1) col = header.indexOf(CSV_HEADERS[fi].toLowerCase());
     if(col !== -1) idx[f] = col;
   });
-  if(idx.year == null || idx.month == null || idx.day == null)
-    return { error:"CSV must include Year, Month and Day columns." };
+  const hasDate = idx.date != null;
+  const hasYMD = idx.year != null && idx.month != null && idx.day != null;
+  if(!hasDate && !hasYMD)
+    return { error:"CSV must include a Date column (YYYY-MM-DD) OR Year/Month/Day columns." };
+
+  // Parse many common date string shapes into [y,m,d] or null
+  function parseDate(s){
+    if(!s) return null;
+    s = s.trim();
+    if(!s) return null;
+    // ISO: 2026-06-17 (also accepts 2026/06/17, 2026.06.17)
+    let mt = s.match(/^(\d{4})[-\/.](\d{1,2})[-\/.](\d{1,2})$/);
+    if(mt) return [+mt[1], +mt[2], +mt[3]];
+    // US/EU short: 6/17/2026, 17-06-2026, 06.17.2026 — pick last 4-digit group as year
+    mt = s.match(/^(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{4})$/);
+    if(mt){
+      // Ambiguous: could be M/D/Y or D/M/Y. If first > 12 it must be D/M/Y; otherwise assume M/D/Y (US-style, matches Excel default).
+      const a = +mt[1], b = +mt[2], y = +mt[3];
+      if(a > 12) return [y, b, a];   // D/M/Y
+      return [y, a, b];               // assume M/D/Y
+    }
+    // Fallback: let Date.parse try
+    const t = new Date(s);
+    if(!isNaN(t.getTime())) return [t.getFullYear(), t.getMonth()+1, t.getDate()];
+    return null;
+  }
 
   let added = 0, skipped = 0;
   for(let r = 1; r < rows.length; r++){
     const cells = rows[r];
     const get = (f) => idx[f] != null ? (cells[idx[f]] || "").trim() : "";
-    const y = parseInt(get("year")), m = parseInt(get("month")), d = parseInt(get("day"));
+    let y, m, d;
+    if(hasDate){
+      const parsed = parseDate(get("date"));
+      if(!parsed){ skipped++; continue; }
+      [y, m, d] = parsed;
+    } else {
+      y = parseInt(get("year")); m = parseInt(get("month")); d = parseInt(get("day"));
+    }
     if(isNaN(y) || isNaN(m) || isNaN(d) || m < 1 || m > 12 || d < 1 || d > 31){ skipped++; continue; }
     data.flights.push({
       id: "f" + Date.now() + Math.random().toString(36).slice(2,6),
