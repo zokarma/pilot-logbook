@@ -239,9 +239,12 @@
               <tr class="text-left text-slate-500 border-b border-slate-200">
                 <th class="py-2 pr-3 font-medium">Date</th>
                 <th class="py-2 pr-3 font-medium">Aircraft</th>
-                <th class="py-2 pr-3 font-medium">Ident</th>
+                <th class="py-2 pr-3 font-medium">Reg</th>
                 <th class="py-2 pr-3 font-medium">Route</th>
+                <th class="py-2 pr-3 font-medium">Role</th>
                 <th class="py-2 pr-3 font-medium">PIC</th>
+                <th class="py-2 pr-3 font-medium">Student / FO</th>
+                <th class="py-2 pr-3 font-medium">Third</th>
                 <th class="py-2 pr-3 font-medium">SE</th>
                 <th class="py-2 pr-3 font-medium">ME</th>
                 <th class="py-2 pr-3 font-medium">XC</th>
@@ -975,7 +978,10 @@ function renderFlightTable(){
       <td class="py-2 pr-3">${esc(fl.aircraftType)}</td>
       <td class="py-2 pr-3">${esc(fl.registration||fl.civilIdent)||'—'}</td>
       <td class="py-2 pr-3 whitespace-nowrap font-medium">${esc(fl.from)||'?'} → ${esc(fl.to)||'?'}</td>
-      <td class="py-2 pr-3">${esc(pilotName(fl.picId) || fl.pic) || '—'}</td>
+      <td class="py-2 pr-3 whitespace-nowrap">${esc(fl.loggedRole) || '—'}</td>
+      <td class="py-2 pr-3 whitespace-nowrap">${esc(pilotName(fl.picId) || fl.pic) || '—'}</td>
+      <td class="py-2 pr-3 whitespace-nowrap">${esc(pilotName(fl.sicId) || fl.sic) || '—'}</td>
+      <td class="py-2 pr-3 whitespace-nowrap">${esc(pilotName(fl.socId) || fl.soc) || '—'}</td>
       <td class="py-2 pr-3">${num(fl.se).toFixed(1)}</td>
       <td class="py-2 pr-3">${num(fl.me).toFixed(1)}</td>
       <td class="py-2 pr-3">${num(fl.xc).toFixed(1)}</td>
