@@ -1121,21 +1121,56 @@ function exportCSV(){
 /* Parse many common date string shapes into [y,m,d] or null. Hoisted so the
    structured-logbook parser can use it too. */
 const MONTH_ABBR = {jan:1,feb:2,mar:3,apr:4,may:5,jun:6,jul:7,aug:8,sep:9,oct:10,nov:11,dec:12};
+// Two-digit year → 4-digit: 00–49 = 20XX, 50–99 = 19XX (matches Excel default)
+function expandTwoDigitYear(y){
+  y = +y;
+  if(y < 100) return y < 50 ? 2000 + y : 1900 + y;
+  return y;
+}
 function parseAnyDate(s, fallbackYear){
   if(!s) return null;
   s = String(s).trim();
   if(!s) return null;
+
   // ISO-ish: 2026-06-17, 2026/06/17, 2026.06.17
   let mt = s.match(/^(\d{4})[-\/.](\d{1,2})[-\/.](\d{1,2})$/);
   if(mt) return [+mt[1], +mt[2], +mt[3]];
-  // M/D/Y or D/M/Y (4-digit year on the right)
+
+  // Numeric with 4-digit year on the right: 6/17/2026, 17-06-2026, 06.17.2026
   mt = s.match(/^(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{4})$/);
   if(mt){
     const a = +mt[1], b = +mt[2], y = +mt[3];
     if(a > 12) return [y, b, a];   // D/M/Y
     return [y, a, b];               // assume M/D/Y
   }
-  // "31-Aug", "Aug-31", "31 Aug" — needs a fallback year supplied by the caller
+  // Numeric with 2-digit year on the right: 6/17/26, 17-06-26
+  mt = s.match(/^(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{2})$/);
+  if(mt){
+    const a = +mt[1], b = +mt[2], y = expandTwoDigitYear(mt[3]);
+    if(a > 12) return [y, b, a];
+    return [y, a, b];
+  }
+
+  // DD-Mon-YYYY or DD-Mon-YY (e.g. "31-Aug-2016", "31-Aug-16", "31 August 2016")
+  mt = s.match(/^(\d{1,2})[-\/\s]([A-Za-z]{3,9})[-\/\s](\d{2,4})$/);
+  if(mt){
+    const m = MONTH_ABBR[mt[2].slice(0,3).toLowerCase()];
+    if(m){
+      const y = expandTwoDigitYear(mt[3]);
+      return [y, m, +mt[1]];
+    }
+  }
+  // Mon-DD-YYYY or Mon-DD-YY (e.g. "Aug-31-16", "August 31, 2016")
+  mt = s.match(/^([A-Za-z]{3,9})[-\/\s,]+(\d{1,2})[-\/\s,]+(\d{2,4})$/);
+  if(mt){
+    const m = MONTH_ABBR[mt[1].slice(0,3).toLowerCase()];
+    if(m){
+      const y = expandTwoDigitYear(mt[3]);
+      return [y, m, +mt[2]];
+    }
+  }
+
+  // Just "31-Aug" / "Aug-31" — needs a fallback year supplied by the caller
   mt = s.match(/^(\d{1,2})[-\/\s]([A-Za-z]{3,9})$/);
   if(mt && fallbackYear){
     const m = MONTH_ABBR[mt[2].slice(0,3).toLowerCase()];
@@ -1146,9 +1181,17 @@ function parseAnyDate(s, fallbackYear){
     const m = MONTH_ABBR[mt[1].slice(0,3).toLowerCase()];
     if(m) return [fallbackYear, m, +mt[2]];
   }
-  // Last resort: native Date parser
-  const t = new Date(s);
-  if(!isNaN(t.getTime())) return [t.getFullYear(), t.getMonth()+1, t.getDate()];
+
+  // Last resort: native Date parser — only attempt when the string is rich enough
+  // to be a real date (contains both letters and a 2+ digit number). This avoids
+  // false positives like "10" being read as the year 2010 or "10-Page" sneaking through.
+  if(/[A-Za-z]/.test(s) && /\d{2,}/.test(s)){
+    const t = new Date(s);
+    if(!isNaN(t.getTime())){
+      const y = t.getFullYear();
+      if(y >= 1900 && y <= 2200) return [y, t.getMonth()+1, t.getDate()];
+    }
+  }
   return null;
 }
 
@@ -1221,26 +1264,35 @@ function importStructuredLogbook(rows, groupRowIdx){
   const combined = buildCombinedHeaders(rows, groupRowIdx);
   const colMap = combined.map(mapLogbookHeader);
 
-  if(!colMap.includes("year") || !colMap.includes("logdate")){
-    return { error: "Couldn't find Year and Date columns in this logbook." };
+  if(!colMap.includes("logdate")){
+    return { error: "Couldn't find a Date column in this logbook." };
   }
 
-  // Find data start: first row AFTER any header row with non-trivial content.
-  // We treat rows whose Year column parses as an integer as data; everything else (subheaders, page markers, blanks) is skipped.
-  const yearCol = colMap.indexOf("year");
+  // The Year column is OPTIONAL — used only as a fallback when the Date cell
+  // is partial (like "31-Aug" with no year). If the spreadsheet's Date column
+  // already contains full dates (e.g. "31-Aug-16"), we don't need a Year column.
+  const yearCol = colMap.indexOf("year");   // may be -1
   const dateCol = colMap.indexOf("logdate");
 
   let added = 0, skipped = 0;
   for(let r = groupRowIdx + 1; r < rows.length; r++){
     const row = rows[r];
-    const yearRaw = (row[yearCol]||"").trim();
-    const year = parseInt(yearRaw, 10);
-    if(!year || year < 1900 || year > 3000){ continue; } // header, blank, or "Page N"
     const dateRaw = (row[dateCol]||"").trim();
-    const parsed = parseAnyDate(dateRaw, year);
-    if(!parsed){ skipped++; continue; }
+    if(!dateRaw) continue; // blank row — silent skip
+
+    // Fallback year, if the spreadsheet has a Year column
+    let fallbackYear = null;
+    if(yearCol >= 0){
+      const yr = parseInt((row[yearCol]||"").trim(), 10);
+      if(yr && yr >= 1900 && yr <= 3000) fallbackYear = yr;
+    }
+
+    const parsed = parseAnyDate(dateRaw, fallbackYear);
+    // Silent skip (not "skipped count") for things that clearly aren't data rows:
+    // header subrows, "Page N" markers, partial-date with no year context.
+    if(!parsed) continue;
     const [y,m,d] = parsed;
-    if(isNaN(y)||isNaN(m)||isNaN(d)){ skipped++; continue; }
+    if(isNaN(y)||isNaN(m)||isNaN(d) || y < 1900 || y > 2200){ continue; }
 
     let se=0, me=0, xc=0, dayH=0, nightH=0;
     let ifrAct=0, ifrSim=0;
