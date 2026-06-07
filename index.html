@@ -1342,7 +1342,21 @@ const dstr = (d) => {
   return `${d.getFullYear()}-${m}-${day}`;
 };
 
+/* Cache of "YYYY-MM-DD" -> true for every date the current pilot
+   has at least one flight on. Rebuilt on each renderDuty call. */
+let flightDateSet = new Set();
+function rebuildFlightDateSet(){
+  const pid = data.currentPilotId;
+  flightDateSet = new Set(
+    data.flights
+      .filter(f => !pid || f.pilotId === pid)
+      .map(f => flightDateStr(f))
+      .filter(Boolean)
+  );
+}
+
 function renderDuty(){
+  rebuildFlightDateSet();
   const grid = $("#dutyGrid");
   let days = []; // array of Date or null (for month padding)
   let label = "";
@@ -1374,9 +1388,13 @@ function renderDuty(){
 
   $("#dutyRangeLabel").textContent = label;
 
-  // counts within visible range
+  // counts within visible range — a day is "on" if manually toggled OR has a flight
   let on=0, off=0;
-  days.forEach(d => { if(!d) return; if(data.duty[dstr(d)]) on++; else off++; });
+  days.forEach(d => {
+    if(!d) return;
+    const k = dstr(d);
+    if(data.duty[k] || flightDateSet.has(k)) on++; else off++;
+  });
   $("#dutyOnCount").textContent = on;
   $("#dutyOffCount").textContent = off;
 }
@@ -1384,13 +1402,19 @@ function renderDuty(){
 function cellHtml(d){
   if(!d) return `<div></div>`;
   const key = dstr(d);
-  const on = !!data.duty[key];
+  const manual = !!data.duty[key];
+  const hasFlight = flightDateSet.has(key);
+  const on = manual || hasFlight;
   const isToday = key === dstr(new Date());
   const base = on ? "bg-brand-600 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200";
   const ring = isToday ? "ring-2 ring-amber-400" : "";
-  return `<button onclick="toggleDuty('${key}')" class="aspect-square rounded-lg text-sm font-medium flex flex-col items-center justify-center ${base} ${ring} transition">
+  // Show a small ✈ when the "on" state comes from a flight (and not just a manual toggle)
+  const flightBadge = hasFlight ? '<span class="text-[10px] leading-none">✈</span>' : '';
+  const label = on ? (hasFlight ? 'FLIGHT' : 'ON') : 'off';
+  return `<button onclick="toggleDuty('${key}')" class="aspect-square rounded-lg text-sm font-medium flex flex-col items-center justify-center gap-0.5 ${base} ${ring} transition">
       <span>${d.getDate()}</span>
-      <span class="text-[10px] opacity-70">${on?'ON':'off'}</span>
+      ${flightBadge}
+      <span class="text-[10px] opacity-80">${label}</span>
     </button>`;
 }
 
