@@ -96,12 +96,21 @@
           <button id="logoutBtn" class="bg-brand-600 hover:bg-brand-500 px-3 py-1.5 rounded-lg transition">Log Out</button>
         </div>
       </div>
+      <!-- Current Pilot selector strip -->
+      <div class="flex items-center gap-2 py-1.5 text-sm border-t border-brand-600/40 flex-wrap">
+        <span class="text-brand-100">Logbook for:</span>
+        <select id="currentPilotSelect" class="bg-brand-600 text-white text-sm rounded px-2 py-1 border border-brand-500 focus:outline-none focus:ring-2 focus:ring-white/40"></select>
+        <span id="currentPilotEmpty" class="hidden text-xs text-amber-200">No pilot profiles yet —
+          <button id="goToPilotsLink" class="underline hover:text-white">add one in the Pilots tab</button>
+        </span>
+      </div>
       <!-- Tab nav -->
       <nav class="flex gap-1 overflow-x-auto no-scrollbar -mb-px">
         <button data-tab="logger" class="tab-btn active whitespace-nowrap px-4 py-2.5 text-sm font-medium rounded-t-lg">Flight Logger</button>
         <button data-tab="dashboard" class="tab-btn whitespace-nowrap px-4 py-2.5 text-sm font-medium rounded-t-lg text-brand-100 hover:bg-brand-600">Dashboard</button>
         <button data-tab="routemap" class="tab-btn whitespace-nowrap px-4 py-2.5 text-sm font-medium rounded-t-lg text-brand-100 hover:bg-brand-600">Route Map</button>
         <button data-tab="duty" class="tab-btn whitespace-nowrap px-4 py-2.5 text-sm font-medium rounded-t-lg text-brand-100 hover:bg-brand-600">Duty Tracker</button>
+        <button data-tab="pilots" class="tab-btn whitespace-nowrap px-4 py-2.5 text-sm font-medium rounded-t-lg text-brand-100 hover:bg-brand-600">Pilots</button>
       </nav>
     </div>
   </header>
@@ -118,37 +127,37 @@
         <form id="flightForm" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <input type="hidden" name="id" />
           <div>
-            <label class="block text-xs font-medium text-slate-500 mb-1">Year</label>
-            <input name="year" type="number" required class="w-full px-3 py-2 border border-slate-300 rounded-lg" />
-          </div>
-          <div>
-            <label class="block text-xs font-medium text-slate-500 mb-1">Month</label>
-            <input name="month" type="number" min="1" max="12" required class="w-full px-3 py-2 border border-slate-300 rounded-lg" />
-          </div>
-          <div>
-            <label class="block text-xs font-medium text-slate-500 mb-1">Day</label>
-            <input name="day" type="number" min="1" max="31" required class="w-full px-3 py-2 border border-slate-300 rounded-lg" />
+            <label class="block text-xs font-medium text-slate-500 mb-1">Date</label>
+            <input name="date" type="date" required class="w-full px-3 py-2 border border-slate-300 rounded-lg" />
           </div>
           <div>
             <label class="block text-xs font-medium text-slate-500 mb-1">Aircraft Type</label>
-            <input name="aircraftType" required placeholder="e.g. C172" class="w-full px-3 py-2 border border-slate-300 rounded-lg" />
+            <select name="aircraftType" required class="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white">
+              <option value="">— select —</option>
+            </select>
           </div>
           <div>
-            <label class="block text-xs font-medium text-slate-500 mb-1">Civil Ident</label>
-            <input name="civilIdent" placeholder="e.g. C-GABC" class="w-full px-3 py-2 border border-slate-300 rounded-lg" />
+            <label class="block text-xs font-medium text-slate-500 mb-1">Registration</label>
+            <input name="registration" list="registrationsList" placeholder="e.g. C-GABC" class="w-full px-3 py-2 border border-slate-300 rounded-lg uppercase" />
+            <datalist id="registrationsList"></datalist>
           </div>
           <div>
-            <label class="block text-xs font-medium text-slate-500 mb-1">PIC Name</label>
-            <input name="pic" class="w-full px-3 py-2 border border-slate-300 rounded-lg" />
+            <label class="block text-xs font-medium text-slate-500 mb-1">Pilot Being Logged Role</label>
+            <select name="loggedRole" class="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white"></select>
           </div>
           <div>
-            <label class="block text-xs font-medium text-slate-500 mb-1">SIC Name</label>
-            <input name="sic" class="w-full px-3 py-2 border border-slate-300 rounded-lg" />
+            <label class="block text-xs font-medium text-slate-500 mb-1">PIC</label>
+            <select name="picId" class="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white"></select>
           </div>
           <div>
-            <label class="block text-xs font-medium text-slate-500 mb-1">SOC Name <span class="text-slate-400">(optional)</span></label>
-            <input name="soc" class="w-full px-3 py-2 border border-slate-300 rounded-lg" />
+            <label class="block text-xs font-medium text-slate-500 mb-1">Student / First Officer</label>
+            <select name="sicId" class="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white"></select>
           </div>
+          <div>
+            <label class="block text-xs font-medium text-slate-500 mb-1">Third Crew <span class="text-slate-400">(optional)</span></label>
+            <select name="socId" class="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white"></select>
+          </div>
+          <div></div>
           <div>
             <label class="block text-xs font-medium text-slate-500 mb-1">ICAO From</label>
             <input name="from" maxlength="4" placeholder="CYYZ" class="w-full px-3 py-2 border border-slate-300 rounded-lg uppercase" />
@@ -183,6 +192,15 @@
             <label class="block text-xs font-medium text-slate-500 mb-1">Cross Country (hrs)</label>
             <input name="xc" type="number" step="0.1" min="0" value="0" class="w-full px-3 py-2 border border-slate-300 rounded-lg" />
           </div>
+          <div></div>
+          <div>
+            <label class="block text-xs font-medium text-slate-500 mb-1">Day (hrs)</label>
+            <input name="dayHours" type="number" step="0.1" min="0" value="0" class="w-full px-3 py-2 border border-slate-300 rounded-lg" />
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-slate-500 mb-1">Night (hrs)</label>
+            <input name="nightHours" type="number" step="0.1" min="0" value="0" class="w-full px-3 py-2 border border-slate-300 rounded-lg" />
+          </div>
           <div>
             <label class="block text-xs font-medium text-slate-500 mb-1">IFR Actual (hrs)</label>
             <input name="ifrActual" type="number" step="0.1" min="0" value="0" class="w-full px-3 py-2 border border-slate-300 rounded-lg" />
@@ -197,6 +215,7 @@
           </div>
           <div class="sm:col-span-2 lg:col-span-4 flex gap-3">
             <button type="submit" id="flightSubmitBtn" class="bg-brand-600 hover:bg-brand-700 text-white font-medium px-5 py-2.5 rounded-lg transition">Add Flight</button>
+            <p id="flightFormMsg" class="text-sm text-red-500 self-center"></p>
           </div>
         </form>
       </div>
@@ -248,14 +267,13 @@
           <div id="aircraftBreakdown" class="space-y-3"></div>
         </div>
         <div class="bg-white rounded-xl shadow-sm p-5">
-          <h3 class="font-semibold mb-2">Pilot Attribution</h3>
-          <p class="text-sm text-slate-500 mb-3">PIC &amp; Dual hours count flights where this name matches the PIC / SIC field.</p>
-          <label class="block text-xs font-medium text-slate-500 mb-1">My pilot name</label>
-          <div class="flex gap-2">
-            <input id="pilotNameInput" placeholder="e.g. J. Smith" class="flex-1 px-3 py-2 border border-slate-300 rounded-lg" />
-            <button id="savePilotNameBtn" class="bg-brand-600 hover:bg-brand-700 text-white px-4 rounded-lg text-sm">Save</button>
-          </div>
-          <p id="pilotNameMsg" class="text-xs text-emerald-600 mt-2 min-h-[1rem]"></p>
+          <h3 class="font-semibold mb-2">Current Pilot</h3>
+          <p class="text-sm text-slate-500 mb-3">All metrics on this page are for the pilot selected in the header.</p>
+          <div id="currentPilotCard" class="text-sm space-y-2"></div>
+          <!-- Legacy hidden inputs kept for the rare migration path that still references them -->
+          <input id="pilotNameInput" type="hidden" />
+          <button id="savePilotNameBtn" type="button" class="hidden"></button>
+          <span id="pilotNameMsg" class="hidden"></span>
         </div>
       </div>
     </section>
@@ -314,6 +332,61 @@
             <div class="p-3 rounded-lg bg-violet-50 border border-violet-200"><div class="font-semibold text-violet-800">15 minutes</div><div class="text-violet-700">Nutrition break every 6 hours of duty</div></div>
           </div>
         </div>
+      </div>
+    </section>
+
+    <!-- ===== PILOTS TAB ===== -->
+    <section id="tab-pilots" class="tab-panel hidden fade-in">
+      <div class="bg-white rounded-xl shadow-sm p-5 mb-6">
+        <div class="flex items-center justify-between mb-4">
+          <h2 id="pilotFormTitle" class="text-lg font-semibold">Add Pilot Profile</h2>
+          <button id="cancelPilotEditBtn" class="hidden text-sm text-slate-500 hover:text-slate-700">Cancel edit</button>
+        </div>
+        <p class="text-sm text-slate-500 mb-4">Pilot profiles are the people whose logbooks this app tracks. Each flight you log is attached to one profile (the "Logbook for" selector at the top).</p>
+        <form id="pilotForm" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <input type="hidden" name="id" />
+          <div>
+            <label class="block text-xs font-medium text-slate-500 mb-1">First Name</label>
+            <input name="firstName" required class="w-full px-3 py-2 border border-slate-300 rounded-lg" />
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-slate-500 mb-1">Last Name</label>
+            <input name="lastName" required class="w-full px-3 py-2 border border-slate-300 rounded-lg" />
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-slate-500 mb-1">Employee # <span class="text-slate-400">(optional)</span></label>
+            <input name="employeeNumber" class="w-full px-3 py-2 border border-slate-300 rounded-lg" />
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-slate-500 mb-1">License # <span class="text-slate-400">(optional)</span></label>
+            <input name="licenseNumber" class="w-full px-3 py-2 border border-slate-300 rounded-lg" />
+          </div>
+          <div class="sm:col-span-2 lg:col-span-4 flex gap-3">
+            <button type="submit" id="pilotSubmitBtn" class="bg-brand-600 hover:bg-brand-700 text-white font-medium px-5 py-2.5 rounded-lg transition">Add Pilot</button>
+          </div>
+        </form>
+      </div>
+
+      <div class="bg-white rounded-xl shadow-sm p-5">
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="text-lg font-semibold">Pilot Profiles</h2>
+          <span id="pilotCountBadge" class="text-sm text-slate-500"></span>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="text-left text-slate-500 border-b border-slate-200">
+                <th class="py-2 pr-3 font-medium">Name</th>
+                <th class="py-2 pr-3 font-medium">Employee #</th>
+                <th class="py-2 pr-3 font-medium">License #</th>
+                <th class="py-2 pr-3 font-medium">Flights</th>
+                <th class="py-2 pr-3 font-medium text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="pilotTableBody"></tbody>
+          </table>
+        </div>
+        <p id="noPilotsMsg" class="text-center text-slate-400 py-8 hidden">No pilot profiles yet. Add your first above.</p>
       </div>
     </section>
 
@@ -406,9 +479,10 @@ const dataKey = (u) => "plb_data_" + u;
 
 function loadUsers(){ try { return JSON.parse(localStorage.getItem(USERS_KEY)) || {}; } catch(e){ return {}; } }
 function saveUsers(u){ localStorage.setItem(USERS_KEY, JSON.stringify(u)); }
+function emptyData(){ return { flights:[], duty:{}, pilotName:"", pilots:[], currentPilotId:null, lastLoggedRole:"Captain" }; }
 function loadData(user){
-  try { return JSON.parse(localStorage.getItem(dataKey(user))) || { flights:[], duty:{}, pilotName:"" }; }
-  catch(e){ return { flights:[], duty:{}, pilotName:"" }; }
+  try { return JSON.parse(localStorage.getItem(dataKey(user))) || emptyData(); }
+  catch(e){ return emptyData(); }
 }
 function saveData(user, data){ localStorage.setItem(dataKey(user), JSON.stringify(data)); }
 
@@ -446,6 +520,119 @@ const AIRPORTS = {
   ZBAA:[40.0799,116.6031], VIDP:[28.5562,77.1], SBGR:[-23.4356,-46.4731], MMMX:[19.4363,-99.0721],
   FAOR:[-26.1392,28.246], UUEE:[55.9726,37.4146], LTFM:[41.2753,28.7519]
 };
+
+/* ============================================================
+   AIRCRAFT TYPES (standardized dropdown list)
+   ============================================================ */
+const AIRCRAFT_TYPES = [
+  { code:"C172",  name:"Cessna 172" },
+  { code:"C182",  name:"Cessna 182" },
+  { code:"PA28",  name:"Piper PA-28" },
+  { code:"DA20",  name:"Diamond DA20" },
+  { code:"DA40",  name:"Diamond DA40" },
+  { code:"DA42",  name:"Diamond DA42" },
+  { code:"BE20",  name:"Beechcraft King Air 200" },
+  { code:"PC-12", name:"Pilatus PC-12" },
+  { code:"DHC-8", name:"De Havilland Dash 8" },
+  { code:"CRJ200",name:"Bombardier CRJ200" },
+  { code:"CRJ700",name:"Bombardier CRJ700" },
+  { code:"CRJ900",name:"Bombardier CRJ900" },
+  { code:"B737",  name:"Boeing 737" },
+  { code:"B738",  name:"Boeing 737-800" },
+  { code:"A220",  name:"Airbus A220" },
+  { code:"A320",  name:"Airbus A320" },
+  { code:"A321",  name:"Airbus A321" }
+];
+function aircraftName(code){
+  const t = AIRCRAFT_TYPES.find(x=>x.code===code);
+  return t ? t.name : (code || "");
+}
+
+/* ============================================================
+   CREW ROLES (Pilot Being Logged role dropdown)
+   ============================================================ */
+const CREW_ROLES = ["Captain","First Officer","Dual","Student","Dual Given","Dual Received","Instructor"];
+
+/* ============================================================
+   DATA MIGRATION — bring older logbooks into the new shape
+   ============================================================ */
+function migrateData(d){
+  if(!d) d = emptyData();
+  if(!Array.isArray(d.flights)) d.flights = [];
+  if(!Array.isArray(d.pilots)) d.pilots = [];
+  if(typeof d.currentPilotId === "undefined") d.currentPilotId = null;
+  if(!d.lastLoggedRole) d.lastLoggedRole = "Captain";
+  if(!d.duty || typeof d.duty !== "object") d.duty = {};
+  if(typeof d.pilotName !== "string") d.pilotName = "";
+
+  // Build a quick name -> pilotId map; create profiles for any free-text PIC/SIC/SOC we find.
+  const nameToId = {};
+  d.pilots.forEach(p => {
+    const full = ((p.firstName||"") + " " + (p.lastName||"")).trim().toLowerCase();
+    if(full) nameToId[full] = p.id;
+  });
+  function ensurePilot(rawName){
+    const name = (rawName||"").trim();
+    if(!name) return "";
+    const key = name.toLowerCase();
+    if(nameToId[key]) return nameToId[key];
+    const parts = name.split(/\s+/);
+    const p = {
+      id: "p" + Date.now() + Math.random().toString(36).slice(2,6),
+      firstName: parts[0] || name,
+      lastName: parts.slice(1).join(" "),
+      employeeNumber: "",
+      licenseNumber: "",
+      createdAt: new Date().toISOString()
+    };
+    d.pilots.push(p);
+    nameToId[key] = p.id;
+    return p.id;
+  }
+
+  d.flights.forEach(fl => {
+    // year/month/day -> date string
+    if(!fl.date && fl.year){
+      const m = String(fl.month||1).padStart(2,"0");
+      const dd = String(fl.day||1).padStart(2,"0");
+      fl.date = `${fl.year}-${m}-${dd}`;
+    }
+    // civilIdent -> registration
+    if(!fl.registration && fl.civilIdent) fl.registration = fl.civilIdent;
+    // Pilot text -> Pilot ID
+    if(typeof fl.picId === "undefined") fl.picId = ensurePilot(fl.pic);
+    if(typeof fl.sicId === "undefined") fl.sicId = ensurePilot(fl.sic);
+    if(typeof fl.socId === "undefined") fl.socId = ensurePilot(fl.soc);
+    // New numeric fields default to 0
+    if(typeof fl.dayHours === "undefined") fl.dayHours = 0;
+    if(typeof fl.nightHours === "undefined") fl.nightHours = 0;
+    // Role + ownership default
+    if(!fl.loggedRole) fl.loggedRole = "Captain";
+    if(!fl.pilotId){
+      // Best-effort guess: the PIC. Reassigned via Current Pilot when user edits.
+      fl.pilotId = fl.picId || null;
+    }
+  });
+
+  // Promote legacy pilotName (used by old Dashboard attribution) into a profile if missing.
+  if(d.pilotName && !d.pilots.find(p => ((p.firstName||"")+" "+(p.lastName||"")).trim().toLowerCase() === d.pilotName.trim().toLowerCase())){
+    ensurePilot(d.pilotName);
+  }
+  if(!d.currentPilotId && d.pilots.length) d.currentPilotId = d.pilots[0].id;
+
+  return d;
+}
+
+/* ============================================================
+   PILOT HELPERS
+   ============================================================ */
+function pilotById(id){ return data.pilots.find(p => p.id === id) || null; }
+function pilotName(id){
+  const p = pilotById(id);
+  if(!p) return "";
+  return ((p.firstName||"") + " " + (p.lastName||"")).trim();
+}
+function currentPilot(){ return pilotById(data.currentPilotId); }
 
 // Deterministic fallback coords for unknown ICAO codes
 function airportCoord(code){
@@ -522,17 +709,26 @@ $("#logoutBtn").addEventListener("click", () => {
 function startSession(username){
   currentUser = username;
   localStorage.setItem(SESSION_KEY, username);
-  data = loadData(username);
-  if(!data.duty) data.duty = {};
-  if(!Array.isArray(data.flights)) data.flights = [];
-  if(data.pilotName == null) data.pilotName = "";
+  data = migrateData(loadData(username));
+  saveData(username, data); // persist any migration changes
   $("#currentUserLabel").textContent = username;
   $("#pilotNameInput").value = data.pilotName || "";
+  populateStaticDropdowns();
   $("#authView").classList.add("hidden");
   $("#appView").classList.remove("hidden");
   switchTab("logger");
   renderAll();
   syncOnLogin(); // async — non-blocking
+}
+
+/* Static dropdowns that depend only on the constants */
+function populateStaticDropdowns(){
+  const at = $("#flightForm").aircraftType;
+  // keep first "select" option then refill
+  at.innerHTML = '<option value="">— select —</option>' +
+    AIRCRAFT_TYPES.map(t => `<option value="${esc(t.code)}">${esc(t.code)} — ${esc(t.name)}</option>`).join("");
+  const role = $("#flightForm").loggedRole;
+  role.innerHTML = CREW_ROLES.map(r => `<option value="${esc(r)}">${esc(r)}</option>`).join("");
 }
 
 /* ============================================================
@@ -550,6 +746,7 @@ function switchTab(tab){
   if(tab === "dashboard") renderDashboard();
   if(tab === "routemap") renderRouteMap();
   if(tab === "duty") renderDuty();
+  if(tab === "pilots") renderPilots();
 }
 
 /* ============================================================
@@ -558,26 +755,128 @@ function switchTab(tab){
 const num = (v) => { const n = parseFloat(v); return isNaN(n) ? 0 : n; };
 const totalHours = (fl) => num(fl.se) + num(fl.me);
 const ifrHours = (fl) => num(fl.ifrActual) + num(fl.ifrSim);
-function flightDate(fl){ return new Date(fl.year, (fl.month||1)-1, fl.day||1); }
-function fmtDate(fl){
-  const m = String(fl.month).padStart(2,"0"), d = String(fl.day).padStart(2,"0");
-  return `${fl.year}-${m}-${d}`;
+function flightDateStr(fl){
+  if(fl.date) return fl.date;
+  if(fl.year){
+    const m = String(fl.month||1).padStart(2,"0"), d = String(fl.day||1).padStart(2,"0");
+    return `${fl.year}-${m}-${d}`;
+  }
+  return "";
 }
+function flightDate(fl){
+  const s = flightDateStr(fl);
+  if(!s) return new Date(0);
+  const [y,m,d] = s.split("-").map(n=>parseInt(n,10));
+  return new Date(y, (m||1)-1, d||1);
+}
+const fmtDate = flightDateStr;
+
+/* Sorted list of flights for the currently selected pilot (newest first). */
+function flightsForCurrentPilot(){
+  const pid = data.currentPilotId;
+  return data.flights
+    .filter(f => !pid || f.pilotId === pid)
+    .sort((a,b) => flightDate(b) - flightDate(a));
+}
+
+/* Refill all pilot-driven dropdowns whenever the pilot list changes. */
+function refreshPilotDropdowns(){
+  const opts = data.pilots
+    .map(p => `<option value="${esc(p.id)}">${esc(pilotName(p.id) || "(unnamed)")}</option>`)
+    .join("");
+  const blank = `<option value="">— none —</option>`;
+  // Logger form pilot fields
+  ["picId","sicId","socId"].forEach(name => {
+    const sel = $("#flightForm")[name];
+    if(!sel) return;
+    const prev = sel.value;
+    sel.innerHTML = blank + opts;
+    sel.value = prev;
+  });
+  // Current Pilot selector
+  const cp = $("#currentPilotSelect");
+  const prev = cp.value;
+  cp.innerHTML = data.pilots.length
+    ? opts
+    : `<option value="">(no pilot profiles)</option>`;
+  if(data.pilots.length){
+    cp.value = data.pilots.some(p=>p.id===data.currentPilotId) ? data.currentPilotId : data.pilots[0].id;
+    data.currentPilotId = cp.value;
+  } else {
+    data.currentPilotId = null;
+  }
+  $("#currentPilotEmpty").classList.toggle("hidden", data.pilots.length > 0);
+  cp.classList.toggle("hidden", data.pilots.length === 0);
+}
+
+/* Update the Registration <datalist> with every unique reg used so far. */
+function refreshRegistrationsList(){
+  const dl = $("#registrationsList");
+  const seen = new Set();
+  data.flights.forEach(f => {
+    const r = (f.registration || f.civilIdent || "").trim().toUpperCase();
+    if(r) seen.add(r);
+  });
+  dl.innerHTML = Array.from(seen).sort().map(r => `<option value="${esc(r)}"></option>`).join("");
+}
+
+$("#currentPilotSelect").addEventListener("change", e => {
+  data.currentPilotId = e.target.value || null;
+  saveData(currentUser, data);
+  renderFlightTable();
+  renderDashboard();
+});
+
+$("#goToPilotsLink").addEventListener("click", () => switchTab("pilots"));
 
 $("#flightForm").addEventListener("submit", (e) => {
   e.preventDefault();
   const f = e.target;
+  const msg = $("#flightFormMsg");
+  msg.textContent = "";
+  if(!data.pilots.length){
+    msg.textContent = "Add at least one pilot profile in the Pilots tab first.";
+    return;
+  }
+  if(!f.aircraftType.value){
+    msg.textContent = "Please pick an aircraft type.";
+    return;
+  }
+  if(!f.date.value){
+    msg.textContent = "Please pick a date.";
+    return;
+  }
+  // Persist the last-used role so the next entry remembers it
+  data.lastLoggedRole = f.loggedRole.value || "Captain";
+
+  const dateStr = f.date.value; // "YYYY-MM-DD"
+  const [y,m,d] = dateStr.split("-").map(n=>parseInt(n,10));
+
   const flight = {
     id: editingId || ("f" + Date.now() + Math.random().toString(36).slice(2,6)),
-    year: parseInt(f.year.value), month: parseInt(f.month.value), day: parseInt(f.day.value),
-    aircraftType: f.aircraftType.value.trim(),
-    civilIdent: f.civilIdent.value.trim(),
-    pic: f.pic.value.trim(), sic: f.sic.value.trim(), soc: f.soc.value.trim(),
-    from: f.from.value.trim().toUpperCase(), to: f.to.value.trim().toUpperCase(),
-    takeoff: f.takeoff.value, landing: f.landing.value,
+    // Canonical new fields
+    date: dateStr,
+    aircraftType: f.aircraftType.value,
+    registration: f.registration.value.trim().toUpperCase(),
+    pilotId: data.currentPilotId,
+    loggedRole: f.loggedRole.value,
+    picId: f.picId.value || "",
+    sicId: f.sicId.value || "",
+    socId: f.socId.value || "",
+    from: f.from.value.trim().toUpperCase(),
+    to: f.to.value.trim().toUpperCase(),
+    takeoff: f.takeoff.value,
+    landing: f.landing.value,
     se: num(f.se.value), me: num(f.me.value), xc: num(f.xc.value),
+    dayHours: num(f.dayHours.value), nightHours: num(f.nightHours.value),
     ifrActual: num(f.ifrActual.value), ifrSim: num(f.ifrSim.value),
     notes: f.notes.value.trim(),
+    // Backward-compatible mirrors (used by CSV/Supabase schema)
+    year: y, month: m, day: d,
+    civilIdent: f.registration.value.trim().toUpperCase(),
+    pic: pilotName(f.picId.value),
+    sic: pilotName(f.sicId.value),
+    soc: pilotName(f.socId.value),
     updated_at: new Date().toISOString()
   };
   if(editingId){
@@ -589,19 +888,25 @@ $("#flightForm").addEventListener("submit", (e) => {
   saveData(currentUser, data);
   pushFlight(flight);
   resetFlightForm();
+  refreshRegistrationsList();
   renderFlightTable();
 });
 
 function resetFlightForm(){
   editingId = null;
-  $("#flightForm").reset();
+  const f = $("#flightForm");
+  f.reset();
   $("#flightFormTitle").textContent = "Log a Flight";
   $("#flightSubmitBtn").textContent = "Add Flight";
   $("#cancelEditBtn").classList.add("hidden");
+  $("#flightFormMsg").textContent = "";
   const t = new Date();
-  $("#flightForm").year.value = t.getFullYear();
-  $("#flightForm").month.value = t.getMonth()+1;
-  $("#flightForm").day.value = t.getDate();
+  const mm = String(t.getMonth()+1).padStart(2,"0");
+  const dd = String(t.getDate()).padStart(2,"0");
+  f.date.value = `${t.getFullYear()}-${mm}-${dd}`;
+  // Re-apply remembered role
+  f.loggedRole.value = data.lastLoggedRole || "Captain";
+  // Reset hour fields to 0 (form.reset() restores defaultValue which is 0)
 }
 
 $("#cancelEditBtn").addEventListener("click", resetFlightForm);
@@ -611,14 +916,35 @@ function editFlight(id){
   if(!fl) return;
   editingId = id;
   const f = $("#flightForm");
-  f.year.value=fl.year; f.month.value=fl.month; f.day.value=fl.day;
-  f.aircraftType.value=fl.aircraftType; f.civilIdent.value=fl.civilIdent;
-  f.pic.value=fl.pic; f.sic.value=fl.sic; f.soc.value=fl.soc;
-  f.from.value=fl.from; f.to.value=fl.to;
-  f.takeoff.value=fl.takeoff; f.landing.value=fl.landing;
-  f.se.value=fl.se; f.me.value=fl.me; f.xc.value=fl.xc;
-  f.ifrActual.value=fl.ifrActual; f.ifrSim.value=fl.ifrSim;
-  f.notes.value=fl.notes;
+  f.date.value = flightDateStr(fl);
+  // If the saved aircraftType isn't in our standardized list, add it as an option so it still selects.
+  if(fl.aircraftType && !AIRCRAFT_TYPES.find(t=>t.code===fl.aircraftType) &&
+     !Array.from(f.aircraftType.options).some(o=>o.value===fl.aircraftType)){
+    const opt = document.createElement("option");
+    opt.value = fl.aircraftType;
+    opt.textContent = fl.aircraftType + " (custom)";
+    f.aircraftType.appendChild(opt);
+  }
+  f.aircraftType.value = fl.aircraftType || "";
+  f.registration.value = fl.registration || fl.civilIdent || "";
+  f.loggedRole.value = fl.loggedRole || "Captain";
+  f.picId.value = fl.picId || "";
+  f.sicId.value = fl.sicId || "";
+  f.socId.value = fl.socId || "";
+  f.from.value = fl.from || "";
+  f.to.value = fl.to || "";
+  f.takeoff.value = fl.takeoff || "Day";
+  f.landing.value = fl.landing || "Day";
+  f.se.value = fl.se||0; f.me.value = fl.me||0; f.xc.value = fl.xc||0;
+  f.dayHours.value = fl.dayHours||0; f.nightHours.value = fl.nightHours||0;
+  f.ifrActual.value = fl.ifrActual||0; f.ifrSim.value = fl.ifrSim||0;
+  f.notes.value = fl.notes || "";
+  // Switch current pilot to the owner of this flight if needed
+  if(fl.pilotId && fl.pilotId !== data.currentPilotId){
+    data.currentPilotId = fl.pilotId;
+    $("#currentPilotSelect").value = fl.pilotId;
+    saveData(currentUser, data);
+  }
   $("#flightFormTitle").textContent = "Edit Flight";
   $("#flightSubmitBtn").textContent = "Save Changes";
   $("#cancelEditBtn").classList.remove("hidden");
@@ -632,21 +958,24 @@ function deleteFlight(id){
   saveData(currentUser, data);
   deleteCloudFlight(id);
   if(editingId === id) resetFlightForm();
+  refreshRegistrationsList();
   renderFlightTable();
 }
 
 function renderFlightTable(){
   const body = $("#flightTableBody");
-  const flights = [...data.flights].sort((a,b) => flightDate(b) - flightDate(a));
-  $("#flightCountBadge").textContent = flights.length + (flights.length===1?" flight":" flights");
+  const flights = flightsForCurrentPilot();
+  const cp = currentPilot();
+  const label = cp ? ` for ${esc(pilotName(cp.id))}` : "";
+  $("#flightCountBadge").innerHTML = flights.length + (flights.length===1?" flight":" flights") + label;
   $("#noFlightsMsg").classList.toggle("hidden", flights.length > 0);
   body.innerHTML = flights.map(fl => `
     <tr class="border-b border-slate-100 hover:bg-slate-50">
       <td class="py-2 pr-3 whitespace-nowrap">${esc(fmtDate(fl))}</td>
       <td class="py-2 pr-3">${esc(fl.aircraftType)}</td>
-      <td class="py-2 pr-3">${esc(fl.civilIdent)||'—'}</td>
+      <td class="py-2 pr-3">${esc(fl.registration||fl.civilIdent)||'—'}</td>
       <td class="py-2 pr-3 whitespace-nowrap font-medium">${esc(fl.from)||'?'} → ${esc(fl.to)||'?'}</td>
-      <td class="py-2 pr-3">${esc(fl.pic)||'—'}</td>
+      <td class="py-2 pr-3">${esc(pilotName(fl.picId) || fl.pic) || '—'}</td>
       <td class="py-2 pr-3">${num(fl.se).toFixed(1)}</td>
       <td class="py-2 pr-3">${num(fl.me).toFixed(1)}</td>
       <td class="py-2 pr-3">${num(fl.xc).toFixed(1)}</td>
@@ -663,8 +992,8 @@ function renderFlightTable(){
 /* ============================================================
    CSV EXPORT / IMPORT
    ============================================================ */
-const CSV_FIELDS = ['year','month','day','aircraftType','civilIdent','pic','sic','soc','from','to','takeoff','landing','se','me','xc','ifrActual','ifrSim','notes'];
-const CSV_HEADERS = ['Year','Month','Day','Aircraft Type','Civil Ident','PIC','SIC','SOC','ICAO From','ICAO To','Takeoff','Landing','Single Engine','Multi Engine','Cross Country','IFR Actual','IFR Simulated','Notes'];
+const CSV_FIELDS = ['year','month','day','aircraftType','civilIdent','pic','sic','soc','from','to','takeoff','landing','se','me','xc','dayHours','nightHours','ifrActual','ifrSim','loggedRole','notes'];
+const CSV_HEADERS = ['Year','Month','Day','Aircraft Type','Registration','PIC','SIC','SOC','ICAO From','ICAO To','Takeoff','Landing','Single Engine','Multi Engine','Cross Country','Day Hours','Night Hours','IFR Actual','IFR Simulated','Logged Role','Notes'];
 
 function csvCell(v){
   v = (v == null ? "" : String(v));
@@ -740,18 +1069,32 @@ function importCSV(text){
     data.flights.push({
       id: "f" + Date.now() + Math.random().toString(36).slice(2,6),
       year:y, month:m, day:d,
-      aircraftType:get("aircraftType"), civilIdent:get("civilIdent"),
+      date: `${y}-${String(m).padStart(2,"0")}-${String(d).padStart(2,"0")}`,
+      aircraftType:get("aircraftType"),
+      civilIdent:get("civilIdent"),
+      registration:get("civilIdent").toUpperCase(),
       pic:get("pic"), sic:get("sic"), soc:get("soc"),
       from:get("from").toUpperCase(), to:get("to").toUpperCase(),
       takeoff: get("takeoff").toLowerCase() === "night" ? "Night" : "Day",
       landing: get("landing").toLowerCase() === "night" ? "Night" : "Day",
       se:num(get("se")), me:num(get("me")), xc:num(get("xc")),
+      dayHours:num(get("dayHours")), nightHours:num(get("nightHours")),
       ifrActual:num(get("ifrActual")), ifrSim:num(get("ifrSim")),
+      loggedRole: get("loggedRole") || "Captain",
       notes:get("notes")
     });
     added++;
   }
-  if(added){ saveData(currentUser, data); renderFlightTable(); renderDashboard(); }
+  if(added){
+    // Re-run migration so the new rows get pilotIds, picIds, etc.
+    data = migrateData(data);
+    saveData(currentUser, data);
+    refreshPilotDropdowns();
+    refreshRegistrationsList();
+    renderPilots();
+    renderFlightTable();
+    renderDashboard();
+  }
   return { added, skipped };
 }
 
@@ -787,13 +1130,17 @@ $("#savePilotNameBtn").addEventListener("click", () => {
 });
 
 function renderDashboard(){
-  const fl = data.flights;
+  const pid = data.currentPilotId;
+  // All flights this pilot owns (their logbook)
+  const fl = data.flights.filter(x => !pid || x.pilotId === pid);
   const total = fl.reduce((s,x)=>s+totalHours(x),0);
   const xc = fl.reduce((s,x)=>s+num(x.xc),0);
   const ifr = fl.reduce((s,x)=>s+ifrHours(x),0);
-  const pname = (data.pilotName||"").trim().toLowerCase();
-  const pic = pname ? fl.filter(x=>(x.pic||"").trim().toLowerCase()===pname).reduce((s,x)=>s+totalHours(x),0) : 0;
-  const dual = pname ? fl.filter(x=>(x.sic||"").trim().toLowerCase()===pname).reduce((s,x)=>s+totalHours(x),0) : 0;
+  const dayH = fl.reduce((s,x)=>s+num(x.dayHours),0);
+  const nightH = fl.reduce((s,x)=>s+num(x.nightHours),0);
+  // PIC/Dual attribution by ID
+  const pic = pid ? fl.filter(x => x.picId === pid).reduce((s,x)=>s+totalHours(x),0) : 0;
+  const dual = pid ? fl.filter(x => x.sicId === pid).reduce((s,x)=>s+totalHours(x),0) : 0;
   const routes = new Set(fl.filter(x=>x.from&&x.to).map(x=>x.from+"-"+x.to));
 
   const cards = [
@@ -801,6 +1148,8 @@ function renderDashboard(){
     ["PIC Hours", pic.toFixed(1), "bg-emerald-600"],
     ["Dual (SIC) Hours", dual.toFixed(1), "bg-violet-600"],
     ["Cross Country Hours", xc.toFixed(1), "bg-amber-500"],
+    ["Day Hours", dayH.toFixed(1), "bg-yellow-500"],
+    ["Night Hours", nightH.toFixed(1), "bg-indigo-600"],
     ["IFR Hours", ifr.toFixed(1), "bg-sky-600"],
     ["Total Flights", String(fl.length), "bg-rose-600"],
     ["Unique Routes", String(routes.size), "bg-teal-600"],
@@ -811,7 +1160,7 @@ function renderDashboard(){
       <div class="text-xs opacity-90 mt-1">${label}</div>
     </div>`).join("");
 
-  // Hours by aircraft type
+  // Hours by aircraft type — use friendly name when known
   const byType = {};
   fl.forEach(x => { const t = x.aircraftType||"Unknown"; byType[t] = (byType[t]||0) + totalHours(x); });
   const entries = Object.entries(byType).sort((a,b)=>b[1]-a[1]);
@@ -820,11 +1169,28 @@ function renderDashboard(){
   if(!entries.length){
     wrap.innerHTML = '<p class="text-slate-400 text-sm">No flights logged yet.</p>';
   } else {
-    wrap.innerHTML = entries.map(([t,h]) => `
+    wrap.innerHTML = entries.map(([t,h]) => {
+      const friendly = aircraftName(t);
+      const display = friendly && friendly !== t ? `${esc(t)} <span class="text-slate-400 font-normal">— ${esc(friendly)}</span>` : esc(t);
+      return `
       <div>
-        <div class="flex justify-between text-sm mb-1"><span class="font-medium">${esc(t)}</span><span class="text-slate-500">${h.toFixed(1)} hrs</span></div>
+        <div class="flex justify-between text-sm mb-1"><span class="font-medium">${display}</span><span class="text-slate-500">${h.toFixed(1)} hrs</span></div>
         <div class="h-2.5 bg-slate-100 rounded-full overflow-hidden"><div class="h-full bg-brand-500 rounded-full" style="width:${max?(h/max*100):0}%"></div></div>
-      </div>`).join("");
+      </div>`;
+    }).join("");
+  }
+
+  // Current pilot info card
+  const cp = currentPilot();
+  const card = $("#currentPilotCard");
+  if(!cp){
+    card.innerHTML = '<p class="text-slate-400">No pilot selected. Add a profile in the Pilots tab.</p>';
+  } else {
+    card.innerHTML = `
+      <div class="flex justify-between"><span class="text-slate-500">Name:</span><span class="font-medium">${esc(pilotName(cp.id))}</span></div>
+      <div class="flex justify-between"><span class="text-slate-500">Employee #:</span><span>${esc(cp.employeeNumber)||'—'}</span></div>
+      <div class="flex justify-between"><span class="text-slate-500">License #:</span><span>${esc(cp.licenseNumber)||'—'}</span></div>
+    `;
   }
 }
 
@@ -834,7 +1200,8 @@ function renderDashboard(){
 function renderRouteMap(){
   const svg = $("#routeSvg");
   const W=800, H=500, pad=60;
-  const flights = data.flights.filter(x=>x.from && x.to);
+  const pid = data.currentPilotId;
+  const flights = data.flights.filter(x => (!pid || x.pilotId === pid) && x.from && x.to);
 
   if(!flights.length){
     svg.innerHTML = `<text x="${W/2}" y="${H/2}" text-anchor="middle" fill="#94a3b8" font-size="18">No routes to display. Log a flight with From/To airports.</text>`;
@@ -990,18 +1357,121 @@ function toggleDuty(key){
 }
 
 /* ============================================================
+   PILOTS TAB
+   ============================================================ */
+let editingPilotId = null;
+
+$("#pilotForm").addEventListener("submit", e => {
+  e.preventDefault();
+  const f = e.target;
+  const pilot = {
+    id: editingPilotId || ("p" + Date.now() + Math.random().toString(36).slice(2,6)),
+    firstName: f.firstName.value.trim(),
+    lastName:  f.lastName.value.trim(),
+    employeeNumber: f.employeeNumber.value.trim(),
+    licenseNumber:  f.licenseNumber.value.trim(),
+    createdAt: editingPilotId ? (pilotById(editingPilotId)?.createdAt || new Date().toISOString()) : new Date().toISOString()
+  };
+  if(editingPilotId){
+    const i = data.pilots.findIndex(p => p.id === editingPilotId);
+    if(i > -1) data.pilots[i] = pilot;
+  } else {
+    data.pilots.push(pilot);
+    if(!data.currentPilotId) data.currentPilotId = pilot.id;
+  }
+  saveData(currentUser, data);
+  resetPilotForm();
+  refreshPilotDropdowns();
+  renderPilots();
+  renderFlightTable();
+  renderDashboard();
+});
+
+function resetPilotForm(){
+  editingPilotId = null;
+  $("#pilotForm").reset();
+  $("#pilotFormTitle").textContent = "Add Pilot Profile";
+  $("#pilotSubmitBtn").textContent = "Add Pilot";
+  $("#cancelPilotEditBtn").classList.add("hidden");
+}
+
+$("#cancelPilotEditBtn").addEventListener("click", resetPilotForm);
+
+function editPilot(id){
+  const p = pilotById(id);
+  if(!p) return;
+  editingPilotId = id;
+  const f = $("#pilotForm");
+  f.firstName.value = p.firstName || "";
+  f.lastName.value = p.lastName || "";
+  f.employeeNumber.value = p.employeeNumber || "";
+  f.licenseNumber.value = p.licenseNumber || "";
+  $("#pilotFormTitle").textContent = "Edit Pilot Profile";
+  $("#pilotSubmitBtn").textContent = "Save Changes";
+  $("#cancelPilotEditBtn").classList.remove("hidden");
+  switchTab("pilots");
+  window.scrollTo({ top:0, behavior:"smooth" });
+}
+
+function deletePilot(id){
+  const count = data.flights.filter(f => f.pilotId === id || f.picId === id || f.sicId === id || f.socId === id).length;
+  const warn = count
+    ? `Delete this pilot profile? ${count} flight${count===1?"":"s"} reference this pilot — those references will be cleared but the flights stay.`
+    : "Delete this pilot profile?";
+  if(!confirm(warn)) return;
+  data.pilots = data.pilots.filter(p => p.id !== id);
+  data.flights.forEach(f => {
+    if(f.pilotId === id) f.pilotId = data.pilots[0]?.id || null;
+    if(f.picId === id) { f.picId = ""; f.pic = ""; }
+    if(f.sicId === id) { f.sicId = ""; f.sic = ""; }
+    if(f.socId === id) { f.socId = ""; f.soc = ""; }
+  });
+  if(data.currentPilotId === id) data.currentPilotId = data.pilots[0]?.id || null;
+  saveData(currentUser, data);
+  if(editingPilotId === id) resetPilotForm();
+  refreshPilotDropdowns();
+  renderPilots();
+  renderFlightTable();
+  renderDashboard();
+}
+
+function renderPilots(){
+  const body = $("#pilotTableBody");
+  $("#pilotCountBadge").textContent = data.pilots.length + (data.pilots.length===1?" profile":" profiles");
+  $("#noPilotsMsg").classList.toggle("hidden", data.pilots.length > 0);
+  body.innerHTML = data.pilots.map(p => {
+    const flightCount = data.flights.filter(f => f.pilotId === p.id).length;
+    return `<tr class="border-b border-slate-100 hover:bg-slate-50">
+      <td class="py-2 pr-3 font-medium">${esc(pilotName(p.id)) || '(unnamed)'}</td>
+      <td class="py-2 pr-3">${esc(p.employeeNumber) || '—'}</td>
+      <td class="py-2 pr-3">${esc(p.licenseNumber) || '—'}</td>
+      <td class="py-2 pr-3">${flightCount}</td>
+      <td class="py-2 pr-3 text-right whitespace-nowrap">
+        <button onclick="editPilot('${p.id}')" class="text-brand-600 hover:text-brand-800 font-medium mr-3">Edit</button>
+        <button onclick="deletePilot('${p.id}')" class="text-red-500 hover:text-red-700 font-medium">Delete</button>
+      </td>
+    </tr>`;
+  }).join("");
+}
+
+/* ============================================================
    RENDER ALL
    ============================================================ */
 function renderAll(){
+  refreshPilotDropdowns();
+  refreshRegistrationsList();
   resetFlightForm();
   renderFlightTable();
   renderDashboard();
+  renderPilots();
 }
 
 // expose handlers used by inline onclick
 window.editFlight = editFlight;
 window.deleteFlight = deleteFlight;
 window.toggleDuty = toggleDuty;
+window.editPilot = editPilot;
+window.deletePilot = deletePilot;
 
 /* ============================================================
    SUPABASE SYNC
@@ -1082,7 +1552,12 @@ async function syncOnLogin(){
     });
     data.flights.forEach(lf => { if(!cloudById[lf.id]) merged[lf.id] = lf; });
     data.flights = Object.values(merged);
+    // Re-run migration so cloud rows get pilotId/picId/sicId/socId etc.
+    data = migrateData(data);
     saveData(currentUser, data);
+    refreshPilotDropdowns();
+    refreshRegistrationsList();
+    renderPilots();
     renderFlightTable();
 
     // push any local-only flights up to cloud
