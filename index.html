@@ -97,6 +97,7 @@
         <div class="flex items-center gap-3 text-sm">
           <span id="syncStatus" class="hidden text-xs font-medium"></span>
           <span class="hidden sm:inline opacity-90">Hi, <span id="currentUserLabel" class="font-medium"></span></span>
+          <button id="reportBugBtn" title="Report a bug" class="bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium px-3 py-1.5 rounded-lg transition">Report Bug</button>
           <button id="settingsBtn" title="Supabase / Cloud Sync Settings" class="opacity-70 hover:opacity-100 transition p-1 rounded-lg hover:bg-brand-600">
             <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
           </button>
@@ -118,6 +119,7 @@
         <button data-tab="routemap" class="tab-btn whitespace-nowrap px-4 py-2.5 text-sm font-medium rounded-t-lg text-brand-100 hover:bg-brand-600">Route Map</button>
         <button data-tab="duty" class="tab-btn whitespace-nowrap px-4 py-2.5 text-sm font-medium rounded-t-lg text-brand-100 hover:bg-brand-600">Duty Tracker</button>
         <button data-tab="pilots" class="tab-btn whitespace-nowrap px-4 py-2.5 text-sm font-medium rounded-t-lg text-brand-100 hover:bg-brand-600">Pilots</button>
+        <button data-tab="bugs" class="tab-btn whitespace-nowrap px-4 py-2.5 text-sm font-medium rounded-t-lg text-brand-100 hover:bg-brand-600">Bug Reports</button>
       </nav>
     </div>
   </header>
@@ -382,6 +384,18 @@
         </form>
       </div>
 
+      <!-- Duplicate detection -->
+      <div id="pilotDupesPanel" class="bg-amber-50 border border-amber-200 rounded-xl shadow-sm p-5 mb-6 hidden">
+        <div class="flex items-start justify-between gap-3 mb-3">
+          <div>
+            <h3 class="font-semibold text-amber-900">Possible duplicate profiles</h3>
+            <p class="text-sm text-amber-800 mt-1">Pick which profile is the canonical one in each group, then click <b>Merge</b>. All flights from the others will be reassigned and the duplicates deleted.</p>
+          </div>
+          <button id="pilotDupesDismiss" class="text-xs text-amber-700 hover:text-amber-900">Dismiss</button>
+        </div>
+        <div id="pilotDupesGroups" class="space-y-3"></div>
+      </div>
+
       <div class="bg-white rounded-xl shadow-sm p-5">
         <div class="flex items-center justify-between mb-3">
           <h2 class="text-lg font-semibold">Pilot Profiles</h2>
@@ -402,6 +416,31 @@
           </table>
         </div>
         <p id="noPilotsMsg" class="text-center text-slate-400 py-8 hidden">No pilot profiles yet. Add your first above.</p>
+      </div>
+    </section>
+
+    <!-- ===== BUG REPORTS TAB ===== -->
+    <section id="tab-bugs" class="tab-panel hidden fade-in">
+      <div class="bg-white rounded-xl shadow-sm p-5 mb-6">
+        <div class="flex flex-wrap items-center justify-between gap-3 mb-3">
+          <div>
+            <h2 class="text-lg font-semibold">Bug Reports</h2>
+            <p class="text-sm text-slate-500 mt-1">
+              All bug reports filed from this device, plus any synced from cloud sync.
+              Click <b>Report Bug</b> in the header to file a new one.
+            </p>
+          </div>
+          <div class="flex items-center gap-2">
+            <select id="bugFilter" class="text-sm border border-slate-300 rounded-lg px-3 py-2 bg-white">
+              <option value="all">All</option>
+              <option value="open">Open only</option>
+              <option value="resolved">Resolved only</option>
+            </select>
+            <button id="fileBugFromTabBtn" class="bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium px-3 py-2 rounded-lg transition">+ New report</button>
+          </div>
+        </div>
+        <div id="bugReportsList" class="space-y-3"></div>
+        <p id="noBugsMsg" class="text-center text-slate-400 py-8 hidden">No bug reports yet. Click <b>Report Bug</b> in the header (or "+ New report" above) to file one.</p>
       </div>
     </section>
 
@@ -467,14 +506,32 @@ CREATE TABLE plb_pilot_profiles (
   username TEXT PRIMARY KEY,
   pilot_name TEXT DEFAULT ''
 );
+CREATE TABLE plb_bug_reports (
+  id TEXT PRIMARY KEY,
+  username TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  status TEXT DEFAULT 'open',
+  severity TEXT DEFAULT 'medium',
+  description TEXT,
+  steps TEXT DEFAULT '',
+  tab TEXT DEFAULT '',
+  url TEXT DEFAULT '',
+  user_agent TEXT DEFAULT '',
+  viewport TEXT DEFAULT '',
+  app_version TEXT DEFAULT '',
+  app_state JSONB,
+  recent_errors JSONB
+);
 
 -- 2. Enable Row Level Security + allow anon access
 ALTER TABLE plb_flights ENABLE ROW LEVEL SECURITY;
 ALTER TABLE plb_duty_days ENABLE ROW LEVEL SECURITY;
 ALTER TABLE plb_pilot_profiles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE plb_bug_reports ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "anon_all" ON plb_flights FOR ALL TO anon USING (true) WITH CHECK (true);
 CREATE POLICY "anon_all" ON plb_duty_days FOR ALL TO anon USING (true) WITH CHECK (true);
-CREATE POLICY "anon_all" ON plb_pilot_profiles FOR ALL TO anon USING (true) WITH CHECK (true);</code></pre>
+CREATE POLICY "anon_all" ON plb_pilot_profiles FOR ALL TO anon USING (true) WITH CHECK (true);
+CREATE POLICY "anon_all" ON plb_bug_reports FOR ALL TO anon USING (true) WITH CHECK (true);</code></pre>
           <p class="text-xs text-slate-400 mt-2">Find this in your Supabase project → SQL Editor → New query. Run it once, then come back here to connect.</p>
         </div>
       </div>
@@ -529,10 +586,75 @@ CREATE POLICY "anon_all" ON plb_pilot_profiles FOR ALL TO anon USING (true) WITH
       </div>
     </div>
   </div>
+
+  <!-- ===== BUG REPORT MODAL ===== -->
+  <div id="bugModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-xl max-h-[90vh] overflow-y-auto">
+      <div class="p-6">
+        <div class="flex items-center justify-between mb-1">
+          <h3 class="text-lg font-semibold">Report a bug</h3>
+          <button id="bugModalClose" type="button" class="text-slate-400 hover:text-slate-600 text-2xl leading-none">&times;</button>
+        </div>
+        <p class="text-sm text-slate-500 mb-4">Help us fix it. Your username, the active tab, browser info, and any recent JavaScript errors are attached automatically.</p>
+        <form id="bugForm" class="space-y-4">
+          <div>
+            <label class="block text-xs font-medium text-slate-500 mb-1">What went wrong? <span class="text-red-500">*</span></label>
+            <textarea name="description" rows="3" required placeholder="e.g. After importing my logbook, the dashboard shows 0 PIC hours even though I'm the PIC on most flights." class="w-full px-3 py-2 border border-slate-300 rounded-lg"></textarea>
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-slate-500 mb-1">Steps to reproduce <span class="text-slate-400">(optional)</span></label>
+            <textarea name="steps" rows="3" placeholder="1. Click ... 2. Then ... 3. I expected X but saw Y" class="w-full px-3 py-2 border border-slate-300 rounded-lg"></textarea>
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-slate-500 mb-1">Severity</label>
+            <select name="severity" class="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white">
+              <option value="low">Low — minor annoyance</option>
+              <option value="medium" selected>Medium — feature partially broken</option>
+              <option value="high">High — blocks me from using the app</option>
+              <option value="data-loss">Data loss — affects my saved flights</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-slate-500 mb-1">Screenshot <span class="text-slate-400">(optional, ≤2MB)</span></label>
+            <input id="bugScreenshot" name="screenshot" type="file" accept="image/*" class="text-sm" />
+            <p id="bugScreenshotMsg" class="text-xs text-slate-400 mt-1">Or paste an image (Ctrl+V) while this modal is focused.</p>
+            <div id="bugScreenshotPreview" class="hidden mt-2 border border-slate-200 rounded-lg p-2">
+              <img id="bugScreenshotImg" alt="Screenshot preview" class="max-h-40 rounded" />
+              <button type="button" id="bugScreenshotRemove" class="text-xs text-red-500 hover:text-red-700 mt-1">Remove</button>
+            </div>
+          </div>
+          <details class="text-xs text-slate-500">
+            <summary class="cursor-pointer hover:text-slate-700">Attached automatically (preview)</summary>
+            <pre id="bugAttachedInfo" class="mt-2 p-2 bg-slate-50 rounded text-[10px] leading-relaxed overflow-x-auto whitespace-pre-wrap"></pre>
+          </details>
+          <p id="bugFormMsg" class="text-sm min-h-[1.25rem]"></p>
+          <div class="flex justify-end gap-2 pt-2">
+            <button type="button" id="bugModalCancel" class="px-4 py-2 text-sm rounded-lg hover:bg-slate-100">Cancel</button>
+            <button type="submit" class="bg-brand-600 hover:bg-brand-700 text-white px-4 py-2 rounded-lg text-sm">Submit report</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
 </div>
 
 <script>
 "use strict";
+
+/* Rolling buffer of the most recent JS errors. Captured before anything else
+   so even the earliest boot-time errors are kept. Bug reports include this. */
+const APP_VERSION = "0.6.0";
+const RECENT_ERRORS = [];
+function logRecentError(kind, msg, extra){
+  RECENT_ERRORS.push({ t: new Date().toISOString(), kind, msg: String(msg||"").slice(0, 500), extra: extra ? String(extra).slice(0, 500) : "" });
+  if(RECENT_ERRORS.length > 20) RECENT_ERRORS.shift();
+}
+window.addEventListener("error", e => {
+  logRecentError("error", e.message, (e.filename||"") + ":" + (e.lineno||"") + ":" + (e.colno||""));
+});
+window.addEventListener("unhandledrejection", e => {
+  logRecentError("promise-rejection", (e.reason && (e.reason.message || e.reason)) || "");
+});
 
 /* ============================================================
    STORAGE KEYS & HELPERS
@@ -543,7 +665,7 @@ const dataKey = (u) => "plb_data_" + u;
 
 function loadUsers(){ try { return JSON.parse(localStorage.getItem(USERS_KEY)) || {}; } catch(e){ return {}; } }
 function saveUsers(u){ localStorage.setItem(USERS_KEY, JSON.stringify(u)); }
-function emptyData(){ return { flights:[], duty:{}, pilotName:"", pilots:[], currentPilotId:null, lastLoggedRole:"Captain" }; }
+function emptyData(){ return { flights:[], duty:{}, pilotName:"", pilots:[], currentPilotId:null, lastLoggedRole:"Captain", bugReports:[] }; }
 function loadData(user){
   try { return JSON.parse(localStorage.getItem(dataKey(user))) || emptyData(); }
   catch(e){ return emptyData(); }
@@ -846,6 +968,7 @@ function migrateData(d){
     else if(d.duty[k] && typeof d.duty[k] === "object" && d.duty[k].on === undefined) d.duty[k].on = true;
   });
   if(typeof d.pilotName !== "string") d.pilotName = "";
+  if(!Array.isArray(d.bugReports)) d.bugReports = [];
 
   // Build a quick name -> pilotId map; create profiles for any free-text PIC/SIC/SOC we find.
   const nameToId = {};
@@ -1042,6 +1165,7 @@ function switchTab(tab){
   if(tab === "routemap") renderRouteMap();
   if(tab === "duty") renderDuty();
   if(tab === "pilots") renderPilots();
+  if(tab === "bugs") renderBugReports();
 }
 
 /* ============================================================
@@ -2205,23 +2329,181 @@ function deletePilot(id){
   renderDashboard();
 }
 
+/* Per-pilot "duplicate key": initials of leading words + ":" + the longest word.
+   "B.Pearce" -> "b:pearce" ; "Ben Pearce" -> "b:pearce" ; "A. MOWBRAY" -> "a:mowbray".
+   Two pilots with the same key are flagged as candidate duplicates. */
+function pilotDupKey(p){
+  const full = `${p.firstName||""} ${p.lastName||""}`.toLowerCase();
+  const words = full.split(/[^a-z]+/).filter(Boolean);
+  if(!words.length) return "";
+  const last = words[words.length - 1];
+  const initials = words.slice(0, -1).map(w => w[0]).sort().join("");
+  return `${initials}:${last}`;
+}
+
+/* Move every reference from sourceId -> targetId, then delete the source profile.
+   Skips if either pilot is missing or source == target. Confirms with the user
+   before doing anything destructive. */
+function mergePilots(sourceId, targetId){
+  if(!sourceId || !targetId || sourceId === targetId) return false;
+  const src = pilotById(sourceId), tgt = pilotById(targetId);
+  if(!src || !tgt) return false;
+  const refs = data.flights.filter(f =>
+    f.pilotId === sourceId || f.picId === sourceId || f.sicId === sourceId || f.socId === sourceId
+  ).length;
+  if(!confirm(
+    `Merge "${pilotName(sourceId)}" into "${pilotName(targetId)}"?\n\n` +
+    `${refs} flight reference${refs===1?"":"s"} will be reassigned, then ` +
+    `"${pilotName(sourceId)}" will be deleted.\n\nThis cannot be undone.`
+  )) return false;
+  // Carry over optional metadata that the target is missing
+  if(!tgt.employeeNumber && src.employeeNumber) tgt.employeeNumber = src.employeeNumber;
+  if(!tgt.licenseNumber && src.licenseNumber) tgt.licenseNumber = src.licenseNumber;
+  // Reassign references on every flight
+  data.flights.forEach(f => {
+    if(f.pilotId === sourceId) f.pilotId = targetId;
+    if(f.picId === sourceId){ f.picId = targetId; f.pic = pilotName(targetId); }
+    if(f.sicId === sourceId){ f.sicId = targetId; f.sic = pilotName(targetId); }
+    if(f.socId === sourceId){ f.socId = targetId; f.soc = pilotName(targetId); }
+  });
+  data.pilots = data.pilots.filter(p => p.id !== sourceId);
+  if(data.currentPilotId === sourceId) data.currentPilotId = targetId;
+  saveData(currentUser, data);
+  refreshPilotDropdowns();
+  refreshRegistrationsList();
+  renderPilots();
+  renderFlightTable();
+  renderDashboard();
+  return true;
+}
+
+/* Merge an entire group of duplicates: every pilot in `sourceIds` is folded
+   into `targetId`. One confirm covers all. */
+function mergePilotsGroup(targetId, sourceIds){
+  if(!targetId || !sourceIds || !sourceIds.length) return;
+  const refs = data.flights.filter(f => sourceIds.some(id =>
+    f.pilotId === id || f.picId === id || f.sicId === id || f.socId === id
+  )).length;
+  const names = sourceIds.map(id => `"${pilotName(id)}"`).join(", ");
+  if(!confirm(
+    `Merge ${names} into "${pilotName(targetId)}"?\n\n` +
+    `${refs} flight reference${refs===1?"":"s"} will be reassigned, then ${sourceIds.length} ` +
+    `duplicate profile${sourceIds.length===1?"":"s"} will be deleted.\n\nThis cannot be undone.`
+  )) return;
+  const tgt = pilotById(targetId);
+  sourceIds.forEach(id => {
+    const src = pilotById(id);
+    if(!src || !tgt) return;
+    if(!tgt.employeeNumber && src.employeeNumber) tgt.employeeNumber = src.employeeNumber;
+    if(!tgt.licenseNumber && src.licenseNumber) tgt.licenseNumber = src.licenseNumber;
+  });
+  data.flights.forEach(f => {
+    if(sourceIds.includes(f.pilotId)) f.pilotId = targetId;
+    if(sourceIds.includes(f.picId)){ f.picId = targetId; f.pic = pilotName(targetId); }
+    if(sourceIds.includes(f.sicId)){ f.sicId = targetId; f.sic = pilotName(targetId); }
+    if(sourceIds.includes(f.socId)){ f.socId = targetId; f.soc = pilotName(targetId); }
+  });
+  data.pilots = data.pilots.filter(p => !sourceIds.includes(p.id));
+  if(sourceIds.includes(data.currentPilotId)) data.currentPilotId = targetId;
+  saveData(currentUser, data);
+  refreshPilotDropdowns();
+  refreshRegistrationsList();
+  renderPilots();
+  renderFlightTable();
+  renderDashboard();
+}
+
+/* User-facing wrapper for the per-row "Merge into…" dropdown so the select can
+   be reset whether the merge proceeds or the user cancels. */
+function handleMergeSelect(sourceId, sel){
+  const targetId = sel.value;
+  sel.value = "";
+  if(targetId) mergePilots(sourceId, targetId);
+}
+
+/* Build duplicate clusters: pilots sharing the same dup key. */
+function findDuplicateClusters(){
+  const groups = {};
+  data.pilots.forEach(p => {
+    const k = pilotDupKey(p);
+    if(!k) return;
+    (groups[k] = groups[k] || []).push(p);
+  });
+  return Object.values(groups).filter(g => g.length >= 2);
+}
+
+function renderDuplicatesPanel(){
+  const panel = $("#pilotDupesPanel");
+  const wrap  = $("#pilotDupesGroups");
+  if(!panel || !wrap) return;
+  const clusters = findDuplicateClusters();
+  if(!clusters.length || panel.dataset.dismissed === "1"){
+    panel.classList.add("hidden");
+    return;
+  }
+  panel.classList.remove("hidden");
+  wrap.innerHTML = clusters.map((group, gi) => {
+    // Pre-select the profile with the most flights as the canonical default
+    const counted = group.map(p => ({
+      p,
+      n: data.flights.filter(f => f.pilotId === p.id || f.picId === p.id || f.sicId === p.id || f.socId === p.id).length
+    }));
+    counted.sort((a,b) => b.n - a.n);
+    const defaultTargetId = counted[0].p.id;
+    const opts = counted.map(({p,n}) => {
+      const lbl = `${esc(pilotName(p.id) || '(unnamed)')} — ${n} flight${n===1?"":"s"}`;
+      return `<option value="${p.id}" ${p.id===defaultTargetId?"selected":""}>${lbl}</option>`;
+    }).join("");
+    const sourceIdsCsv = counted.map(c => c.p.id).join(",");
+    return `
+      <div class="bg-white rounded-lg p-3 border border-amber-100">
+        <div class="text-sm text-slate-600 mb-2">Group: <b>${esc(group.map(p => pilotName(p.id)).join(", "))}</b></div>
+        <div class="flex flex-wrap items-center gap-2">
+          <label class="text-sm text-slate-500">Keep:</label>
+          <select id="dupTarget_${gi}" class="text-sm border border-slate-300 rounded px-2 py-1 bg-white">${opts}</select>
+          <button onclick="mergeDuplicateGroup(${gi}, '${sourceIdsCsv}')"
+                  class="bg-amber-600 hover:bg-amber-700 text-white text-sm font-medium px-3 py-1.5 rounded transition">
+            Merge ${group.length - 1} duplicate${group.length-1===1?"":"s"}
+          </button>
+        </div>
+      </div>`;
+  }).join("");
+}
+
+function mergeDuplicateGroup(gi, sourceIdsCsv){
+  const sel = $("#dupTarget_" + gi);
+  if(!sel) return;
+  const targetId = sel.value;
+  const sourceIds = sourceIdsCsv.split(",").filter(id => id && id !== targetId);
+  mergePilotsGroup(targetId, sourceIds);
+}
+
 function renderPilots(){
   const body = $("#pilotTableBody");
   $("#pilotCountBadge").textContent = data.pilots.length + (data.pilots.length===1?" profile":" profiles");
   $("#noPilotsMsg").classList.toggle("hidden", data.pilots.length > 0);
   body.innerHTML = data.pilots.map(p => {
     const flightCount = data.flights.filter(f => f.pilotId === p.id).length;
+    const others = data.pilots.filter(x => x.id !== p.id);
+    const mergeSelect = others.length
+      ? `<select onchange="handleMergeSelect('${p.id}', this)" class="text-xs border border-slate-300 rounded px-1.5 py-1 mr-2 bg-white">
+           <option value="">Merge into…</option>
+           ${others.map(o => `<option value="${o.id}">${esc(pilotName(o.id))}</option>`).join("")}
+         </select>`
+      : "";
     return `<tr class="border-b border-slate-100 hover:bg-slate-50">
       <td class="py-2 pr-3 font-medium">${esc(pilotName(p.id)) || '(unnamed)'}</td>
       <td class="py-2 pr-3">${esc(p.employeeNumber) || '—'}</td>
       <td class="py-2 pr-3">${esc(p.licenseNumber) || '—'}</td>
       <td class="py-2 pr-3">${flightCount}</td>
       <td class="py-2 pr-3 text-right whitespace-nowrap">
+        ${mergeSelect}
         <button onclick="editPilot('${p.id}')" class="text-brand-600 hover:text-brand-800 font-medium mr-3">Edit</button>
         <button onclick="deletePilot('${p.id}')" class="text-red-500 hover:text-red-700 font-medium">Delete</button>
       </td>
     </tr>`;
   }).join("");
+  renderDuplicatesPanel();
 }
 
 /* ============================================================
@@ -2234,6 +2516,7 @@ function renderAll(){
   renderFlightTable();
   renderDashboard();
   renderPilots();
+  renderBugReports();
 }
 
 // expose handlers used by inline onclick
@@ -2242,6 +2525,15 @@ window.deleteFlight = deleteFlight;
 window.openDutyModal = openDutyModal;
 window.editPilot = editPilot;
 window.deletePilot = deletePilot;
+window.handleMergeSelect = handleMergeSelect;
+window.mergeDuplicateGroup = mergeDuplicateGroup;
+
+// Dismiss the duplicate-detection banner for the rest of the session
+document.getElementById("pilotDupesDismiss")?.addEventListener("click", () => {
+  const panel = document.getElementById("pilotDupesPanel");
+  panel.dataset.dismissed = "1";
+  panel.classList.add("hidden");
+});
 
 /* ============================================================
    SUPABASE SYNC
@@ -2352,6 +2644,22 @@ async function syncOnLogin(){
       saveData(currentUser, data);
     }
 
+    // --- bug reports (read all rows; reports are shared across users) ---
+    try {
+      const { data: bugRows } = await sb.from("plb_bug_reports").select("*");
+      if(bugRows){
+        const localById = Object.fromEntries((data.bugReports||[]).map(r=>[r.id, r]));
+        bugRows.forEach(r => {
+          if(!localById[r.id]){
+            // Cloud copy has no screenshot blob; that field stays "" until viewer attaches one
+            data.bugReports.push({ ...r, screenshot: localById[r.id]?.screenshot || "" });
+          }
+        });
+        saveData(currentUser, data);
+        renderBugReports();
+      }
+    } catch(e){ /* missing table OK — feature degrades */ }
+
     showSyncStatus("ok");
     renderDashboard();
   } catch(e){ showSyncStatus("offline"); }
@@ -2430,6 +2738,244 @@ $("#clearSettingsBtn").addEventListener("click", () => {
   hideSyncStatus();
   setSettingsMsg("Disconnected.", "info");
 });
+
+/* ============================================================
+   BUG REPORTER
+   ============================================================
+   Reports are stored in data.bugReports per user (so each app user
+   sees their own filed reports in their localStorage) and pushed to
+   Supabase `plb_bug_reports` when cloud sync is configured. The
+   Bug Reports tab merges local + any other rows synced down from
+   the same Supabase project, giving a single combined view.
+
+   Storage shape:
+     {
+       id, username, created_at, status, severity,
+       description, steps, tab,
+       user_agent, viewport, app_version,
+       app_state, recent_errors,
+       screenshot (base64 data URL, may be omitted on cloud)
+     }
+*/
+
+let pendingBugScreenshot = ""; // base64 data URL, set by file input or paste
+
+function activeTabName(){
+  const t = document.querySelector(".tab-btn.active");
+  return t ? t.dataset.tab : "";
+}
+
+function gatherBugContext(){
+  const ctx = {
+    user_agent: navigator.userAgent,
+    viewport: `${window.innerWidth}x${window.innerHeight}`,
+    app_version: APP_VERSION,
+    tab: activeTabName(),
+    url: window.location.href,
+    app_state: {
+      pilot_count: data.pilots.length,
+      flight_count: data.flights.length,
+      current_pilot_id: data.currentPilotId || null,
+      current_pilot_name: pilotName(data.currentPilotId) || null,
+      cloud_sync: !!sb
+    },
+    recent_errors: RECENT_ERRORS.slice()
+  };
+  return ctx;
+}
+
+function openBugModal(){
+  pendingBugScreenshot = "";
+  $("#bugScreenshot").value = "";
+  $("#bugScreenshotPreview").classList.add("hidden");
+  $("#bugForm").reset();
+  $("#bugFormMsg").textContent = "";
+  $("#bugAttachedInfo").textContent = JSON.stringify(gatherBugContext(), null, 2);
+  $("#bugModal").classList.remove("hidden");
+}
+function closeBugModal(){ $("#bugModal").classList.add("hidden"); }
+
+$("#reportBugBtn").addEventListener("click", openBugModal);
+$("#bugModalClose").addEventListener("click", closeBugModal);
+$("#bugModalCancel").addEventListener("click", closeBugModal);
+$("#bugModal").addEventListener("click", e => { if(e.target === $("#bugModal")) closeBugModal(); });
+$("#fileBugFromTabBtn").addEventListener("click", openBugModal);
+
+function setBugScreenshot(dataUrl, fileSize){
+  if(dataUrl.length > 2_500_000){
+    $("#bugScreenshotMsg").textContent = "Screenshot too large — please use one under 2MB.";
+    $("#bugScreenshotMsg").className = "text-xs text-red-500 mt-1";
+    return;
+  }
+  pendingBugScreenshot = dataUrl;
+  $("#bugScreenshotImg").src = dataUrl;
+  $("#bugScreenshotPreview").classList.remove("hidden");
+  $("#bugScreenshotMsg").textContent = fileSize ? `Attached (${Math.round(fileSize/1024)} KB).` : "Pasted.";
+  $("#bugScreenshotMsg").className = "text-xs text-emerald-600 mt-1";
+}
+
+$("#bugScreenshot").addEventListener("change", e => {
+  const file = e.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = () => setBugScreenshot(reader.result, file.size);
+  reader.onerror = () => { $("#bugFormMsg").textContent = "Couldn't read screenshot."; };
+  reader.readAsDataURL(file);
+});
+
+$("#bugScreenshotRemove").addEventListener("click", () => {
+  pendingBugScreenshot = "";
+  $("#bugScreenshot").value = "";
+  $("#bugScreenshotPreview").classList.add("hidden");
+  $("#bugScreenshotMsg").textContent = "";
+  $("#bugScreenshotMsg").className = "text-xs text-slate-400 mt-1";
+});
+
+// Paste image from clipboard while modal is open
+document.addEventListener("paste", e => {
+  if($("#bugModal").classList.contains("hidden")) return;
+  for(const item of (e.clipboardData?.items || [])){
+    if(item.type && item.type.startsWith("image/")){
+      const file = item.getAsFile();
+      if(file){
+        const reader = new FileReader();
+        reader.onload = () => setBugScreenshot(reader.result, file.size);
+        reader.readAsDataURL(file);
+        e.preventDefault();
+        return;
+      }
+    }
+  }
+});
+
+$("#bugForm").addEventListener("submit", e => {
+  e.preventDefault();
+  const f = e.target;
+  const description = f.description.value.trim();
+  if(!description){
+    $("#bugFormMsg").textContent = "Description is required.";
+    $("#bugFormMsg").className = "text-sm text-red-500 min-h-[1.25rem]";
+    return;
+  }
+  const ctx = gatherBugContext();
+  const report = {
+    id: "bug_" + Date.now() + "_" + Math.random().toString(36).slice(2,6),
+    username: currentUser || "(anonymous)",
+    created_at: new Date().toISOString(),
+    status: "open",
+    severity: f.severity.value,
+    description,
+    steps: f.steps.value.trim(),
+    tab: ctx.tab,
+    url: ctx.url,
+    user_agent: ctx.user_agent,
+    viewport: ctx.viewport,
+    app_version: ctx.app_version,
+    app_state: ctx.app_state,
+    recent_errors: ctx.recent_errors,
+    screenshot: pendingBugScreenshot || ""
+  };
+  data.bugReports.push(report);
+  saveData(currentUser, data);
+  pushBugReport(report); // async, no-op if cloud not configured
+  $("#bugFormMsg").textContent = "Submitted — thank you!";
+  $("#bugFormMsg").className = "text-sm text-emerald-600 min-h-[1.25rem]";
+  renderBugReports();
+  setTimeout(closeBugModal, 800);
+});
+
+/* ---------- Bug Reports tab list ---------- */
+
+let bugFilterValue = "all";
+$("#bugFilter").addEventListener("change", e => { bugFilterValue = e.target.value; renderBugReports(); });
+
+function renderBugReports(){
+  const list = $("#bugReportsList");
+  const reports = (data.bugReports || []).slice().sort((a,b) => (b.created_at||"").localeCompare(a.created_at||""));
+  const filtered = reports.filter(r =>
+    bugFilterValue === "all" ||
+    (bugFilterValue === "open" && r.status !== "resolved") ||
+    (bugFilterValue === "resolved" && r.status === "resolved")
+  );
+  $("#noBugsMsg").classList.toggle("hidden", filtered.length > 0);
+  if(!filtered.length){ list.innerHTML = ""; return; }
+  list.innerHTML = filtered.map(r => {
+    const sevColor = r.severity === "data-loss" ? "bg-red-100 text-red-700"
+      : r.severity === "high"   ? "bg-orange-100 text-orange-700"
+      : r.severity === "medium" ? "bg-amber-100 text-amber-700"
+      :                            "bg-slate-100 text-slate-600";
+    const statusBadge = r.status === "resolved"
+      ? '<span class="text-xs bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full">resolved</span>'
+      : '<span class="text-xs bg-sky-100 text-sky-700 px-2 py-0.5 rounded-full">open</span>';
+    const when = (r.created_at||"").replace("T"," ").slice(0,16);
+    const shortDesc = (r.description||"").slice(0, 200);
+    return `<div class="border border-slate-200 rounded-lg p-3">
+      <div class="flex flex-wrap items-start justify-between gap-2 mb-1">
+        <div class="flex flex-wrap items-center gap-2">
+          ${statusBadge}
+          <span class="text-xs ${sevColor} px-2 py-0.5 rounded-full">${esc(r.severity || "—")}</span>
+          <span class="text-xs text-slate-500">${esc(when)} · ${esc(r.username || "")} · <i>${esc(r.tab || "")}</i></span>
+        </div>
+        <div class="flex gap-2">
+          ${r.status === "resolved"
+            ? `<button onclick="setBugStatus('${r.id}','open')" class="text-xs text-sky-600 hover:text-sky-800">Reopen</button>`
+            : `<button onclick="setBugStatus('${r.id}','resolved')" class="text-xs text-emerald-600 hover:text-emerald-800">Mark resolved</button>`}
+          <button onclick="deleteBugReport('${r.id}')" class="text-xs text-red-500 hover:text-red-700">Delete</button>
+        </div>
+      </div>
+      <div class="text-sm text-slate-800 mb-2 whitespace-pre-line">${esc(shortDesc)}${r.description && r.description.length > 200 ? "…" : ""}</div>
+      ${r.steps ? `<div class="text-xs text-slate-500 mb-2 whitespace-pre-line"><b>Steps:</b> ${esc(r.steps)}</div>` : ""}
+      ${r.screenshot ? `<details class="text-xs"><summary class="cursor-pointer text-slate-500 hover:text-slate-700">View screenshot</summary><img src="${esc(r.screenshot)}" class="mt-2 max-h-64 rounded border border-slate-200"></details>` : ""}
+      <details class="text-xs text-slate-500 mt-1">
+        <summary class="cursor-pointer hover:text-slate-700">Diagnostics</summary>
+        <pre class="mt-1 p-2 bg-slate-50 rounded text-[10px] leading-relaxed overflow-x-auto whitespace-pre-wrap">${esc(JSON.stringify({
+          tab: r.tab, url: r.url, user_agent: r.user_agent, viewport: r.viewport,
+          app_version: r.app_version, app_state: r.app_state, recent_errors: r.recent_errors
+        }, null, 2))}</pre>
+      </details>
+    </div>`;
+  }).join("");
+}
+
+function setBugStatus(id, status){
+  const r = data.bugReports.find(x => x.id === id);
+  if(!r) return;
+  r.status = status;
+  saveData(currentUser, data);
+  pushBugReport(r);
+  renderBugReports();
+}
+function deleteBugReport(id){
+  if(!confirm("Delete this bug report? This cannot be undone.")) return;
+  data.bugReports = data.bugReports.filter(r => r.id !== id);
+  saveData(currentUser, data);
+  deleteCloudBugReport(id);
+  renderBugReports();
+}
+
+window.setBugStatus = setBugStatus;
+window.deleteBugReport = deleteBugReport;
+
+/* ---------- Cloud sync hooks ---------- */
+async function pushBugReport(r){
+  if(!sb) return;
+  try {
+    await sb.from("plb_bug_reports").upsert([{
+      id: r.id, username: r.username, created_at: r.created_at,
+      status: r.status, severity: r.severity,
+      description: r.description, steps: r.steps || "",
+      tab: r.tab || "", url: r.url || "",
+      user_agent: r.user_agent || "", viewport: r.viewport || "",
+      app_version: r.app_version || "",
+      app_state: r.app_state || {}, recent_errors: r.recent_errors || []
+      // screenshot intentionally NOT pushed — keep blob storage off the table
+    }]);
+  } catch(e){ /* network/offline — local copy is the source of truth */ }
+}
+async function deleteCloudBugReport(id){
+  if(!sb) return;
+  try { await sb.from("plb_bug_reports").delete().eq("id", id); } catch(e){}
+}
 
 /* ============================================================
    BOOTSTRAP
