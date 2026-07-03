@@ -707,7 +707,7 @@ CREATE POLICY "anon_all" ON plb_bug_reports FOR ALL TO anon USING (true) WITH CH
 
 /* Rolling buffer of the most recent JS errors. Captured before anything else
    so even the earliest boot-time errors are kept. Bug reports include this. */
-const APP_VERSION = "0.6.0";
+const APP_VERSION = "0.6.1";
 const RECENT_ERRORS = [];
 function logRecentError(kind, msg, extra){
   RECENT_ERRORS.push({ t: new Date().toISOString(), kind, msg: String(msg||"").slice(0, 500), extra: extra ? String(extra).slice(0, 500) : "" });
