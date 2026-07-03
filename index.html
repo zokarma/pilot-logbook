@@ -13,20 +13,29 @@
     theme: {
       extend: {
         colors: {
-          brand: { 50:'#eef6ff',100:'#d9ebff',500:'#2563eb',600:'#1d4ed8',700:'#1e40af',900:'#172554' }
+          brand: { 50:'#ecfeff',100:'#cffafe',200:'#a5f3fc',300:'#67e8f9',400:'#22d3ee',500:'#22d3ee',600:'#0891b2',700:'#0e7490',800:'#155e75',900:'#164e63' }
         }
       }
     }
   }
 </script>
 <style>
-  html,body{ -webkit-text-size-adjust:100%; }
-  .tab-btn.active{ background:#1d4ed8; color:#fff; }
+  html,body{ -webkit-text-size-adjust:100%; color-scheme:dark; }
+  body{ background:radial-gradient(1200px 600px at 10% -10%, rgba(34,211,238,0.08), transparent), #020617; }
+  .tab-btn.active{ }
   .no-scrollbar::-webkit-scrollbar{ display:none; }
   .no-scrollbar{ -ms-overflow-style:none; scrollbar-width:none; }
-  input,select,textarea{ outline:none; }
+  input,select,textarea{ outline:none; background-color:rgba(2,6,23,0.5); border-color:#334155; color:#e2e8f0; }
+  input::placeholder, textarea::placeholder{ color:#64748b; }
+  input:focus, select:focus, textarea:focus{ border-color:#22d3ee; box-shadow:0 0 0 2px rgba(34,211,238,0.35); }
+  ::-webkit-scrollbar{ width:10px; height:10px; }
+  ::-webkit-scrollbar-track{ background:#0f172a; }
+  ::-webkit-scrollbar-thumb{ background:#334155; border-radius:9999px; }
   .fade-in{ animation:fade .25s ease; }
   @keyframes fade{ from{opacity:0; transform:translateY(4px);} to{opacity:1; transform:none;} }
+  .card{ background:rgba(15,23,42,0.65); border:1px solid rgba(30,41,59,0.9); border-radius:1rem; box-shadow:0 10px 30px -14px rgba(0,0,0,0.6); }
+  .modal-card{ background:#0f172a; border:1px solid #1e293b; border-radius:1rem; box-shadow:0 25px 50px -12px rgba(0,0,0,0.7); }
+  .nav-item{ transition:background-color .15s ease, color .15s ease, border-color .15s ease; }
   .leaflet-tooltip.route-airport-label{
     background:rgba(255,255,255,0.9); border:1px solid #cbd5e1; box-shadow:none;
     padding:1px 6px; font-size:11px; font-weight:600; color:#334155; border-radius:4px;
@@ -34,34 +43,34 @@
   .leaflet-tooltip.route-airport-label:before{ display:none; }
 </style>
 </head>
-<body class="bg-slate-100 text-slate-800 min-h-screen">
+<body class="bg-slate-950 text-slate-100 min-h-screen">
 
 <!-- ============ AUTH VIEW ============ -->
 <div id="authView" class="min-h-screen flex items-center justify-center p-4">
-  <div class="w-full max-w-md bg-white rounded-2xl shadow-xl p-8 fade-in">
+  <div class="w-full max-w-md modal-card p-8 fade-in">
     <div class="text-center mb-6">
-      <div class="mx-auto w-14 h-14 rounded-2xl bg-brand-600 flex items-center justify-center mb-3">
+      <div class="mx-auto w-14 h-14 rounded-2xl bg-brand-600 shadow-lg shadow-brand-600/40 flex items-center justify-center mb-3">
         <svg xmlns="http://www.w3.org/2000/svg" class="w-8 h-8 text-white" viewBox="0 0 24 24" fill="currentColor"><path d="M21 16v-2l-8-5V3.5A1.5 1.5 0 0 0 11.5 2 1.5 1.5 0 0 0 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5L21 16z"/></svg>
       </div>
-      <h1 class="text-2xl font-bold text-slate-900">Pilot Logbook</h1>
-      <p class="text-sm text-slate-500 mt-1">Offline flight time tracking</p>
+      <h1 class="text-2xl font-bold text-white">Pilot Logbook</h1>
+      <p class="text-sm text-slate-400 mt-1">Offline flight time tracking</p>
     </div>
 
     <!-- Tab toggle -->
-    <div class="flex bg-slate-100 rounded-lg p-1 mb-5">
-      <button id="loginTabBtn" class="flex-1 py-2 text-sm font-medium rounded-md bg-white shadow-sm">Log In</button>
-      <button id="signupTabBtn" class="flex-1 py-2 text-sm font-medium rounded-md text-slate-500">Sign Up</button>
+    <div class="flex bg-slate-800/60 rounded-lg p-1 mb-5">
+      <button id="loginTabBtn" class="flex-1 py-2 text-sm font-medium rounded-md bg-slate-700 text-white shadow-sm">Log In</button>
+      <button id="signupTabBtn" class="flex-1 py-2 text-sm font-medium rounded-md text-slate-400">Sign Up</button>
     </div>
 
     <!-- Login form -->
     <form id="loginForm" class="space-y-4">
       <div>
         <label class="block text-sm font-medium mb-1">Username</label>
-        <input name="username" autocomplete="username" required class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500" />
+        <input name="username" autocomplete="username" required class="w-full px-3 py-2 border border-slate-700 rounded-lg focus:ring-2 focus:ring-brand-500" />
       </div>
       <div>
         <label class="block text-sm font-medium mb-1">Password</label>
-        <input name="password" type="password" autocomplete="current-password" required class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500" />
+        <input name="password" type="password" autocomplete="current-password" required class="w-full px-3 py-2 border border-slate-700 rounded-lg focus:ring-2 focus:ring-brand-500" />
       </div>
       <button type="submit" class="w-full bg-brand-600 hover:bg-brand-700 text-white font-medium py-2.5 rounded-lg transition">Log In</button>
     </form>
@@ -70,11 +79,11 @@
     <form id="signupForm" class="space-y-4 hidden">
       <div>
         <label class="block text-sm font-medium mb-1">Username</label>
-        <input name="username" autocomplete="username" required class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500" />
+        <input name="username" autocomplete="username" required class="w-full px-3 py-2 border border-slate-700 rounded-lg focus:ring-2 focus:ring-brand-500" />
       </div>
       <div>
         <label class="block text-sm font-medium mb-1">Password</label>
-        <input name="password" type="password" autocomplete="new-password" required minlength="4" class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500" />
+        <input name="password" type="password" autocomplete="new-password" required minlength="4" class="w-full px-3 py-2 border border-slate-700 rounded-lg focus:ring-2 focus:ring-brand-500" />
         <p class="text-xs text-slate-400 mt-1">Minimum 4 characters.</p>
       </div>
       <button type="submit" class="w-full bg-brand-600 hover:bg-brand-700 text-white font-medium py-2.5 rounded-lg transition">Create Account</button>
@@ -85,143 +94,170 @@
 </div>
 
 <!-- ============ APP VIEW ============ -->
-<div id="appView" class="hidden min-h-screen flex flex-col">
-  <!-- Header -->
-  <header class="bg-brand-700 text-white shadow-md sticky top-0 z-20">
-    <div class="max-w-6xl mx-auto px-4">
-      <div class="flex items-center justify-between h-14">
-        <div class="flex items-center gap-2 font-semibold">
-          <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" viewBox="0 0 24 24" fill="currentColor"><path d="M21 16v-2l-8-5V3.5A1.5 1.5 0 0 0 11.5 2 1.5 1.5 0 0 0 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5L21 16z"/></svg>
-          <span>Pilot Logbook</span>
-        </div>
+<div id="appView" class="hidden min-h-screen flex bg-slate-950">
+  <!-- Sidebar -->
+  <aside class="w-16 lg:w-60 shrink-0 bg-slate-900/80 border-r border-slate-800 flex flex-col py-5 sticky top-0 h-screen z-20">
+    <div class="flex items-center gap-2 px-3 lg:px-5 mb-8 justify-center lg:justify-start">
+      <svg xmlns="http://www.w3.org/2000/svg" class="w-7 h-7 text-brand-400 shrink-0" viewBox="0 0 24 24" fill="currentColor"><path d="M21 16v-2l-8-5V3.5A1.5 1.5 0 0 0 11.5 2 1.5 1.5 0 0 0 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5L21 16z"/></svg>
+      <span class="hidden lg:inline font-bold text-lg tracking-tight text-white">LOGBOOK</span>
+    </div>
+    <nav class="flex-1 flex flex-col gap-1 px-2 lg:px-3">
+      <button data-tab="dashboard" title="Dashboard" class="tab-btn nav-item w-full flex items-center justify-center lg:justify-start gap-3 px-3 py-2.5 rounded-lg text-sm font-medium border-l-2 border-transparent text-slate-400 hover:bg-slate-800/60 hover:text-slate-100">
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="8" height="8" rx="1.5"/><rect x="13" y="3" width="8" height="5" rx="1.5"/><rect x="13" y="12" width="8" height="9" rx="1.5"/><rect x="3" y="15" width="8" height="6" rx="1.5"/></svg>
+        <span class="hidden lg:inline">Dashboard</span>
+      </button>
+      <button data-tab="logger" title="Flight Logs" class="tab-btn nav-item w-full flex items-center justify-center lg:justify-start gap-3 px-3 py-2.5 rounded-lg text-sm font-medium border-l-2 border-transparent text-slate-400 hover:bg-slate-800/60 hover:text-slate-100">
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3v3M16 3v3M4 8h16M5 5h14a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z"/><path d="M8 12h8M8 16h5"/></svg>
+        <span class="hidden lg:inline">Flight Logs</span>
+      </button>
+      <button data-tab="routemap" title="Route Map" class="tab-btn nav-item w-full flex items-center justify-center lg:justify-start gap-3 px-3 py-2.5 rounded-lg text-sm font-medium border-l-2 border-transparent text-slate-400 hover:bg-slate-800/60 hover:text-slate-100">
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 20l-6-3V4l6 3 6-3 6 3v13l-6-3-6 3z"/><path d="M9 7v13M15 4v13"/></svg>
+        <span class="hidden lg:inline">Route Map</span>
+      </button>
+      <button data-tab="duty" title="Duty Tracker" class="tab-btn nav-item w-full flex items-center justify-center lg:justify-start gap-3 px-3 py-2.5 rounded-lg text-sm font-medium border-l-2 border-transparent text-slate-400 hover:bg-slate-800/60 hover:text-slate-100">
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
+        <span class="hidden lg:inline">Duty Tracker</span>
+      </button>
+      <button data-tab="pilots" title="Pilots" class="tab-btn nav-item w-full flex items-center justify-center lg:justify-start gap-3 px-3 py-2.5 rounded-lg text-sm font-medium border-l-2 border-transparent text-slate-400 hover:bg-slate-800/60 hover:text-slate-100">
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.25"/><path d="M3.5 20a5.5 5.5 0 0 1 11 0"/><circle cx="17.5" cy="9.5" r="2.5"/><path d="M15.5 20a4.5 4.5 0 0 1 6.7-3.9"/></svg>
+        <span class="hidden lg:inline">Pilots</span>
+      </button>
+      <button data-tab="bugs" title="Bug Reports" class="tab-btn nav-item w-full flex items-center justify-center lg:justify-start gap-3 px-3 py-2.5 rounded-lg text-sm font-medium border-l-2 border-transparent text-slate-400 hover:bg-slate-800/60 hover:text-slate-100">
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8a4 4 0 0 1 4 4v3a4 4 0 1 1-8 0v-3a4 4 0 0 1 4-4z"/><path d="M8 12H3M21 12h-5M9 6l-2-2M15 6l2-2M9 18l-2 2M15 18l2 2M8 9l-2-1M16 9l2-1"/></svg>
+        <span class="hidden lg:inline">Bug Reports</span>
+      </button>
+    </nav>
+    <div class="px-2 lg:px-3 mt-4 border-t border-slate-800 pt-3">
+      <button id="settingsBtn" title="Supabase / Cloud Sync Settings" class="nav-item w-full flex items-center justify-center lg:justify-start gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-400 hover:bg-slate-800/60 hover:text-slate-100">
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        <span class="hidden lg:inline">Settings</span>
+      </button>
+    </div>
+  </aside>
+
+  <div class="flex-1 flex flex-col min-w-0">
+    <!-- Top bar -->
+    <header class="sticky top-0 z-10 bg-slate-950/90 backdrop-blur border-b border-slate-800">
+      <div class="px-4 lg:px-8 py-4 flex items-center justify-between gap-3 flex-wrap">
+        <h1 class="text-xl font-bold text-white">LOGBOOK</h1>
         <div class="flex items-center gap-3 text-sm">
           <span id="syncStatus" class="hidden text-xs font-medium"></span>
-          <span class="hidden sm:inline opacity-90">Hi, <span id="currentUserLabel" class="font-medium"></span></span>
-          <button id="reportBugBtn" title="Report a bug" class="bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium px-3 py-1.5 rounded-lg transition">Report Bug</button>
-          <button id="settingsBtn" title="Supabase / Cloud Sync Settings" class="opacity-70 hover:opacity-100 transition p-1 rounded-lg hover:bg-brand-600">
-            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-          </button>
-          <button id="logoutBtn" class="bg-brand-600 hover:bg-brand-500 px-3 py-1.5 rounded-lg transition">Log Out</button>
+          <span class="hidden sm:inline text-slate-400">Hi, <span id="currentUserLabel" class="font-medium text-slate-100"></span></span>
+          <button id="reportBugBtn" title="Report a bug" class="bg-slate-800 hover:bg-slate-700 text-slate-200 text-sm font-medium px-3 py-1.5 rounded-lg transition">Report Bug</button>
+          <button id="logoutBtn" class="bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-1.5 rounded-lg transition">Log Out</button>
+          <div class="w-9 h-9 rounded-full bg-brand-600 flex items-center justify-center text-sm font-semibold text-white shrink-0">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21a8 8 0 1 0-16 0"/><circle cx="12" cy="8" r="4"/></svg>
+          </div>
         </div>
       </div>
       <!-- Current Pilot selector strip -->
-      <div class="flex items-center gap-2 py-1.5 text-sm border-t border-brand-600/40 flex-wrap">
-        <span class="text-brand-100">Logbook for:</span>
-        <select id="currentPilotSelect" class="bg-brand-600 text-white text-sm rounded px-2 py-1 border border-brand-500 focus:outline-none focus:ring-2 focus:ring-white/40"></select>
-        <span id="currentPilotEmpty" class="hidden text-xs text-amber-200">No pilot profiles yet —
+      <div class="px-4 lg:px-8 pb-3 flex items-center gap-2 text-sm flex-wrap">
+        <span class="text-slate-400">Logbook for:</span>
+        <select id="currentPilotSelect" class="bg-slate-800 text-slate-100 text-sm rounded-lg px-2 py-1 border border-slate-700 focus:outline-none focus:ring-2 focus:ring-brand-500/50"></select>
+        <span id="currentPilotEmpty" class="hidden text-xs text-amber-300">No pilot profiles yet —
           <button id="goToPilotsLink" class="underline hover:text-white">add one in the Pilots tab</button>
         </span>
       </div>
-      <!-- Tab nav -->
-      <nav class="flex gap-1 overflow-x-auto no-scrollbar -mb-px">
-        <button data-tab="logger" class="tab-btn active whitespace-nowrap px-4 py-2.5 text-sm font-medium rounded-t-lg">Flight Logger</button>
-        <button data-tab="dashboard" class="tab-btn whitespace-nowrap px-4 py-2.5 text-sm font-medium rounded-t-lg text-brand-100 hover:bg-brand-600">Dashboard</button>
-        <button data-tab="routemap" class="tab-btn whitespace-nowrap px-4 py-2.5 text-sm font-medium rounded-t-lg text-brand-100 hover:bg-brand-600">Route Map</button>
-        <button data-tab="duty" class="tab-btn whitespace-nowrap px-4 py-2.5 text-sm font-medium rounded-t-lg text-brand-100 hover:bg-brand-600">Duty Tracker</button>
-        <button data-tab="pilots" class="tab-btn whitespace-nowrap px-4 py-2.5 text-sm font-medium rounded-t-lg text-brand-100 hover:bg-brand-600">Pilots</button>
-        <button data-tab="bugs" class="tab-btn whitespace-nowrap px-4 py-2.5 text-sm font-medium rounded-t-lg text-brand-100 hover:bg-brand-600">Bug Reports</button>
-      </nav>
-    </div>
-  </header>
+    </header>
 
-  <main class="flex-1 max-w-6xl w-full mx-auto px-4 py-6">
+    <main class="flex-1 w-full px-4 lg:px-8 pt-6 pb-24">
 
     <!-- ===== LOGGER TAB ===== -->
     <section id="tab-logger" class="tab-panel fade-in">
-      <div class="bg-white rounded-xl shadow-sm p-5 mb-6">
+      <div class="card p-5 mb-6">
         <div class="flex items-center justify-between mb-4">
           <h2 id="flightFormTitle" class="text-lg font-semibold">Log a Flight</h2>
-          <button id="cancelEditBtn" class="hidden text-sm text-slate-500 hover:text-slate-700">Cancel edit</button>
+          <button id="cancelEditBtn" class="hidden text-sm text-slate-400 hover:text-slate-200">Cancel edit</button>
         </div>
         <form id="flightForm" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <input type="hidden" name="id" />
           <div>
-            <label class="block text-xs font-medium text-slate-500 mb-1">Date</label>
-            <input name="date" type="date" required class="w-full px-3 py-2 border border-slate-300 rounded-lg" />
+            <label class="block text-xs font-medium text-slate-400 mb-1">Date</label>
+            <input name="date" type="date" required class="w-full px-3 py-2 border border-slate-700 rounded-lg" />
           </div>
           <div>
-            <label class="block text-xs font-medium text-slate-500 mb-1">Aircraft Type</label>
-            <select name="aircraftType" required class="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white">
+            <label class="block text-xs font-medium text-slate-400 mb-1">Aircraft Type</label>
+            <select name="aircraftType" required class="w-full px-3 py-2 border border-slate-700 rounded-lg">
               <option value="">— select —</option>
             </select>
           </div>
           <div>
-            <label class="block text-xs font-medium text-slate-500 mb-1">Registration</label>
-            <input name="registration" list="registrationsList" placeholder="e.g. C-GABC" class="w-full px-3 py-2 border border-slate-300 rounded-lg uppercase" />
+            <label class="block text-xs font-medium text-slate-400 mb-1">Registration</label>
+            <input name="registration" list="registrationsList" placeholder="e.g. C-GABC" class="w-full px-3 py-2 border border-slate-700 rounded-lg uppercase" />
             <datalist id="registrationsList"></datalist>
           </div>
           <div>
-            <label class="block text-xs font-medium text-slate-500 mb-1">Pilot Being Logged Role</label>
-            <select name="loggedRole" class="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white"></select>
+            <label class="block text-xs font-medium text-slate-400 mb-1">Pilot Being Logged Role</label>
+            <select name="loggedRole" class="w-full px-3 py-2 border border-slate-700 rounded-lg"></select>
           </div>
           <div>
-            <label class="block text-xs font-medium text-slate-500 mb-1">PIC</label>
-            <select name="picId" class="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white"></select>
+            <label class="block text-xs font-medium text-slate-400 mb-1">PIC</label>
+            <select name="picId" class="w-full px-3 py-2 border border-slate-700 rounded-lg"></select>
           </div>
           <div>
-            <label class="block text-xs font-medium text-slate-500 mb-1">Student / First Officer</label>
-            <select name="sicId" class="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white"></select>
+            <label class="block text-xs font-medium text-slate-400 mb-1">Student / First Officer</label>
+            <select name="sicId" class="w-full px-3 py-2 border border-slate-700 rounded-lg"></select>
           </div>
           <div>
-            <label class="block text-xs font-medium text-slate-500 mb-1">Third Crew <span class="text-slate-400">(optional)</span></label>
-            <select name="socId" class="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white"></select>
+            <label class="block text-xs font-medium text-slate-400 mb-1">Third Crew <span class="text-slate-400">(optional)</span></label>
+            <select name="socId" class="w-full px-3 py-2 border border-slate-700 rounded-lg"></select>
           </div>
           <div></div>
           <div>
-            <label class="block text-xs font-medium text-slate-500 mb-1">ICAO From</label>
-            <input name="from" list="icaoList" maxlength="6" placeholder="CYYZ" class="w-full px-3 py-2 border border-slate-300 rounded-lg uppercase" />
+            <label class="block text-xs font-medium text-slate-400 mb-1">ICAO From</label>
+            <input name="from" list="icaoList" maxlength="6" placeholder="CYYZ" class="w-full px-3 py-2 border border-slate-700 rounded-lg uppercase" />
           </div>
           <div>
-            <label class="block text-xs font-medium text-slate-500 mb-1">ICAO To</label>
-            <input name="to" list="icaoList" maxlength="6" placeholder="CYVR" class="w-full px-3 py-2 border border-slate-300 rounded-lg uppercase" />
+            <label class="block text-xs font-medium text-slate-400 mb-1">ICAO To</label>
+            <input name="to" list="icaoList" maxlength="6" placeholder="CYVR" class="w-full px-3 py-2 border border-slate-700 rounded-lg uppercase" />
           </div>
           <datalist id="icaoList"></datalist>
           <div>
-            <label class="block text-xs font-medium text-slate-500 mb-1">Takeoff</label>
-            <select name="takeoff" class="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white">
+            <label class="block text-xs font-medium text-slate-400 mb-1">Takeoff</label>
+            <select name="takeoff" class="w-full px-3 py-2 border border-slate-700 rounded-lg">
               <option value="Day">Day</option>
               <option value="Night">Night</option>
             </select>
           </div>
           <div>
-            <label class="block text-xs font-medium text-slate-500 mb-1">Landing</label>
-            <select name="landing" class="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white">
+            <label class="block text-xs font-medium text-slate-400 mb-1">Landing</label>
+            <select name="landing" class="w-full px-3 py-2 border border-slate-700 rounded-lg">
               <option value="Day">Day</option>
               <option value="Night">Night</option>
             </select>
           </div>
           <div>
-            <label class="block text-xs font-medium text-slate-500 mb-1">Single Engine (hrs)</label>
-            <input name="se" type="number" step="0.1" min="0" value="0" class="w-full px-3 py-2 border border-slate-300 rounded-lg" />
+            <label class="block text-xs font-medium text-slate-400 mb-1">Single Engine (hrs)</label>
+            <input name="se" type="number" step="0.1" min="0" value="0" class="w-full px-3 py-2 border border-slate-700 rounded-lg" />
           </div>
           <div>
-            <label class="block text-xs font-medium text-slate-500 mb-1">Multi Engine (hrs)</label>
-            <input name="me" type="number" step="0.1" min="0" value="0" class="w-full px-3 py-2 border border-slate-300 rounded-lg" />
+            <label class="block text-xs font-medium text-slate-400 mb-1">Multi Engine (hrs)</label>
+            <input name="me" type="number" step="0.1" min="0" value="0" class="w-full px-3 py-2 border border-slate-700 rounded-lg" />
           </div>
           <div>
-            <label class="block text-xs font-medium text-slate-500 mb-1">Cross Country (hrs)</label>
-            <input name="xc" type="number" step="0.1" min="0" value="0" class="w-full px-3 py-2 border border-slate-300 rounded-lg" />
+            <label class="block text-xs font-medium text-slate-400 mb-1">Cross Country (hrs)</label>
+            <input name="xc" type="number" step="0.1" min="0" value="0" class="w-full px-3 py-2 border border-slate-700 rounded-lg" />
           </div>
           <div></div>
           <div>
-            <label class="block text-xs font-medium text-slate-500 mb-1">Day (hrs)</label>
-            <input name="dayHours" type="number" step="0.1" min="0" value="0" class="w-full px-3 py-2 border border-slate-300 rounded-lg" />
+            <label class="block text-xs font-medium text-slate-400 mb-1">Day (hrs)</label>
+            <input name="dayHours" type="number" step="0.1" min="0" value="0" class="w-full px-3 py-2 border border-slate-700 rounded-lg" />
           </div>
           <div>
-            <label class="block text-xs font-medium text-slate-500 mb-1">Night (hrs)</label>
-            <input name="nightHours" type="number" step="0.1" min="0" value="0" class="w-full px-3 py-2 border border-slate-300 rounded-lg" />
+            <label class="block text-xs font-medium text-slate-400 mb-1">Night (hrs)</label>
+            <input name="nightHours" type="number" step="0.1" min="0" value="0" class="w-full px-3 py-2 border border-slate-700 rounded-lg" />
           </div>
           <div>
-            <label class="block text-xs font-medium text-slate-500 mb-1">IFR Actual (hrs)</label>
-            <input name="ifrActual" type="number" step="0.1" min="0" value="0" class="w-full px-3 py-2 border border-slate-300 rounded-lg" />
+            <label class="block text-xs font-medium text-slate-400 mb-1">IFR Actual (hrs)</label>
+            <input name="ifrActual" type="number" step="0.1" min="0" value="0" class="w-full px-3 py-2 border border-slate-700 rounded-lg" />
           </div>
           <div>
-            <label class="block text-xs font-medium text-slate-500 mb-1">IFR Simulated (hrs)</label>
-            <input name="ifrSim" type="number" step="0.1" min="0" value="0" class="w-full px-3 py-2 border border-slate-300 rounded-lg" />
+            <label class="block text-xs font-medium text-slate-400 mb-1">IFR Simulated (hrs)</label>
+            <input name="ifrSim" type="number" step="0.1" min="0" value="0" class="w-full px-3 py-2 border border-slate-700 rounded-lg" />
           </div>
           <div class="sm:col-span-2 lg:col-span-4">
-            <label class="block text-xs font-medium text-slate-500 mb-1">Notes / Remarks</label>
-            <textarea name="notes" rows="2" class="w-full px-3 py-2 border border-slate-300 rounded-lg"></textarea>
+            <label class="block text-xs font-medium text-slate-400 mb-1">Notes / Remarks</label>
+            <textarea name="notes" rows="2" class="w-full px-3 py-2 border border-slate-700 rounded-lg"></textarea>
           </div>
           <div class="sm:col-span-2 lg:col-span-4 flex gap-3">
             <button type="submit" id="flightSubmitBtn" class="bg-brand-600 hover:bg-brand-700 text-white font-medium px-5 py-2.5 rounded-lg transition">Add Flight</button>
@@ -230,15 +266,15 @@
         </form>
       </div>
 
-      <div class="bg-white rounded-xl shadow-sm p-5">
+      <div class="card p-5">
         <div class="flex flex-wrap items-center justify-between gap-3 mb-3">
           <div class="flex items-center gap-3">
             <h2 class="text-lg font-semibold">Logged Flights</h2>
-            <span id="flightCountBadge" class="text-sm text-slate-500"></span>
+            <span id="flightCountBadge" class="text-sm text-slate-400"></span>
           </div>
           <div class="flex items-center gap-2">
-            <button id="exportCsvBtn" class="text-sm bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium px-3 py-1.5 rounded-lg transition">Export CSV</button>
-            <button id="importCsvBtn" class="text-sm bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium px-3 py-1.5 rounded-lg transition">Import CSV</button>
+            <button id="exportCsvBtn" class="text-sm bg-slate-800 hover:bg-slate-700 text-slate-200 font-medium px-3 py-1.5 rounded-lg transition">Export CSV</button>
+            <button id="importCsvBtn" class="text-sm bg-slate-800 hover:bg-slate-700 text-slate-200 font-medium px-3 py-1.5 rounded-lg transition">Import CSV</button>
             <input id="csvFileInput" type="file" accept=".csv,text/csv" class="hidden" />
           </div>
         </div>
@@ -246,7 +282,7 @@
         <div class="overflow-x-auto">
           <table class="w-full text-sm">
             <thead>
-              <tr class="text-left text-slate-500 border-b border-slate-200">
+              <tr class="text-left text-slate-400 border-b border-slate-800">
                 <th class="py-2 pr-3 font-medium">Date</th>
                 <th class="py-2 pr-3 font-medium">Aircraft</th>
                 <th class="py-2 pr-3 font-medium">Reg</th>
@@ -272,16 +308,30 @@
     </section>
 
     <!-- ===== DASHBOARD TAB ===== -->
-    <section id="tab-dashboard" class="tab-panel hidden fade-in">
-      <div id="dashCards" class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6"></div>
+    <section id="tab-dashboard" class="tab-panel hidden fade-in space-y-8">
+      <div>
+        <h3 class="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-3">Flight Stats</h3>
+        <div id="dashCards" class="grid grid-cols-2 lg:grid-cols-4 gap-4"></div>
+      </div>
+
+      <div>
+        <h3 class="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-3">Flight Time Breakdown</h3>
+        <div id="dashSecondaryCards" class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3"></div>
+      </div>
+
+      <div>
+        <h3 class="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-3">Active Duty</h3>
+        <div id="activeDutyCards" class="grid grid-cols-1 sm:grid-cols-2 gap-4"></div>
+      </div>
+
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div class="bg-white rounded-xl shadow-sm p-5">
+        <div class="card p-5">
           <h3 class="font-semibold mb-4">Hours by Aircraft Type</h3>
           <div id="aircraftBreakdown" class="space-y-3"></div>
         </div>
-        <div class="bg-white rounded-xl shadow-sm p-5">
+        <div class="card p-5">
           <h3 class="font-semibold mb-2">Current Pilot</h3>
-          <p class="text-sm text-slate-500 mb-3">All metrics on this page are for the pilot selected in the header.</p>
+          <p class="text-sm text-slate-400 mb-3">All metrics on this page are for the pilot selected in the header.</p>
           <div id="currentPilotCard" class="text-sm space-y-2"></div>
           <!-- Legacy hidden inputs kept for the rare migration path that still references them -->
           <input id="pilotNameInput" type="hidden" />
@@ -289,22 +339,32 @@
           <span id="pilotNameMsg" class="hidden"></span>
         </div>
       </div>
+
+      <div>
+        <h3 class="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-3">Recent Logs</h3>
+        <div id="recentLogsCard"></div>
+      </div>
+
+      <div>
+        <h3 class="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-3">CARs Compliance</h3>
+        <div id="carsComplianceCards" class="grid grid-cols-1 sm:grid-cols-2 gap-4"></div>
+      </div>
     </section>
 
     <!-- ===== ROUTE MAP TAB ===== -->
     <section id="tab-routemap" class="tab-panel hidden fade-in">
       <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div class="lg:col-span-2 bg-white rounded-xl shadow-sm p-5">
+        <div class="lg:col-span-2 card p-5">
           <div class="flex items-center justify-between mb-3">
             <h3 class="font-semibold">Route Map</h3>
             <p id="routeMapEmpty" class="text-xs text-slate-400 hidden">No routes yet — log a flight with From/To airports.</p>
           </div>
-          <div class="border border-slate-200 rounded-lg overflow-hidden">
+          <div class="border border-slate-800 rounded-lg overflow-hidden">
             <div id="routeMap" style="height:500px;"></div>
           </div>
           <p class="text-xs text-slate-400 mt-2">Line thickness reflects how often a route is flown. Pan &amp; zoom freely. Click a red marker for the airport code.</p>
         </div>
-        <div class="bg-white rounded-xl shadow-sm p-5">
+        <div class="card p-5">
           <h3 class="font-semibold mb-3">Route Statistics</h3>
           <div id="routeStats" class="space-y-3 max-h-[460px] overflow-y-auto"></div>
         </div>
@@ -314,39 +374,39 @@
     <!-- ===== DUTY TRACKER TAB ===== -->
     <section id="tab-duty" class="tab-panel hidden fade-in">
       <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div class="lg:col-span-2 bg-white rounded-xl shadow-sm p-5">
+        <div class="lg:col-span-2 card p-5">
           <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
             <h3 class="font-semibold">Duty Schedule</h3>
-            <select id="dutyType" class="px-3 py-2 border border-slate-300 rounded-lg bg-white text-sm">
+            <select id="dutyType" class="px-3 py-2 border border-slate-700 rounded-lg text-sm">
               <option value="14">14-Day</option>
               <option value="21">21-Day</option>
               <option value="month">Monthly</option>
             </select>
           </div>
           <div class="flex items-center justify-between mb-3">
-            <button id="dutyPrev" class="px-3 py-1.5 text-sm bg-slate-100 hover:bg-slate-200 rounded-lg">&larr; Prev</button>
-            <span id="dutyRangeLabel" class="text-sm font-medium text-slate-600"></span>
-            <button id="dutyNext" class="px-3 py-1.5 text-sm bg-slate-100 hover:bg-slate-200 rounded-lg">Next &rarr;</button>
+            <button id="dutyPrev" class="px-3 py-1.5 text-sm bg-slate-800 hover:bg-slate-700 rounded-lg">&larr; Prev</button>
+            <span id="dutyRangeLabel" class="text-sm font-medium text-slate-300"></span>
+            <button id="dutyNext" class="px-3 py-1.5 text-sm bg-slate-800 hover:bg-slate-700 rounded-lg">Next &rarr;</button>
           </div>
           <div id="dutyGrid" class="grid gap-1.5"></div>
           <div class="flex items-center gap-4 mt-4 text-sm">
             <span class="flex items-center gap-1.5"><span class="w-4 h-4 rounded bg-brand-600 inline-block"></span> On duty (<span id="dutyOnCount">0</span>)</span>
-            <span class="flex items-center gap-1.5"><span class="w-4 h-4 rounded bg-slate-200 inline-block"></span> Off (<span id="dutyOffCount">0</span>)</span>
-            <span id="dutyTotalHours" class="text-slate-500 text-xs"></span>
+            <span class="flex items-center gap-1.5"><span class="w-4 h-4 rounded bg-slate-700 inline-block"></span> Off (<span id="dutyOffCount">0</span>)</span>
+            <span id="dutyTotalHours" class="text-slate-400 text-xs"></span>
             <span class="text-slate-400 ml-auto">Click a day to add start/end times &amp; op type.</span>
           </div>
         </div>
-        <div class="bg-white rounded-xl shadow-sm p-5">
+        <div class="card p-5">
           <h3 class="font-semibold mb-1">CARs Part VII Limits</h3>
           <p class="text-xs text-slate-400 mb-4">Canadian Aviation Regulations — flight &amp; duty time reference.</p>
           <div class="space-y-3 text-sm">
-            <div class="p-3 rounded-lg bg-amber-50 border border-amber-200"><div class="font-semibold text-amber-800">18 hours</div><div class="text-amber-700">Maximum flight duty period</div></div>
-            <div class="p-3 rounded-lg bg-amber-50 border border-amber-200"><div class="font-semibold text-amber-800">16 hours</div><div class="text-amber-700">Maximum single flight time</div></div>
-            <div class="p-3 rounded-lg bg-sky-50 border border-sky-200"><div class="font-semibold text-sky-800">2,200 hours</div><div class="text-sky-700">Maximum flight time per 365 days</div></div>
-            <div class="p-3 rounded-lg bg-sky-50 border border-sky-200"><div class="font-semibold text-sky-800">192 hours</div><div class="text-sky-700">Maximum flight time per 28 days</div></div>
-            <div class="p-3 rounded-lg bg-emerald-50 border border-emerald-200"><div class="font-semibold text-emerald-800">12 hours</div><div class="text-emerald-700">Minimum rest at home base</div></div>
-            <div class="p-3 rounded-lg bg-emerald-50 border border-emerald-200"><div class="font-semibold text-emerald-800">10 hours</div><div class="text-emerald-700">Minimum rest away from base</div></div>
-            <div class="p-3 rounded-lg bg-violet-50 border border-violet-200"><div class="font-semibold text-violet-800">15 minutes</div><div class="text-violet-700">Nutrition break every 6 hours of duty</div></div>
+            <div class="p-3 rounded-lg bg-amber-500/10 border border-amber-500/30"><div class="font-semibold text-amber-300">18 hours</div><div class="text-amber-400">Maximum flight duty period</div></div>
+            <div class="p-3 rounded-lg bg-amber-500/10 border border-amber-500/30"><div class="font-semibold text-amber-300">16 hours</div><div class="text-amber-400">Maximum single flight time</div></div>
+            <div class="p-3 rounded-lg bg-sky-500/10 border border-sky-500/30"><div class="font-semibold text-sky-300">2,200 hours</div><div class="text-sky-400">Maximum flight time per 365 days</div></div>
+            <div class="p-3 rounded-lg bg-sky-500/10 border border-sky-500/30"><div class="font-semibold text-sky-300">192 hours</div><div class="text-sky-400">Maximum flight time per 28 days</div></div>
+            <div class="p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/30"><div class="font-semibold text-emerald-300">12 hours</div><div class="text-emerald-400">Minimum rest at home base</div></div>
+            <div class="p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/30"><div class="font-semibold text-emerald-300">10 hours</div><div class="text-emerald-400">Minimum rest away from base</div></div>
+            <div class="p-3 rounded-lg bg-violet-500/10 border border-violet-500/30"><div class="font-semibold text-violet-300">15 minutes</div><div class="text-violet-400">Nutrition break every 6 hours of duty</div></div>
           </div>
         </div>
       </div>
@@ -354,29 +414,29 @@
 
     <!-- ===== PILOTS TAB ===== -->
     <section id="tab-pilots" class="tab-panel hidden fade-in">
-      <div class="bg-white rounded-xl shadow-sm p-5 mb-6">
+      <div class="card p-5 mb-6">
         <div class="flex items-center justify-between mb-4">
           <h2 id="pilotFormTitle" class="text-lg font-semibold">Add Pilot Profile</h2>
-          <button id="cancelPilotEditBtn" class="hidden text-sm text-slate-500 hover:text-slate-700">Cancel edit</button>
+          <button id="cancelPilotEditBtn" class="hidden text-sm text-slate-400 hover:text-slate-200">Cancel edit</button>
         </div>
-        <p class="text-sm text-slate-500 mb-4">Pilot profiles are the people whose logbooks this app tracks. Each flight you log is attached to one profile (the "Logbook for" selector at the top).</p>
+        <p class="text-sm text-slate-400 mb-4">Pilot profiles are the people whose logbooks this app tracks. Each flight you log is attached to one profile (the "Logbook for" selector at the top).</p>
         <form id="pilotForm" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <input type="hidden" name="id" />
           <div>
-            <label class="block text-xs font-medium text-slate-500 mb-1">First Name</label>
-            <input name="firstName" required class="w-full px-3 py-2 border border-slate-300 rounded-lg" />
+            <label class="block text-xs font-medium text-slate-400 mb-1">First Name</label>
+            <input name="firstName" required class="w-full px-3 py-2 border border-slate-700 rounded-lg" />
           </div>
           <div>
-            <label class="block text-xs font-medium text-slate-500 mb-1">Last Name</label>
-            <input name="lastName" required class="w-full px-3 py-2 border border-slate-300 rounded-lg" />
+            <label class="block text-xs font-medium text-slate-400 mb-1">Last Name</label>
+            <input name="lastName" required class="w-full px-3 py-2 border border-slate-700 rounded-lg" />
           </div>
           <div>
-            <label class="block text-xs font-medium text-slate-500 mb-1">Employee # <span class="text-slate-400">(optional)</span></label>
-            <input name="employeeNumber" class="w-full px-3 py-2 border border-slate-300 rounded-lg" />
+            <label class="block text-xs font-medium text-slate-400 mb-1">Employee # <span class="text-slate-400">(optional)</span></label>
+            <input name="employeeNumber" class="w-full px-3 py-2 border border-slate-700 rounded-lg" />
           </div>
           <div>
-            <label class="block text-xs font-medium text-slate-500 mb-1">License # <span class="text-slate-400">(optional)</span></label>
-            <input name="licenseNumber" class="w-full px-3 py-2 border border-slate-300 rounded-lg" />
+            <label class="block text-xs font-medium text-slate-400 mb-1">License # <span class="text-slate-400">(optional)</span></label>
+            <input name="licenseNumber" class="w-full px-3 py-2 border border-slate-700 rounded-lg" />
           </div>
           <div class="sm:col-span-2 lg:col-span-4 flex gap-3">
             <button type="submit" id="pilotSubmitBtn" class="bg-brand-600 hover:bg-brand-700 text-white font-medium px-5 py-2.5 rounded-lg transition">Add Pilot</button>
@@ -385,26 +445,26 @@
       </div>
 
       <!-- Duplicate detection -->
-      <div id="pilotDupesPanel" class="bg-amber-50 border border-amber-200 rounded-xl shadow-sm p-5 mb-6 hidden">
+      <div id="pilotDupesPanel" class="bg-amber-500/10 border border-amber-500/30 rounded-xl shadow-sm p-5 mb-6 hidden">
         <div class="flex items-start justify-between gap-3 mb-3">
           <div>
-            <h3 class="font-semibold text-amber-900">Possible duplicate profiles</h3>
-            <p class="text-sm text-amber-800 mt-1">Pick which profile is the canonical one in each group, then click <b>Merge</b>. All flights from the others will be reassigned and the duplicates deleted.</p>
+            <h3 class="font-semibold text-amber-200">Possible duplicate profiles</h3>
+            <p class="text-sm text-amber-300 mt-1">Pick which profile is the canonical one in each group, then click <b>Merge</b>. All flights from the others will be reassigned and the duplicates deleted.</p>
           </div>
-          <button id="pilotDupesDismiss" class="text-xs text-amber-700 hover:text-amber-900">Dismiss</button>
+          <button id="pilotDupesDismiss" class="text-xs text-amber-400 hover:text-amber-200">Dismiss</button>
         </div>
         <div id="pilotDupesGroups" class="space-y-3"></div>
       </div>
 
-      <div class="bg-white rounded-xl shadow-sm p-5">
+      <div class="card p-5">
         <div class="flex items-center justify-between mb-3">
           <h2 class="text-lg font-semibold">Pilot Profiles</h2>
-          <span id="pilotCountBadge" class="text-sm text-slate-500"></span>
+          <span id="pilotCountBadge" class="text-sm text-slate-400"></span>
         </div>
         <div class="overflow-x-auto">
           <table class="w-full text-sm">
             <thead>
-              <tr class="text-left text-slate-500 border-b border-slate-200">
+              <tr class="text-left text-slate-400 border-b border-slate-800">
                 <th class="py-2 pr-3 font-medium">Name</th>
                 <th class="py-2 pr-3 font-medium">Employee #</th>
                 <th class="py-2 pr-3 font-medium">License #</th>
@@ -421,17 +481,17 @@
 
     <!-- ===== BUG REPORTS TAB ===== -->
     <section id="tab-bugs" class="tab-panel hidden fade-in">
-      <div class="bg-white rounded-xl shadow-sm p-5 mb-6">
+      <div class="card p-5 mb-6">
         <div class="flex flex-wrap items-center justify-between gap-3 mb-3">
           <div>
             <h2 class="text-lg font-semibold">Bug Reports</h2>
-            <p class="text-sm text-slate-500 mt-1">
+            <p class="text-sm text-slate-400 mt-1">
               All bug reports filed from this device, plus any synced from cloud sync.
               Click <b>Report Bug</b> in the header to file a new one.
             </p>
           </div>
           <div class="flex items-center gap-2">
-            <select id="bugFilter" class="text-sm border border-slate-300 rounded-lg px-3 py-2 bg-white">
+            <select id="bugFilter" class="text-sm border border-slate-700 rounded-lg px-3 py-2">
               <option value="all">All</option>
               <option value="open">Open only</option>
               <option value="resolved">Resolved only</option>
@@ -444,38 +504,42 @@
       </div>
     </section>
 
-  </main>
+    </main>
+  </div>
+
+  <!-- Floating quick-add action -->
+  <button id="fabAddFlight" title="Log a flight" class="fixed bottom-6 right-6 w-14 h-14 rounded-full bg-brand-500 hover:bg-brand-400 text-white shadow-lg shadow-brand-500/40 flex items-center justify-center text-3xl leading-none z-30 transition">+</button>
 
   <!-- ===== SETTINGS MODAL ===== -->
   <div id="settingsModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+    <div class="modal-card w-full max-w-lg max-h-[90vh] overflow-y-auto">
       <div class="p-6">
         <div class="flex items-center justify-between mb-1">
           <h3 class="text-lg font-semibold">Cloud Sync (Supabase)</h3>
-          <button id="closeSettingsBtn" class="text-slate-400 hover:text-slate-600 text-2xl leading-none">&times;</button>
+          <button id="closeSettingsBtn" class="text-slate-400 hover:text-slate-300 text-2xl leading-none">&times;</button>
         </div>
-        <p class="text-sm text-slate-500 mb-5">Connect to your Supabase project for multi-device sync. Data stays in localStorage for offline use and syncs automatically when online.</p>
+        <p class="text-sm text-slate-400 mb-5">Connect to your Supabase project for multi-device sync. Data stays in localStorage for offline use and syncs automatically when online.</p>
 
         <div class="space-y-3 mb-4">
           <div>
-            <label class="block text-xs font-medium text-slate-500 mb-1">Supabase Project URL</label>
-            <input id="sbUrl" placeholder="https://xxxxxxxxxxxx.supabase.co" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm" />
+            <label class="block text-xs font-medium text-slate-400 mb-1">Supabase Project URL</label>
+            <input id="sbUrl" placeholder="https://xxxxxxxxxxxx.supabase.co" class="w-full px-3 py-2 border border-slate-700 rounded-lg text-sm" />
           </div>
           <div>
-            <label class="block text-xs font-medium text-slate-500 mb-1">Supabase Anon Key</label>
-            <input id="sbKey" type="password" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm" />
+            <label class="block text-xs font-medium text-slate-400 mb-1">Supabase Anon Key</label>
+            <input id="sbKey" type="password" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." class="w-full px-3 py-2 border border-slate-700 rounded-lg text-sm" />
           </div>
         </div>
         <div class="flex flex-wrap gap-2 mb-2">
-          <button id="testConnectionBtn" class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium px-4 py-2 rounded-lg text-sm transition">Test Connection</button>
+          <button id="testConnectionBtn" class="bg-slate-800 hover:bg-slate-700 text-slate-200 font-medium px-4 py-2 rounded-lg text-sm transition">Test Connection</button>
           <button id="saveSettingsBtn" class="bg-brand-600 hover:bg-brand-700 text-white font-medium px-4 py-2 rounded-lg text-sm transition">Save &amp; Sync Now</button>
           <button id="clearSettingsBtn" class="text-red-500 hover:text-red-700 text-sm px-3 py-2 rounded-lg transition">Disconnect</button>
         </div>
         <p id="settingsMsg" class="text-sm min-h-[1.25rem]"></p>
 
-        <div class="mt-5 border-t border-slate-200 pt-5">
+        <div class="mt-5 border-t border-slate-800 pt-5">
           <h4 class="font-semibold text-sm mb-2">Database Setup (run once in Supabase SQL Editor)</h4>
-          <pre class="bg-slate-900 text-emerald-300 rounded-lg p-4 text-xs overflow-x-auto leading-relaxed whitespace-pre"><code>-- 1. Create tables
+          <pre class="bg-slate-950 text-emerald-300 rounded-lg p-4 text-xs overflow-x-auto leading-relaxed whitespace-pre border border-slate-800"><code>-- 1. Create tables
 CREATE TABLE plb_flights (
   id TEXT PRIMARY KEY,
   username TEXT NOT NULL,
@@ -540,31 +604,31 @@ CREATE POLICY "anon_all" ON plb_bug_reports FOR ALL TO anon USING (true) WITH CH
 
   <!-- ===== DUTY DAY MODAL ===== -->
   <div id="dutyModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md">
+    <div class="modal-card w-full max-w-md">
       <div class="p-6">
         <div class="flex items-center justify-between mb-1">
           <h3 class="text-lg font-semibold">Duty Day</h3>
-          <button id="dutyModalClose" type="button" class="text-slate-400 hover:text-slate-600 text-2xl leading-none">&times;</button>
+          <button id="dutyModalClose" type="button" class="text-slate-400 hover:text-slate-300 text-2xl leading-none">&times;</button>
         </div>
-        <p id="dutyModalDate" class="text-sm text-slate-500 mb-4"></p>
-        <div id="dutyModalFlightInfo" class="hidden mb-4 text-xs bg-brand-50 text-brand-700 border border-brand-100 rounded-lg p-2"></div>
+        <p id="dutyModalDate" class="text-sm text-slate-400 mb-4"></p>
+        <div id="dutyModalFlightInfo" class="hidden mb-4 text-xs bg-cyan-500/10 text-cyan-300 border border-cyan-500/30 rounded-lg p-2"></div>
         <form id="dutyModalForm" class="grid grid-cols-2 gap-3">
           <div>
-            <label class="block text-xs font-medium text-slate-500 mb-1">Start Time</label>
-            <input name="start" type="time" class="w-full px-3 py-2 border border-slate-300 rounded-lg" />
+            <label class="block text-xs font-medium text-slate-400 mb-1">Start Time</label>
+            <input name="start" type="time" class="w-full px-3 py-2 border border-slate-700 rounded-lg" />
           </div>
           <div>
-            <label class="block text-xs font-medium text-slate-500 mb-1">End Time</label>
-            <input name="end" type="time" class="w-full px-3 py-2 border border-slate-300 rounded-lg" />
+            <label class="block text-xs font-medium text-slate-400 mb-1">End Time</label>
+            <input name="end" type="time" class="w-full px-3 py-2 border border-slate-700 rounded-lg" />
           </div>
           <div class="col-span-2">
-            <label class="block text-xs font-medium text-slate-500 mb-1">Duty Hours</label>
-            <input name="hours" type="number" step="0.1" min="0" class="w-full px-3 py-2 border border-slate-300 rounded-lg" />
+            <label class="block text-xs font-medium text-slate-400 mb-1">Duty Hours</label>
+            <input name="hours" type="number" step="0.1" min="0" class="w-full px-3 py-2 border border-slate-700 rounded-lg" />
             <p class="text-xs text-slate-400 mt-1">Auto-calculated from Start/End. Edit to override (e.g., add report/secure time).</p>
           </div>
           <div class="col-span-2">
-            <label class="block text-xs font-medium text-slate-500 mb-1">Operation Type (CARs Part VII)</label>
-            <select name="operationType" class="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white">
+            <label class="block text-xs font-medium text-slate-400 mb-1">Operation Type (CARs Part VII)</label>
+            <select name="operationType" class="w-full px-3 py-2 border border-slate-700 rounded-lg">
               <option value="">— none —</option>
               <option value="702">702 — Aerial Work</option>
               <option value="703">703 — Air Taxi (≤9 pax)</option>
@@ -578,7 +642,7 @@ CREATE POLICY "anon_all" ON plb_bug_reports FOR ALL TO anon USING (true) WITH CH
           <div class="col-span-2 flex items-center justify-between gap-2 pt-2">
             <button type="button" id="dutyModalRemove" class="text-red-500 hover:text-red-700 text-sm">Remove duty</button>
             <div class="flex gap-2">
-              <button type="button" id="dutyModalCancel" class="px-4 py-2 text-sm rounded-lg hover:bg-slate-100">Cancel</button>
+              <button type="button" id="dutyModalCancel" class="px-4 py-2 text-sm rounded-lg hover:bg-slate-800">Cancel</button>
               <button type="submit" class="bg-brand-600 hover:bg-brand-700 text-white px-4 py-2 rounded-lg text-sm">Save</button>
             </div>
           </div>
@@ -589,25 +653,25 @@ CREATE POLICY "anon_all" ON plb_bug_reports FOR ALL TO anon USING (true) WITH CH
 
   <!-- ===== BUG REPORT MODAL ===== -->
   <div id="bugModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-xl max-h-[90vh] overflow-y-auto">
+    <div class="modal-card w-full max-w-xl max-h-[90vh] overflow-y-auto">
       <div class="p-6">
         <div class="flex items-center justify-between mb-1">
           <h3 class="text-lg font-semibold">Report a bug</h3>
-          <button id="bugModalClose" type="button" class="text-slate-400 hover:text-slate-600 text-2xl leading-none">&times;</button>
+          <button id="bugModalClose" type="button" class="text-slate-400 hover:text-slate-300 text-2xl leading-none">&times;</button>
         </div>
-        <p class="text-sm text-slate-500 mb-4">Help us fix it. Your username, the active tab, browser info, and any recent JavaScript errors are attached automatically.</p>
+        <p class="text-sm text-slate-400 mb-4">Help us fix it. Your username, the active tab, browser info, and any recent JavaScript errors are attached automatically.</p>
         <form id="bugForm" class="space-y-4">
           <div>
-            <label class="block text-xs font-medium text-slate-500 mb-1">What went wrong? <span class="text-red-500">*</span></label>
-            <textarea name="description" rows="3" required placeholder="e.g. After importing my logbook, the dashboard shows 0 PIC hours even though I'm the PIC on most flights." class="w-full px-3 py-2 border border-slate-300 rounded-lg"></textarea>
+            <label class="block text-xs font-medium text-slate-400 mb-1">What went wrong? <span class="text-red-500">*</span></label>
+            <textarea name="description" rows="3" required placeholder="e.g. After importing my logbook, the dashboard shows 0 PIC hours even though I'm the PIC on most flights." class="w-full px-3 py-2 border border-slate-700 rounded-lg"></textarea>
           </div>
           <div>
-            <label class="block text-xs font-medium text-slate-500 mb-1">Steps to reproduce <span class="text-slate-400">(optional)</span></label>
-            <textarea name="steps" rows="3" placeholder="1. Click ... 2. Then ... 3. I expected X but saw Y" class="w-full px-3 py-2 border border-slate-300 rounded-lg"></textarea>
+            <label class="block text-xs font-medium text-slate-400 mb-1">Steps to reproduce <span class="text-slate-400">(optional)</span></label>
+            <textarea name="steps" rows="3" placeholder="1. Click ... 2. Then ... 3. I expected X but saw Y" class="w-full px-3 py-2 border border-slate-700 rounded-lg"></textarea>
           </div>
           <div>
-            <label class="block text-xs font-medium text-slate-500 mb-1">Severity</label>
-            <select name="severity" class="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white">
+            <label class="block text-xs font-medium text-slate-400 mb-1">Severity</label>
+            <select name="severity" class="w-full px-3 py-2 border border-slate-700 rounded-lg">
               <option value="low">Low — minor annoyance</option>
               <option value="medium" selected>Medium — feature partially broken</option>
               <option value="high">High — blocks me from using the app</option>
@@ -615,21 +679,21 @@ CREATE POLICY "anon_all" ON plb_bug_reports FOR ALL TO anon USING (true) WITH CH
             </select>
           </div>
           <div>
-            <label class="block text-xs font-medium text-slate-500 mb-1">Screenshot <span class="text-slate-400">(optional, ≤2MB)</span></label>
+            <label class="block text-xs font-medium text-slate-400 mb-1">Screenshot <span class="text-slate-400">(optional, ≤2MB)</span></label>
             <input id="bugScreenshot" name="screenshot" type="file" accept="image/*" class="text-sm" />
             <p id="bugScreenshotMsg" class="text-xs text-slate-400 mt-1">Or paste an image (Ctrl+V) while this modal is focused.</p>
-            <div id="bugScreenshotPreview" class="hidden mt-2 border border-slate-200 rounded-lg p-2">
+            <div id="bugScreenshotPreview" class="hidden mt-2 border border-slate-800 rounded-lg p-2">
               <img id="bugScreenshotImg" alt="Screenshot preview" class="max-h-40 rounded" />
               <button type="button" id="bugScreenshotRemove" class="text-xs text-red-500 hover:text-red-700 mt-1">Remove</button>
             </div>
           </div>
-          <details class="text-xs text-slate-500">
-            <summary class="cursor-pointer hover:text-slate-700">Attached automatically (preview)</summary>
-            <pre id="bugAttachedInfo" class="mt-2 p-2 bg-slate-50 rounded text-[10px] leading-relaxed overflow-x-auto whitespace-pre-wrap"></pre>
+          <details class="text-xs text-slate-400">
+            <summary class="cursor-pointer hover:text-slate-200">Attached automatically (preview)</summary>
+            <pre id="bugAttachedInfo" class="mt-2 p-2 bg-slate-800/60 rounded text-[10px] leading-relaxed overflow-x-auto whitespace-pre-wrap"></pre>
           </details>
           <p id="bugFormMsg" class="text-sm min-h-[1.25rem]"></p>
           <div class="flex justify-end gap-2 pt-2">
-            <button type="button" id="bugModalCancel" class="px-4 py-2 text-sm rounded-lg hover:bg-slate-100">Cancel</button>
+            <button type="button" id="bugModalCancel" class="px-4 py-2 text-sm rounded-lg hover:bg-slate-800">Cancel</button>
             <button type="submit" class="bg-brand-600 hover:bg-brand-700 text-white px-4 py-2 rounded-lg text-sm">Submit report</button>
           </div>
         </form>
@@ -1070,8 +1134,8 @@ function switchAuthTab(which){
   const login = which === "login";
   $("#loginForm").classList.toggle("hidden", !login);
   $("#signupForm").classList.toggle("hidden", login);
-  $("#loginTabBtn").className = "flex-1 py-2 text-sm font-medium rounded-md " + (login ? "bg-white shadow-sm" : "text-slate-500");
-  $("#signupTabBtn").className = "flex-1 py-2 text-sm font-medium rounded-md " + (!login ? "bg-white shadow-sm" : "text-slate-500");
+  $("#loginTabBtn").className = "flex-1 py-2 text-sm font-medium rounded-md " + (login ? "bg-slate-700 text-white shadow-sm" : "text-slate-400");
+  $("#signupTabBtn").className = "flex-1 py-2 text-sm font-medium rounded-md " + (!login ? "bg-slate-700 text-white shadow-sm" : "text-slate-400");
   showAuthMsg("");
 }
 
@@ -1121,7 +1185,7 @@ function startSession(username){
   populateStaticDropdowns();
   $("#authView").classList.add("hidden");
   $("#appView").classList.remove("hidden");
-  switchTab("logger");
+  switchTab("dashboard");
   renderAll();
   syncOnLogin(); // async — non-blocking
 }
@@ -1153,13 +1217,23 @@ function populateStaticDropdowns(){
    TAB NAVIGATION
    ============================================================ */
 $$(".tab-btn").forEach(btn => btn.addEventListener("click", () => switchTab(btn.dataset.tab)));
+$("#fabAddFlight").addEventListener("click", () => {
+  resetFlightForm();
+  switchTab("logger");
+  window.scrollTo({ top:0, behavior:"smooth" });
+  setTimeout(() => { const el = $("#flightForm").date; if(el) el.focus(); }, 250);
+});
 function switchTab(tab){
   $$(".tab-panel").forEach(p => p.classList.add("hidden"));
   $("#tab-" + tab).classList.remove("hidden");
   $$(".tab-btn").forEach(b => {
     const active = b.dataset.tab === tab;
     b.classList.toggle("active", active);
-    b.classList.toggle("text-brand-100", !active);
+    b.classList.toggle("bg-slate-800/80", active);
+    b.classList.toggle("text-white", active);
+    b.classList.toggle("border-brand-400", active);
+    b.classList.toggle("text-slate-400", !active);
+    b.classList.toggle("border-transparent", !active);
   });
   if(tab === "dashboard") renderDashboard();
   if(tab === "routemap") renderRouteMap();
@@ -1389,7 +1463,7 @@ function renderFlightTable(){
   $("#flightCountBadge").innerHTML = flights.length + (flights.length===1?" flight":" flights") + label;
   $("#noFlightsMsg").classList.toggle("hidden", flights.length > 0);
   body.innerHTML = flights.map(fl => `
-    <tr class="border-b border-slate-100 hover:bg-slate-50">
+    <tr class="border-b border-slate-800/60 hover:bg-slate-800/60">
       <td class="py-2 pr-3 whitespace-nowrap">${esc(fmtDate(fl))}</td>
       <td class="py-2 pr-3">${esc(fl.aircraftType)}</td>
       <td class="py-2 pr-3">${esc(fl.registration||fl.civilIdent)||'—'}</td>
@@ -1405,7 +1479,7 @@ function renderFlightTable(){
       <td class="py-2 pr-3">${esc(fl.takeoff)}</td>
       <td class="py-2 pr-3">${esc(fl.landing)}</td>
       <td class="py-2 pr-3 text-right whitespace-nowrap">
-        <button onclick="editFlight('${fl.id}')" class="text-brand-600 hover:text-brand-800 font-medium mr-3">Edit</button>
+        <button onclick="editFlight('${fl.id}')" class="text-cyan-400 hover:text-cyan-300 font-medium mr-3">Edit</button>
         <button onclick="deleteFlight('${fl.id}')" class="text-red-500 hover:text-red-700 font-medium">Delete</button>
       </td>
     </tr>`).join("");
@@ -1451,7 +1525,7 @@ function parseCSV(text){
 function showCsvMsg(text, kind){
   const el = $("#csvMsg");
   el.textContent = text;
-  const color = kind === "error" ? "text-red-500" : kind === "ok" ? "text-emerald-600" : "text-slate-500";
+  const color = kind === "error" ? "text-red-500" : kind === "ok" ? "text-emerald-600" : "text-slate-400";
   el.className = "text-sm mb-3 min-h-[1.25rem] " + color;
   el.classList.remove("hidden");
 }
@@ -1877,6 +1951,48 @@ $("#savePilotNameBtn").addEventListener("click", () => {
   setTimeout(() => msg.textContent = "", 1500);
 });
 
+/* ---------- Small inline icon set used by dashboard stat cards ---------- */
+function dashIcon(name){
+  const icons = {
+    clock: '<svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>',
+    trend: '<svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l6-6 4 4 8-8"/><path d="M15 7h6v6"/></svg>',
+    bar: '<svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10M12 20V4M20 20v-7"/></svg>',
+    plane: '<svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M21 16v-2l-8-5V3.5A1.5 1.5 0 0 0 11.5 2 1.5 1.5 0 0 0 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5L21 16z"/></svg>'
+  };
+  return icons[name] || "";
+}
+
+/* ---------- Radial gauge used for duty & CARs compliance widgets ---------- */
+function ringGauge(pct, size, colorHex){
+  size = size || 96;
+  const stroke = 9;
+  const r = (size - stroke) / 2;
+  const c = 2 * Math.PI * r;
+  const p = Math.max(0, Math.min(100, pct));
+  const offset = c * (1 - p / 100);
+  return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" style="transform:rotate(-90deg)">
+    <circle cx="${size/2}" cy="${size/2}" r="${r}" fill="none" stroke="#1e293b" stroke-width="${stroke}"/>
+    <circle cx="${size/2}" cy="${size/2}" r="${r}" fill="none" stroke="${colorHex}" stroke-width="${stroke}"
+      stroke-linecap="round" stroke-dasharray="${c}" stroke-dashoffset="${offset}"
+      style="filter:drop-shadow(0 0 6px ${colorHex}80); transition:stroke-dashoffset .4s ease"/>
+  </svg>`;
+}
+function gaugeCard(title, subLabel, pct, colorHex){
+  return `
+  <div class="card p-4 flex items-center gap-4">
+    <div class="relative shrink-0" style="width:96px;height:96px;">
+      ${ringGauge(pct, 96, colorHex)}
+      <div class="absolute inset-0 flex flex-col items-center justify-center">
+        <span class="text-base font-bold text-white leading-none">${Math.round(pct)}%</span>
+      </div>
+    </div>
+    <div class="min-w-0">
+      <div class="text-xs uppercase tracking-wide text-slate-400">${esc(title)}</div>
+      <div class="text-sm text-slate-300 mt-1">${esc(subLabel)}</div>
+    </div>
+  </div>`;
+}
+
 function renderDashboard(){
   const pid = data.currentPilotId;
   // All flights this pilot owns (their logbook)
@@ -1891,21 +2007,38 @@ function renderDashboard(){
   const dual = pid ? fl.filter(x => x.sicId === pid).reduce((s,x)=>s+totalHours(x),0) : 0;
   const routes = new Set(fl.filter(x=>x.from&&x.to).map(x=>x.from+"-"+x.to));
 
-  const cards = [
-    ["Total Flight Hours", total.toFixed(1), "bg-brand-600"],
-    ["PIC Hours", pic.toFixed(1), "bg-emerald-600"],
-    ["Dual (SIC) Hours", dual.toFixed(1), "bg-violet-600"],
-    ["Cross Country Hours", xc.toFixed(1), "bg-amber-500"],
-    ["Day Hours", dayH.toFixed(1), "bg-yellow-500"],
-    ["Night Hours", nightH.toFixed(1), "bg-indigo-600"],
-    ["IFR Hours", ifr.toFixed(1), "bg-sky-600"],
-    ["Total Flights", String(fl.length), "bg-rose-600"],
-    ["Unique Routes", String(routes.size), "bg-teal-600"],
+  const now = new Date();
+  const curMonthHrs = fl.filter(x=>{ const d=flightDate(x); return d.getFullYear()===now.getFullYear() && d.getMonth()===now.getMonth(); }).reduce((s,x)=>s+totalHours(x),0);
+  const curYearHrs = fl.filter(x=>flightDate(x).getFullYear()===now.getFullYear()).reduce((s,x)=>s+totalHours(x),0);
+
+  const primaryCards = [
+    ["Total Time", total.toFixed(1) + " hrs", "clock"],
+    ["Current Month", curMonthHrs.toFixed(1) + " hrs", "trend"],
+    ["Annual Total", curYearHrs.toFixed(1) + " hrs", "bar"],
+    ["Total Flights", String(fl.length), "plane"],
   ];
-  $("#dashCards").innerHTML = cards.map(([label,val,bg]) => `
-    <div class="rounded-xl shadow-sm p-4 text-white ${bg}">
-      <div class="text-2xl font-bold">${val}</div>
-      <div class="text-xs opacity-90 mt-1">${label}</div>
+  $("#dashCards").innerHTML = primaryCards.map(([label,val,ic]) => `
+    <div class="card p-4">
+      <div class="flex items-start justify-between">
+        <div class="text-xs uppercase tracking-wide text-slate-400">${esc(label)}</div>
+        <div class="text-brand-400">${dashIcon(ic)}</div>
+      </div>
+      <div class="text-2xl font-bold text-white mt-2">${esc(val)}</div>
+    </div>`).join("");
+
+  const secondaryCards = [
+    ["PIC Hours", pic.toFixed(1), "text-emerald-400"],
+    ["Dual (SIC) Hours", dual.toFixed(1), "text-violet-400"],
+    ["Cross Country", xc.toFixed(1), "text-amber-400"],
+    ["Day Hours", dayH.toFixed(1), "text-yellow-400"],
+    ["Night Hours", nightH.toFixed(1), "text-indigo-400"],
+    ["IFR Hours", ifr.toFixed(1), "text-sky-400"],
+    ["Unique Routes", String(routes.size), "text-teal-400"],
+  ];
+  $("#dashSecondaryCards").innerHTML = secondaryCards.map(([label,val,color]) => `
+    <div class="card p-3">
+      <div class="text-[11px] uppercase tracking-wide text-slate-400">${esc(label)}</div>
+      <div class="text-lg font-bold ${color} mt-1">${esc(val)}</div>
     </div>`).join("");
 
   // Hours by aircraft type — use friendly name when known
@@ -1922,8 +2055,8 @@ function renderDashboard(){
       const display = friendly && friendly !== t ? `${esc(t)} <span class="text-slate-400 font-normal">— ${esc(friendly)}</span>` : esc(t);
       return `
       <div>
-        <div class="flex justify-between text-sm mb-1"><span class="font-medium">${display}</span><span class="text-slate-500">${h.toFixed(1)} hrs</span></div>
-        <div class="h-2.5 bg-slate-100 rounded-full overflow-hidden"><div class="h-full bg-brand-500 rounded-full" style="width:${max?(h/max*100):0}%"></div></div>
+        <div class="flex justify-between text-sm mb-1"><span class="font-medium">${display}</span><span class="text-slate-400">${h.toFixed(1)} hrs</span></div>
+        <div class="h-2.5 bg-slate-800 rounded-full overflow-hidden"><div class="h-full bg-brand-500 rounded-full" style="width:${max?(h/max*100):0}%"></div></div>
       </div>`;
     }).join("");
   }
@@ -1935,11 +2068,104 @@ function renderDashboard(){
     card.innerHTML = '<p class="text-slate-400">No pilot selected. Add a profile in the Pilots tab.</p>';
   } else {
     card.innerHTML = `
-      <div class="flex justify-between"><span class="text-slate-500">Name:</span><span class="font-medium">${esc(pilotName(cp.id))}</span></div>
-      <div class="flex justify-between"><span class="text-slate-500">Employee #:</span><span>${esc(cp.employeeNumber)||'—'}</span></div>
-      <div class="flex justify-between"><span class="text-slate-500">License #:</span><span>${esc(cp.licenseNumber)||'—'}</span></div>
+      <div class="flex justify-between"><span class="text-slate-400">Name:</span><span class="font-medium">${esc(pilotName(cp.id))}</span></div>
+      <div class="flex justify-between"><span class="text-slate-400">Employee #:</span><span>${esc(cp.employeeNumber)||'—'}</span></div>
+      <div class="flex justify-between"><span class="text-slate-400">License #:</span><span>${esc(cp.licenseNumber)||'—'}</span></div>
     `;
   }
+
+  renderActiveDuty();
+  renderRecentLogs();
+  renderCarsCompliance();
+}
+
+/* ---------- Active Duty (today + trailing 7 days) ---------- */
+function renderActiveDuty(){
+  const todayKey = dstr(new Date());
+  const todayEntry = data.duty[todayKey];
+  const dailyHrs = todayEntry && todayEntry.hours ? +todayEntry.hours : 0;
+  const dailyCap = 14; // reference max flight duty period for a single day
+  const dailyPct = Math.min(100, (dailyHrs / dailyCap) * 100);
+
+  const now = new Date();
+  const cutoff7 = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 6);
+  let weeklyHrs = 0;
+  Object.keys(data.duty).forEach(k => {
+    const d = new Date(k + "T00:00:00");
+    if(d >= cutoff7 && d <= now){
+      const e = data.duty[k];
+      if(e && e.hours) weeklyHrs += +e.hours;
+    }
+  });
+  const weeklyCap = 60;
+  const weeklyPct = Math.min(100, (weeklyHrs / weeklyCap) * 100);
+
+  $("#activeDutyCards").innerHTML =
+    gaugeCard("Daily Duty", `${dailyHrs.toFixed(1)}h / ${dailyCap}h today`, dailyPct, "#22d3ee") +
+    gaugeCard("Weekly Duty", `${weeklyHrs.toFixed(1)}h / ${weeklyCap}h (7 days)`, weeklyPct, "#22d3ee");
+}
+
+/* ---------- Most recent flight, dashboard-style summary ---------- */
+function renderRecentLogs(){
+  const wrap = $("#recentLogsCard");
+  const flights = flightsForCurrentPilot();
+  if(!flights.length){
+    wrap.innerHTML = '<div class="card p-5 text-slate-400 text-sm">No flights logged yet.</div>';
+    return;
+  }
+  const fl = flights[0];
+  wrap.innerHTML = `
+    <div class="card p-5">
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
+        <div><div class="text-xs uppercase text-slate-400 mb-1">Date</div><div class="font-semibold text-slate-100">${esc(fmtDate(fl))}</div></div>
+        <div><div class="text-xs uppercase text-slate-400 mb-1">Aircraft</div><div class="font-semibold text-slate-100">${esc(fl.registration||fl.civilIdent)||'—'} <span class="text-slate-400 font-normal">(${esc(fl.aircraftType)||'—'})</span></div></div>
+        <div class="col-span-2 sm:col-span-1"><div class="text-xs uppercase text-slate-400 mb-1">Route</div><div class="font-semibold text-slate-100">${esc(fl.from)||'?'} <span class="text-brand-400">&rarr;</span> ${esc(fl.to)||'?'}</div></div>
+        <div><div class="text-xs uppercase text-slate-400 mb-1">Flight Time</div><div class="font-semibold text-slate-100">${totalHours(fl).toFixed(1)}h</div></div>
+      </div>
+      <div class="mt-4 pt-4 border-t border-slate-800 flex items-center justify-between">
+        <span class="text-xs text-slate-500">Role: ${esc(fl.loggedRole)||'—'} · PIC: ${esc(pilotName(fl.picId)||fl.pic)||'—'}</span>
+        <button onclick="editFlight('${fl.id}')" class="text-xs text-cyan-400 hover:text-cyan-300 font-medium">Details</button>
+      </div>
+    </div>`;
+}
+
+/* ---------- CARs Part VII reference compliance gauges ----------
+   Monthly: rolling 28-day flight time vs the 192h/28-day limit.
+   Rest: smallest recorded rest gap between consecutive duty days
+   (trailing 14 days) vs the 12h minimum rest requirement. Both limits
+   are the same ones shown on the Duty Tracker's CARs reference card. */
+function renderCarsCompliance(){
+  const pid = data.currentPilotId;
+  const fl = data.flights.filter(x => !pid || x.pilotId === pid);
+  const now = new Date();
+  const cutoff28 = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 27);
+  const hrs28 = fl.filter(x => { const d = flightDate(x); return d >= cutoff28 && d <= now; }).reduce((s,x)=>s+totalHours(x),0);
+  const monthlyCap = 192;
+  const monthlyPct = Math.min(100, (hrs28 / monthlyCap) * 100);
+
+  const keys = Object.keys(data.duty).filter(k => {
+    const d = new Date(k + "T00:00:00");
+    const diffDays = (now - d) / 86400000;
+    return diffDays >= 0 && diffDays <= 14;
+  }).sort();
+  let minGapHrs = null;
+  for(let i = 0; i < keys.length - 1; i++){
+    const a = data.duty[keys[i]], b = data.duty[keys[i+1]];
+    if(a && a.end && b && b.start){
+      const aEnd = new Date(keys[i] + "T" + a.end);
+      const bStart = new Date(keys[i+1] + "T" + b.start);
+      let gapHrs = (bStart - aEnd) / 3600000;
+      if(gapHrs < 0) gapHrs += 24;
+      if(minGapHrs === null || gapHrs < minGapHrs) minGapHrs = gapHrs;
+    }
+  }
+  const restCap = 12;
+  const restPct = minGapHrs == null ? 100 : Math.min(100, (minGapHrs / restCap) * 100);
+  const restLabel = minGapHrs == null ? "No duty pairs recorded yet" : `${minGapHrs.toFixed(1)}h / ${restCap}h min rest`;
+
+  $("#carsComplianceCards").innerHTML =
+    gaugeCard("CAR 700.15 — Monthly", `${hrs28.toFixed(1)} / ${monthlyCap} hrs (28-day)`, monthlyPct, monthlyPct > 90 ? "#f59e0b" : "#34d399") +
+    gaugeCard("CAR 700.16 — Rest", restLabel, restPct, restPct < 100 ? "#f59e0b" : "#34d399");
 }
 
 /* ============================================================
@@ -2003,7 +2229,7 @@ function renderRouteMap(){
     const c2 = airportCoord(r.b);
     const ratio = r.count / maxCount;
     L.polyline([c1, c2], {
-      color: "#1d4ed8",
+      color: "#0891b2",
       weight: 1.5 + ratio * 6,
       opacity: 0.4 + ratio * 0.5,
       lineCap: "round"
@@ -2041,13 +2267,13 @@ function renderRouteMap(){
   // Stats panel (unchanged)
   const sorted = Object.values(routes).sort((a,b) => b.count - a.count);
   $("#routeStats").innerHTML = sorted.map(r => `
-    <div class="border border-slate-200 rounded-lg p-3">
+    <div class="border border-slate-800 rounded-lg p-3">
       <div class="flex items-center justify-between">
         <span class="font-semibold">${esc(r.a)} ↔ ${esc(r.b)}</span>
-        <span class="text-xs bg-brand-100 text-brand-700 px-2 py-0.5 rounded-full">${r.count}×</span>
+        <span class="text-xs bg-cyan-500/15 text-cyan-300 px-2 py-0.5 rounded-full">${r.count}×</span>
       </div>
-      <div class="text-xs text-slate-500 mt-1">Aircraft: ${esc(Array.from(r.aircraft).join(", ")) || "—"}</div>
-      <div class="text-xs text-slate-500">Last flown: ${r.last ? dstr(r.last) : "—"}</div>
+      <div class="text-xs text-slate-400 mt-1">Aircraft: ${esc(Array.from(r.aircraft).join(", ")) || "—"}</div>
+      <div class="text-xs text-slate-400">Last flown: ${r.last ? dstr(r.last) : "—"}</div>
     </div>`).join("");
 }
 
@@ -2146,7 +2372,7 @@ function cellHtml(d){
   const hasFlight = flightDateSet.has(key);
   const on = (entry && entry.on) || hasFlight;
   const isToday = key === dstr(new Date());
-  const base = on ? "bg-brand-600 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200";
+  const base = on ? "bg-brand-600 text-white" : "bg-slate-800 text-slate-300 hover:bg-slate-700";
   const ring = isToday ? "ring-2 ring-amber-400" : "";
   // Bottom-line label: hours + op type if present, otherwise FLIGHT/ON/off
   let bottom;
@@ -2456,11 +2682,11 @@ function renderDuplicatesPanel(){
     }).join("");
     const sourceIdsCsv = counted.map(c => c.p.id).join(",");
     return `
-      <div class="bg-white rounded-lg p-3 border border-amber-100">
-        <div class="text-sm text-slate-600 mb-2">Group: <b>${esc(group.map(p => pilotName(p.id)).join(", "))}</b></div>
+      <div class="bg-slate-800/60 rounded-lg p-3 border border-amber-500/30">
+        <div class="text-sm text-slate-300 mb-2">Group: <b>${esc(group.map(p => pilotName(p.id)).join(", "))}</b></div>
         <div class="flex flex-wrap items-center gap-2">
-          <label class="text-sm text-slate-500">Keep:</label>
-          <select id="dupTarget_${gi}" class="text-sm border border-slate-300 rounded px-2 py-1 bg-white">${opts}</select>
+          <label class="text-sm text-slate-400">Keep:</label>
+          <select id="dupTarget_${gi}" class="text-sm border border-slate-700 rounded px-2 py-1">${opts}</select>
           <button onclick="mergeDuplicateGroup(${gi}, '${sourceIdsCsv}')"
                   class="bg-amber-600 hover:bg-amber-700 text-white text-sm font-medium px-3 py-1.5 rounded transition">
             Merge ${group.length - 1} duplicate${group.length-1===1?"":"s"}
@@ -2486,19 +2712,19 @@ function renderPilots(){
     const flightCount = data.flights.filter(f => f.pilotId === p.id).length;
     const others = data.pilots.filter(x => x.id !== p.id);
     const mergeSelect = others.length
-      ? `<select onchange="handleMergeSelect('${p.id}', this)" class="text-xs border border-slate-300 rounded px-1.5 py-1 mr-2 bg-white">
+      ? `<select onchange="handleMergeSelect('${p.id}', this)" class="text-xs border border-slate-700 rounded px-1.5 py-1 mr-2">
            <option value="">Merge into…</option>
            ${others.map(o => `<option value="${o.id}">${esc(pilotName(o.id))}</option>`).join("")}
          </select>`
       : "";
-    return `<tr class="border-b border-slate-100 hover:bg-slate-50">
+    return `<tr class="border-b border-slate-800/60 hover:bg-slate-800/60">
       <td class="py-2 pr-3 font-medium">${esc(pilotName(p.id)) || '(unnamed)'}</td>
       <td class="py-2 pr-3">${esc(p.employeeNumber) || '—'}</td>
       <td class="py-2 pr-3">${esc(p.licenseNumber) || '—'}</td>
       <td class="py-2 pr-3">${flightCount}</td>
       <td class="py-2 pr-3 text-right whitespace-nowrap">
         ${mergeSelect}
-        <button onclick="editPilot('${p.id}')" class="text-brand-600 hover:text-brand-800 font-medium mr-3">Edit</button>
+        <button onclick="editPilot('${p.id}')" class="text-cyan-400 hover:text-cyan-300 font-medium mr-3">Edit</button>
         <button onclick="deletePilot('${p.id}')" class="text-red-500 hover:text-red-700 font-medium">Delete</button>
       </td>
     </tr>`;
@@ -2691,7 +2917,7 @@ async function pushPilotName(name){
 function setSettingsMsg(text, kind){
   const el = $("#settingsMsg");
   el.textContent = text;
-  el.className = "text-sm min-h-[1.25rem] " + (kind==="ok"?"text-emerald-600":kind==="error"?"text-red-500":"text-slate-500");
+  el.className = "text-sm min-h-[1.25rem] " + (kind==="ok"?"text-emerald-600":kind==="error"?"text-red-500":"text-slate-400");
 }
 $("#settingsBtn").addEventListener("click", () => {
   $("#sbUrl").value = localStorage.getItem(SB_URL_KEY)||"";
@@ -2900,35 +3126,35 @@ function renderBugReports(){
   $("#noBugsMsg").classList.toggle("hidden", filtered.length > 0);
   if(!filtered.length){ list.innerHTML = ""; return; }
   list.innerHTML = filtered.map(r => {
-    const sevColor = r.severity === "data-loss" ? "bg-red-100 text-red-700"
-      : r.severity === "high"   ? "bg-orange-100 text-orange-700"
-      : r.severity === "medium" ? "bg-amber-100 text-amber-700"
-      :                            "bg-slate-100 text-slate-600";
+    const sevColor = r.severity === "data-loss" ? "bg-red-500/15 text-red-300"
+      : r.severity === "high"   ? "bg-orange-500/15 text-orange-300"
+      : r.severity === "medium" ? "bg-amber-500/15 text-amber-300"
+      :                            "bg-slate-800 text-slate-300";
     const statusBadge = r.status === "resolved"
-      ? '<span class="text-xs bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full">resolved</span>'
-      : '<span class="text-xs bg-sky-100 text-sky-700 px-2 py-0.5 rounded-full">open</span>';
+      ? '<span class="text-xs bg-emerald-500/15 text-emerald-300 px-2 py-0.5 rounded-full">resolved</span>'
+      : '<span class="text-xs bg-sky-500/15 text-sky-300 px-2 py-0.5 rounded-full">open</span>';
     const when = (r.created_at||"").replace("T"," ").slice(0,16);
     const shortDesc = (r.description||"").slice(0, 200);
-    return `<div class="border border-slate-200 rounded-lg p-3">
+    return `<div class="border border-slate-800 rounded-lg p-3">
       <div class="flex flex-wrap items-start justify-between gap-2 mb-1">
         <div class="flex flex-wrap items-center gap-2">
           ${statusBadge}
           <span class="text-xs ${sevColor} px-2 py-0.5 rounded-full">${esc(r.severity || "—")}</span>
-          <span class="text-xs text-slate-500">${esc(when)} · ${esc(r.username || "")} · <i>${esc(r.tab || "")}</i></span>
+          <span class="text-xs text-slate-400">${esc(when)} · ${esc(r.username || "")} · <i>${esc(r.tab || "")}</i></span>
         </div>
         <div class="flex gap-2">
           ${r.status === "resolved"
-            ? `<button onclick="setBugStatus('${r.id}','open')" class="text-xs text-sky-600 hover:text-sky-800">Reopen</button>`
-            : `<button onclick="setBugStatus('${r.id}','resolved')" class="text-xs text-emerald-600 hover:text-emerald-800">Mark resolved</button>`}
+            ? `<button onclick="setBugStatus('${r.id}','open')" class="text-xs text-sky-600 hover:text-sky-300">Reopen</button>`
+            : `<button onclick="setBugStatus('${r.id}','resolved')" class="text-xs text-emerald-600 hover:text-emerald-300">Mark resolved</button>`}
           <button onclick="deleteBugReport('${r.id}')" class="text-xs text-red-500 hover:text-red-700">Delete</button>
         </div>
       </div>
-      <div class="text-sm text-slate-800 mb-2 whitespace-pre-line">${esc(shortDesc)}${r.description && r.description.length > 200 ? "…" : ""}</div>
-      ${r.steps ? `<div class="text-xs text-slate-500 mb-2 whitespace-pre-line"><b>Steps:</b> ${esc(r.steps)}</div>` : ""}
-      ${r.screenshot ? `<details class="text-xs"><summary class="cursor-pointer text-slate-500 hover:text-slate-700">View screenshot</summary><img src="${esc(r.screenshot)}" class="mt-2 max-h-64 rounded border border-slate-200"></details>` : ""}
-      <details class="text-xs text-slate-500 mt-1">
-        <summary class="cursor-pointer hover:text-slate-700">Diagnostics</summary>
-        <pre class="mt-1 p-2 bg-slate-50 rounded text-[10px] leading-relaxed overflow-x-auto whitespace-pre-wrap">${esc(JSON.stringify({
+      <div class="text-sm text-slate-100 mb-2 whitespace-pre-line">${esc(shortDesc)}${r.description && r.description.length > 200 ? "…" : ""}</div>
+      ${r.steps ? `<div class="text-xs text-slate-400 mb-2 whitespace-pre-line"><b>Steps:</b> ${esc(r.steps)}</div>` : ""}
+      ${r.screenshot ? `<details class="text-xs"><summary class="cursor-pointer text-slate-400 hover:text-slate-200">View screenshot</summary><img src="${esc(r.screenshot)}" class="mt-2 max-h-64 rounded border border-slate-800"></details>` : ""}
+      <details class="text-xs text-slate-400 mt-1">
+        <summary class="cursor-pointer hover:text-slate-200">Diagnostics</summary>
+        <pre class="mt-1 p-2 bg-slate-800/60 rounded text-[10px] leading-relaxed overflow-x-auto whitespace-pre-wrap">${esc(JSON.stringify({
           tab: r.tab, url: r.url, user_agent: r.user_agent, viewport: r.viewport,
           app_version: r.app_version, app_state: r.app_state, recent_errors: r.recent_errors
         }, null, 2))}</pre>
