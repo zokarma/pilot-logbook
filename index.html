@@ -309,44 +309,72 @@
 
     <!-- ===== DASHBOARD TAB ===== -->
     <section id="tab-dashboard" class="tab-panel hidden fade-in space-y-8">
-      <div>
+      <!-- Customize toolbar -->
+      <div class="flex items-center justify-end -mb-4">
+        <button id="dashCustomizeBtn" class="flex items-center gap-2 text-sm font-medium text-slate-300 bg-slate-800 hover:bg-slate-700 px-3 py-1.5 rounded-lg transition">
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h16M4 18h16"/><circle cx="9" cy="6" r="2" fill="currentColor" stroke="none"/><circle cx="15" cy="12" r="2" fill="currentColor" stroke="none"/><circle cx="8" cy="18" r="2" fill="currentColor" stroke="none"/></svg>
+          <span>Customize</span>
+        </button>
+      </div>
+      <div id="dashCustomizePanel" class="card p-5 hidden -mt-4">
+        <div class="flex items-center justify-between mb-3">
+          <h3 class="font-semibold">Customize dashboard</h3>
+          <div class="flex items-center gap-3">
+            <button id="dashCustomizeReset" class="text-xs text-slate-400 hover:text-slate-200">Show all</button>
+            <button id="dashCustomizeDone" class="text-sm font-medium bg-brand-600 hover:bg-brand-500 text-white px-3 py-1.5 rounded-lg transition">Done</button>
+          </div>
+        </div>
+        <p class="text-sm text-slate-400 mb-4">Turn individual metrics on or off. Your choice is saved to this device.</p>
+        <div id="dashCustomizeGroups" class="space-y-4"></div>
+      </div>
+
+      <div id="sec-stats" data-dash-section>
         <h3 class="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-3">Flight Stats</h3>
         <div id="dashCards" class="grid grid-cols-2 lg:grid-cols-4 gap-4"></div>
       </div>
 
-      <div>
+      <div id="sec-breakdown" data-dash-section>
         <h3 class="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-3">Flight Time Breakdown</h3>
         <div id="dashSecondaryCards" class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3"></div>
       </div>
 
-      <div>
+      <div id="sec-duty" data-dash-section>
         <h3 class="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-3">Active Duty</h3>
         <div id="activeDutyCards" class="grid grid-cols-1 sm:grid-cols-2 gap-4"></div>
       </div>
 
-      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div class="card p-5">
-          <h3 class="font-semibold mb-4">Hours by Aircraft Type</h3>
-          <div id="aircraftBreakdown" class="space-y-3"></div>
-        </div>
-        <div class="card p-5">
-          <h3 class="font-semibold mb-2">Current Pilot</h3>
-          <p class="text-sm text-slate-400 mb-3">All metrics on this page are for the pilot selected in the header.</p>
-          <div id="currentPilotCard" class="text-sm space-y-2"></div>
-          <!-- Legacy hidden inputs kept for the rare migration path that still references them -->
-          <input id="pilotNameInput" type="hidden" />
-          <button id="savePilotNameBtn" type="button" class="hidden"></button>
-          <span id="pilotNameMsg" class="hidden"></span>
+      <div id="sec-panels" data-dash-section>
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div id="panel-aircraftHours" class="card p-5">
+            <h3 class="font-semibold mb-4">Hours by Aircraft Type</h3>
+            <div id="aircraftBreakdown" class="space-y-3"></div>
+          </div>
+          <div id="panel-currentPilot" class="card p-5">
+            <h3 class="font-semibold mb-2">Current Pilot</h3>
+            <p class="text-sm text-slate-400 mb-3">All metrics on this page are for the pilot selected in the header.</p>
+            <div id="currentPilotCard" class="text-sm space-y-2"></div>
+            <!-- Legacy hidden inputs kept for the rare migration path that still references them -->
+            <input id="pilotNameInput" type="hidden" />
+            <button id="savePilotNameBtn" type="button" class="hidden"></button>
+            <span id="pilotNameMsg" class="hidden"></span>
+          </div>
         </div>
       </div>
 
-      <div>
+      <div id="sec-recent" data-dash-section>
         <h3 class="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-3">Recent Logs</h3>
         <div id="recentLogsCard"></div>
       </div>
 
-      <div>
-        <h3 class="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-3">CARs Compliance</h3>
+      <div id="sec-cars" data-dash-section>
+        <div class="flex items-center justify-between mb-3">
+          <h3 class="text-xs font-semibold uppercase tracking-wider text-slate-400">CARs Compliance · Duty Tracker</h3>
+          <button id="dashDutyLink" class="text-xs font-medium text-cyan-400 hover:text-cyan-300 flex items-center gap-1">
+            View in Duty Tracker
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+          </button>
+        </div>
+        <p class="text-xs text-slate-500 mb-3">Live from your Duty Tracker — edit duty days there and these update automatically.</p>
         <div id="carsComplianceCards" class="grid grid-cols-1 sm:grid-cols-2 gap-4"></div>
       </div>
     </section>
@@ -729,7 +757,7 @@ const dataKey = (u) => "plb_data_" + u;
 
 function loadUsers(){ try { return JSON.parse(localStorage.getItem(USERS_KEY)) || {}; } catch(e){ return {}; } }
 function saveUsers(u){ localStorage.setItem(USERS_KEY, JSON.stringify(u)); }
-function emptyData(){ return { flights:[], duty:{}, pilotName:"", pilots:[], currentPilotId:null, lastLoggedRole:"Captain", bugReports:[] }; }
+function emptyData(){ return { flights:[], duty:{}, pilotName:"", pilots:[], currentPilotId:null, lastLoggedRole:"Captain", bugReports:[], dashboardHidden:[] }; }
 function loadData(user){
   try { return JSON.parse(localStorage.getItem(dataKey(user))) || emptyData(); }
   catch(e){ return emptyData(); }
@@ -1033,6 +1061,7 @@ function migrateData(d){
   });
   if(typeof d.pilotName !== "string") d.pilotName = "";
   if(!Array.isArray(d.bugReports)) d.bugReports = [];
+  if(!Array.isArray(d.dashboardHidden)) d.dashboardHidden = [];
 
   // Build a quick name -> pilotId map; create profiles for any free-text PIC/SIC/SOC we find.
   const nameToId = {};
@@ -1993,6 +2022,64 @@ function gaugeCard(title, subLabel, pct, colorHex){
   </div>`;
 }
 
+/* ---------- Dashboard metric registry & per-device show/hide ----------
+   Each toggleable card has a stable key. Hidden keys are stored per user in
+   data.dashboardHidden and persisted via saveData. Cloud sync doesn't carry
+   this field, so it stays a local UI preference. */
+const DASH_METRICS = [
+  { section:"Flight Stats", items:[
+    ["totalTime","Total Time"],["currentMonth","Current Month"],["annualTotal","Annual Total"],["totalFlights","Total Flights"]
+  ]},
+  { section:"Flight Time Breakdown", items:[
+    ["pic","PIC Hours"],["dual","Dual (SIC) Hours"],["xc","Cross Country"],["day","Day Hours"],["night","Night Hours"],["ifr","IFR Hours"],["routes","Unique Routes"]
+  ]},
+  { section:"Active Duty", items:[
+    ["dailyDuty","Daily Duty"],["weeklyDuty","Weekly Duty"]
+  ]},
+  { section:"Panels", items:[
+    ["aircraftHours","Hours by Aircraft Type"],["currentPilot","Current Pilot"],["recentLogs","Recent Logs"]
+  ]},
+  { section:"CARs Compliance · Duty Tracker", items:[
+    ["carMonthly","CAR 700.15 — Monthly"],["carRest","CAR 700.16 — Rest"]
+  ]},
+];
+function dashIsHidden(key){ return (data.dashboardHidden||[]).includes(key); }
+function setDashHidden(key, hidden){
+  const set = new Set(data.dashboardHidden||[]);
+  if(hidden) set.add(key); else set.delete(key);
+  data.dashboardHidden = Array.from(set);
+  saveData(currentUser, data);
+}
+
+function renderCustomizePanel(){
+  $("#dashCustomizeGroups").innerHTML = DASH_METRICS.map(g => `
+    <div>
+      <div class="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">${esc(g.section)}</div>
+      <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
+        ${g.items.map(([key,label]) => `
+          <label class="flex items-center gap-2 text-sm text-slate-200 cursor-pointer select-none">
+            <input type="checkbox" data-dash-metric="${esc(key)}" ${dashIsHidden(key)?"":"checked"} class="accent-cyan-500 w-4 h-4">
+            <span>${esc(label)}</span>
+          </label>`).join("")}
+      </div>
+    </div>`).join("");
+}
+
+/* Hide a whole section when none of its cards are visible, so the dashboard
+   collapses cleanly instead of leaving orphaned headers. */
+function updateDashSectionVisibility(){
+  const emptyHide = (secId, containerId) => {
+    const c = $("#"+containerId);
+    $("#"+secId).classList.toggle("hidden", !c || c.children.length === 0);
+  };
+  emptyHide("sec-stats","dashCards");
+  emptyHide("sec-breakdown","dashSecondaryCards");
+  emptyHide("sec-duty","activeDutyCards");
+  emptyHide("sec-cars","carsComplianceCards");
+  $("#sec-panels").classList.toggle("hidden", dashIsHidden("aircraftHours") && dashIsHidden("currentPilot"));
+  $("#sec-recent").classList.toggle("hidden", dashIsHidden("recentLogs"));
+}
+
 function renderDashboard(){
   const pid = data.currentPilotId;
   // All flights this pilot owns (their logbook)
@@ -2012,12 +2099,12 @@ function renderDashboard(){
   const curYearHrs = fl.filter(x=>flightDate(x).getFullYear()===now.getFullYear()).reduce((s,x)=>s+totalHours(x),0);
 
   const primaryCards = [
-    ["Total Time", total.toFixed(1) + " hrs", "clock"],
-    ["Current Month", curMonthHrs.toFixed(1) + " hrs", "trend"],
-    ["Annual Total", curYearHrs.toFixed(1) + " hrs", "bar"],
-    ["Total Flights", String(fl.length), "plane"],
+    ["totalTime", "Total Time", total.toFixed(1) + " hrs", "clock"],
+    ["currentMonth", "Current Month", curMonthHrs.toFixed(1) + " hrs", "trend"],
+    ["annualTotal", "Annual Total", curYearHrs.toFixed(1) + " hrs", "bar"],
+    ["totalFlights", "Total Flights", String(fl.length), "plane"],
   ];
-  $("#dashCards").innerHTML = primaryCards.map(([label,val,ic]) => `
+  $("#dashCards").innerHTML = primaryCards.filter(c => !dashIsHidden(c[0])).map(([key,label,val,ic]) => `
     <div class="card p-4">
       <div class="flex items-start justify-between">
         <div class="text-xs uppercase tracking-wide text-slate-400">${esc(label)}</div>
@@ -2027,15 +2114,15 @@ function renderDashboard(){
     </div>`).join("");
 
   const secondaryCards = [
-    ["PIC Hours", pic.toFixed(1), "text-emerald-400"],
-    ["Dual (SIC) Hours", dual.toFixed(1), "text-violet-400"],
-    ["Cross Country", xc.toFixed(1), "text-amber-400"],
-    ["Day Hours", dayH.toFixed(1), "text-yellow-400"],
-    ["Night Hours", nightH.toFixed(1), "text-indigo-400"],
-    ["IFR Hours", ifr.toFixed(1), "text-sky-400"],
-    ["Unique Routes", String(routes.size), "text-teal-400"],
+    ["pic", "PIC Hours", pic.toFixed(1), "text-emerald-400"],
+    ["dual", "Dual (SIC) Hours", dual.toFixed(1), "text-violet-400"],
+    ["xc", "Cross Country", xc.toFixed(1), "text-amber-400"],
+    ["day", "Day Hours", dayH.toFixed(1), "text-yellow-400"],
+    ["night", "Night Hours", nightH.toFixed(1), "text-indigo-400"],
+    ["ifr", "IFR Hours", ifr.toFixed(1), "text-sky-400"],
+    ["routes", "Unique Routes", String(routes.size), "text-teal-400"],
   ];
-  $("#dashSecondaryCards").innerHTML = secondaryCards.map(([label,val,color]) => `
+  $("#dashSecondaryCards").innerHTML = secondaryCards.filter(c => !dashIsHidden(c[0])).map(([key,label,val,color]) => `
     <div class="card p-3">
       <div class="text-[11px] uppercase tracking-wide text-slate-400">${esc(label)}</div>
       <div class="text-lg font-bold ${color} mt-1">${esc(val)}</div>
@@ -2074,9 +2161,14 @@ function renderDashboard(){
     `;
   }
 
+  // Individual panel show/hide
+  $("#panel-aircraftHours").classList.toggle("hidden", dashIsHidden("aircraftHours"));
+  $("#panel-currentPilot").classList.toggle("hidden", dashIsHidden("currentPilot"));
+
   renderActiveDuty();
   renderRecentLogs();
   renderCarsCompliance();
+  updateDashSectionVisibility();
 }
 
 /* ---------- Active Duty (today + trailing 7 days) ---------- */
@@ -2100,9 +2192,10 @@ function renderActiveDuty(){
   const weeklyCap = 60;
   const weeklyPct = Math.min(100, (weeklyHrs / weeklyCap) * 100);
 
-  $("#activeDutyCards").innerHTML =
-    gaugeCard("Daily Duty", `${dailyHrs.toFixed(1)}h / ${dailyCap}h today`, dailyPct, "#22d3ee") +
-    gaugeCard("Weekly Duty", `${weeklyHrs.toFixed(1)}h / ${weeklyCap}h (7 days)`, weeklyPct, "#22d3ee");
+  const parts = [];
+  if(!dashIsHidden("dailyDuty")) parts.push(gaugeCard("Daily Duty", `${dailyHrs.toFixed(1)}h / ${dailyCap}h today`, dailyPct, "#22d3ee"));
+  if(!dashIsHidden("weeklyDuty")) parts.push(gaugeCard("Weekly Duty", `${weeklyHrs.toFixed(1)}h / ${weeklyCap}h (7 days)`, weeklyPct, "#22d3ee"));
+  $("#activeDutyCards").innerHTML = parts.join("");
 }
 
 /* ---------- Most recent flight, dashboard-style summary ---------- */
@@ -2163,10 +2256,32 @@ function renderCarsCompliance(){
   const restPct = minGapHrs == null ? 100 : Math.min(100, (minGapHrs / restCap) * 100);
   const restLabel = minGapHrs == null ? "No duty pairs recorded yet" : `${minGapHrs.toFixed(1)}h / ${restCap}h min rest`;
 
-  $("#carsComplianceCards").innerHTML =
-    gaugeCard("CAR 700.15 — Monthly", `${hrs28.toFixed(1)} / ${monthlyCap} hrs (28-day)`, monthlyPct, monthlyPct > 90 ? "#f59e0b" : "#34d399") +
-    gaugeCard("CAR 700.16 — Rest", restLabel, restPct, restPct < 100 ? "#f59e0b" : "#34d399");
+  const parts = [];
+  if(!dashIsHidden("carMonthly")) parts.push(gaugeCard("CAR 700.15 — Monthly", `${hrs28.toFixed(1)} / ${monthlyCap} hrs (28-day)`, monthlyPct, monthlyPct > 90 ? "#f59e0b" : "#34d399"));
+  if(!dashIsHidden("carRest")) parts.push(gaugeCard("CAR 700.16 — Rest", restLabel, restPct, restPct < 100 ? "#f59e0b" : "#34d399"));
+  $("#carsComplianceCards").innerHTML = parts.join("");
 }
+
+/* ---------- Customize dashboard wiring ---------- */
+$("#dashCustomizeBtn").addEventListener("click", () => {
+  const panel = $("#dashCustomizePanel");
+  if(panel.classList.contains("hidden")){ renderCustomizePanel(); panel.classList.remove("hidden"); }
+  else panel.classList.add("hidden");
+});
+$("#dashCustomizeDone").addEventListener("click", () => $("#dashCustomizePanel").classList.add("hidden"));
+$("#dashCustomizeReset").addEventListener("click", () => {
+  data.dashboardHidden = [];
+  saveData(currentUser, data);
+  renderCustomizePanel();
+  renderDashboard();
+});
+$("#dashCustomizeGroups").addEventListener("change", (e) => {
+  const cb = e.target.closest("input[data-dash-metric]");
+  if(!cb) return;
+  setDashHidden(cb.getAttribute("data-dash-metric"), !cb.checked);
+  renderDashboard();
+});
+$("#dashDutyLink").addEventListener("click", () => switchTab("duty"));
 
 /* ============================================================
    ROUTE MAP (Leaflet + OpenStreetMap tiles)
