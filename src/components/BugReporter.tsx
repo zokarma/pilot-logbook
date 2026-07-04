@@ -8,7 +8,7 @@ import { getRecentErrors } from "@/lib/recentErrors";
 import { APP_VERSION, BugReport } from "@/lib/types";
 
 export default function BugReporter() {
-  const { data, cloud, currentUser, mutate, persistBug } = useData();
+  const { data, cloud, currentUser, mutate } = useData();
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const [severity, setSeverity] = useState("medium");
@@ -101,7 +101,6 @@ export default function BugReporter() {
       screenshot: screenshot || "",
     };
     mutate((d) => { d.bugReports.push(report); });
-    persistBug(report);
     setMsg({ text: "Submitted — thank you!", ok: true });
     setTimeout(() => setOpen(false), 800);
   }
