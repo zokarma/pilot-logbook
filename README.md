@@ -4,8 +4,10 @@ A pilot logbook web app — flight logging, dashboard, route map, duty tracker,
 pilot profiles with de-duplication, CSV import/export, and bug reporting.
 
 This is the **Next.js / TypeScript** rebuild of the original single-file
-`index.html` app. It uses the App Router, one route per tab, and **Supabase as
-the primary data store** accessed through server-side API routes. A localStorage
+`index.html` app. It uses the App Router (one route per tab) and **Supabase Auth
++ Row Level Security** as the data layer. The browser talks to Supabase directly
+with the **public anon key** — there is **no service-role/secret key anywhere**,
+and RLS guarantees each user can only read/write their own row. A localStorage
 mirror provides offline resilience and holds bug-report screenshots (which are
 never sent to the cloud).
 
@@ -22,78 +24,59 @@ npm run dev                  # http://localhost:8090
 
 ### Environment
 
-| Variable | Where | Purpose |
-| --- | --- | --- |
-| `NEXT_PUBLIC_SUPABASE_URL` | client + server | Supabase project URL |
-| `SUPABASE_SERVICE_ROLE_KEY` | **server only** | Used by `/api` routes; never exposed to the browser |
+Both values are **public** and safe to expose in the browser and in your host —
+the anon/publishable key respects RLS, and this app uses no secret key.
 
-If these are **not** set, the app automatically falls back to a **local-only
-mode**: auth and data live entirely in the browser's localStorage (handy for a
-quick spin without provisioning Supabase). The header will not show a sync badge
-in this mode.
+| Variable | Purpose |
+| --- | --- |
+| `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | anon / publishable key (`sb_publishable_…` or legacy anon JWT) |
+
+If these are **not** set, the app falls back to a **local-only mode**: auth and
+data live entirely in the browser's localStorage (handy for a quick spin without
+provisioning Supabase). No sync badge is shown in that mode.
 
 ## Supabase setup
 
-Run once in the Supabase SQL Editor:
-
-```sql
--- Auth (convenience gate for a personal tool — not a security boundary)
-create table plb_users (
-  username text primary key,
-  password_hash text not null,
-  created_at timestamptz default now()
-);
-
--- Whole-logbook state per user (flights, duty, pilots, currentPilotId, …)
-create table plb_app_state (
-  username text primary key,
-  data jsonb not null default '{}'::jsonb,
-  updated_at timestamptz default now()
-);
-
--- Bug reports, shared across users (screenshots are never stored here)
-create table plb_bug_reports (
-  id text primary key,
-  username text,
-  created_at timestamptz default now(),
-  status text default 'open',
-  severity text default 'medium',
-  description text,
-  steps text default '',
-  tab text default '',
-  url text default '',
-  user_agent text default '',
-  viewport text default '',
-  app_version text default '',
-  app_state jsonb,
-  recent_errors jsonb
-);
-
--- The API routes use the service-role key, which bypasses RLS. Keep RLS on so
--- nothing is reachable with the anon key.
-alter table plb_users enable row level security;
-alter table plb_app_state enable row level security;
-alter table plb_bug_reports enable row level security;
-```
+1. **Run the schema** — Supabase → SQL Editor → paste [`supabase/schema.sql`](supabase/schema.sql) → Run.
+   It creates a single `plb_app_state` table (one JSON row per user, keyed by
+   `user_id → auth.users`) with RLS policies requiring `auth.uid() = user_id`
+   for every select/insert/update/delete.
+2. **Enable the Email provider** — Authentication → Sign In / Providers → Email.
+   Decide whether to require **email confirmation**: with it on, new users must
+   confirm before logging in (the app shows a "check your email" prompt); with it
+   off, signup logs straight in. Confirmation emails use Supabase's built-in
+   sender (rate-limited on the free tier) unless you configure custom SMTP.
+3. **Set Site URL / redirect URLs** (Authentication → URL Configuration) to your
+   dev (`http://localhost:8090`) and production origins — needed for confirmation
+   and password-reset links.
 
 ## Architecture
 
-- **`src/lib`** — framework-free logic ported from the original app: `types`,
-  `airports`, `aircraft`, `hash`, `migrate` (the compatibility spine),
-  `logbook` helpers, `csv` (export + flat/structured import), `pilots`
-  (dedupe/merge).
-- **`src/app/api`** — server routes backed by Supabase: `auth/*`, `state`
-  (GET/PUT the whole logbook), `bugs` (shared table).
-- **`src/context/DataContext.tsx`** — the single client-side state owner. Loads
-  from `/api/state`, applies `migrateData`, mirrors to localStorage, and pushes
-  changes back (debounced, last-write-wins).
+- **`src/lib`** — framework-free logic: `types`, `airports`, `aircraft`, `hash`,
+  `migrate` (the compatibility spine), `logbook` helpers, `csv` (export +
+  flat/structured import), `pilots` (dedupe/merge), `dashboard` (CARs +
+  active-duty math), `supabaseClient` (browser client, anon key), `clientStore`
+  (localStorage mirror + local-only fallback).
+- **`src/context/DataContext.tsx`** — the single client-side state owner. Uses
+  Supabase Auth for the session, loads the user's `plb_app_state` row (RLS-scoped),
+  applies `migrateData`, mirrors to localStorage, and upserts changes back
+  (debounced, last-write-wins). Screenshots are stripped before the cloud write.
 - **`src/app/(app)/*`** — one page per tab: `logger`, `dashboard`, `routemap`,
-  `duty`, `pilots`, `bugs`, wrapped by an auth-guarded layout.
+  `duty`, `pilots`, `bugs`, wrapped by an auth-guarded layout. There is no server
+  `/api` layer — all data access is client-side under RLS.
+
+### Deploying
+
+Set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` in your host's
+environment (e.g. Vercel → Project → Settings → Environment Variables). Both are
+public, so nothing sensitive lives in the repo or the host secrets.
 
 ### Notes / caveats
 
-- Auth is a **convenience gate**, not real security — passwords are hashed with
-  a non-cryptographic djb2 hash. Real server auth (e.g. Supabase Auth) is a
-  sensible follow-up.
-- Sync is **last-write-wins**, keyed by username.
+- Security rests on **RLS + Supabase Auth**: the anon key can only do what the
+  policies allow, so a user can reach only their own row.
+- Sync is **last-write-wins** per user.
+- Bug reports are **private per user** (stored in that user's state JSON);
+  screenshots stay local-only.
 - `*.csv` files are personal flight data and are gitignored — never commit them.

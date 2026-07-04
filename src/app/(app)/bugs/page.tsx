@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { useData } from "@/context/DataContext";
-import { BugReport } from "@/lib/types";
 
 const SEV_COLOR: Record<string, string> = {
   "data-loss": "bg-red-500/15 text-red-300",
@@ -11,7 +10,7 @@ const SEV_COLOR: Record<string, string> = {
 };
 
 export default function BugsPage() {
-  const { data, mutate, persistBug, removeBug } = useData();
+  const { data, mutate } = useData();
   const [filter, setFilter] = useState<"all" | "open" | "resolved">("all");
 
   const reports = (data.bugReports || [])
@@ -25,18 +24,15 @@ export default function BugsPage() {
   );
 
   function setStatus(id: string, status: string) {
-    let updated: BugReport | undefined;
     mutate((d) => {
       const r = d.bugReports.find((x) => x.id === id);
-      if (r) { r.status = status; updated = { ...r }; }
+      if (r) r.status = status;
     });
-    if (updated) persistBug(updated);
   }
 
   function del(id: string) {
     if (!confirm("Delete this bug report? This cannot be undone.")) return;
     mutate((d) => { d.bugReports = d.bugReports.filter((r) => r.id !== id); });
-    removeBug(id);
   }
 
   return (

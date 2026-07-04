@@ -5,10 +5,10 @@ import { useRouter } from "next/navigation";
 import { useData } from "@/context/DataContext";
 
 export default function LoginPage() {
-  const { ready, currentUser, login, signup } = useData();
+  const { ready, currentUser, cloud, login, signup } = useData();
   const router = useRouter();
   const [mode, setMode] = useState<"login" | "signup">("login");
-  const [username, setUsername] = useState("");
+  const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null);
   const [busy, setBusy] = useState(false);
@@ -19,18 +19,30 @@ export default function LoginPage() {
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (!username.trim() || !password) return;
+    if (!identifier.trim() || !password) return;
     setBusy(true);
     setMsg(null);
-    const res = mode === "login" ? await login(username, password) : await signup(username, password);
+    const res = mode === "login" ? await login(identifier, password) : await signup(identifier, password);
     setBusy(false);
     if (res.error) {
       setMsg({ text: res.error, ok: false });
       return;
     }
-    if (mode === "signup") setMsg({ text: "Account created! Logging you in…", ok: true });
+    if (mode === "signup" && res.needsConfirmation) {
+      setMsg({ text: "Account created — check your email to confirm, then log in.", ok: true });
+      setMode("login");
+      setPassword("");
+      return;
+    }
+    // On success the auth listener sets currentUser and the effect redirects.
     router.replace("/logger");
   }
+
+  const label = cloud ? "Email" : "Username";
+  const inputType = cloud ? "email" : "text";
+  const autoComplete = cloud
+    ? mode === "login" ? "email" : "email"
+    : "username";
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4">
@@ -42,7 +54,9 @@ export default function LoginPage() {
             </svg>
           </div>
           <h1 className="text-2xl font-bold text-white">Pilot Logbook</h1>
-          <p className="text-sm text-slate-400 mt-1">Offline flight time tracking</p>
+          <p className="text-sm text-slate-400 mt-1">
+            {cloud ? "Cloud-synced flight time tracking" : "Offline flight time tracking"}
+          </p>
         </div>
 
         <div className="flex bg-slate-800/60 rounded-lg p-1 mb-5">
@@ -62,11 +76,12 @@ export default function LoginPage() {
 
         <form onSubmit={submit} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium mb-1">Username</label>
+            <label className="block text-sm font-medium mb-1">{label}</label>
             <input
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              autoComplete="username"
+              value={identifier}
+              onChange={(e) => setIdentifier(e.target.value)}
+              type={inputType}
+              autoComplete={autoComplete}
               required
               className="w-full px-3 py-2 border border-slate-700 rounded-lg focus:ring-2 focus:ring-brand-500"
             />
@@ -79,7 +94,7 @@ export default function LoginPage() {
               type="password"
               autoComplete={mode === "login" ? "current-password" : "new-password"}
               required
-              minLength={4}
+              minLength={cloud ? 6 : 4}
               className="w-full px-3 py-2 border border-slate-700 rounded-lg focus:ring-2 focus:ring-brand-500"
             />
           </div>
@@ -92,7 +107,7 @@ export default function LoginPage() {
           </button>
         </form>
 
-        <p className={"text-center text-sm mt-4 min-h-[1.25rem] " + (msg ? (msg.ok ? "text-emerald-600" : "text-red-500") : "")}>
+        <p className={"text-center text-sm mt-4 min-h-[1.25rem] " + (msg ? (msg.ok ? "text-emerald-400" : "text-red-400") : "")}>
           {msg?.text || ""}
         </p>
       </div>

@@ -1,21 +1,32 @@
 "use client";
 
-// Owns the entire logbook state and its persistence. Supabase (via /api routes)
-// is the primary store; a localStorage mirror provides offline resilience and
-// holds bug-report screenshots. When Supabase isn't configured the whole thing
-// runs local-only.
+// Owns the entire logbook state and its persistence.
+//
+// Cloud mode (Supabase configured): real Supabase Auth (email/password) manages
+// the session; the browser talks to the `plb_app_state` table directly with the
+// PUBLIC anon key, and Row Level Security guarantees each user only ever sees
+// their own row. There is NO service-role/secret key anywhere.
+//
+// Local-only mode (no Supabase env): auth + data live entirely in localStorage.
 
 import {
   createContext, useCallback, useContext, useEffect, useRef, useState, ReactNode,
 } from "react";
-import { AppData, BugReport, emptyData } from "@/lib/types";
+import type { Session } from "@supabase/supabase-js";
+import { AppData, emptyData } from "@/lib/types";
 import { migrateData } from "@/lib/migrate";
+import { getSupabaseClient, supabaseConfigured } from "@/lib/supabaseClient";
 import {
-  loadCache, saveCache, mergeScreenshots,
+  loadCache, saveCache, mergeScreenshots, stripScreenshots,
   localLogin, localSignup, localSession, localLogout,
 } from "@/lib/clientStore";
 
 export type SyncState = "ok" | "syncing" | "offline" | "error" | null;
+
+interface AuthResult {
+  error?: string;
+  needsConfirmation?: boolean;
+}
 
 interface DataCtx {
   ready: boolean;
@@ -25,11 +36,9 @@ interface DataCtx {
   data: AppData;
   mutate: (fn: (draft: AppData) => void) => void;
   replace: (next: AppData) => void;
-  login: (u: string, p: string) => Promise<{ error?: string }>;
-  signup: (u: string, p: string) => Promise<{ error?: string }>;
+  login: (identifier: string, password: string) => Promise<AuthResult>;
+  signup: (identifier: string, password: string) => Promise<AuthResult>;
   logout: () => Promise<void>;
-  persistBug: (r: BugReport) => void;
-  removeBug: (id: string) => void;
 }
 
 const Ctx = createContext<DataCtx | null>(null);
@@ -41,41 +50,39 @@ export function useData(): DataCtx {
 }
 
 export function DataProvider({ children }: { children: ReactNode }) {
+  const cloud = supabaseConfigured();
   const [ready, setReady] = useState(false);
   const [currentUser, setCurrentUser] = useState<string | null>(null);
-  const [cloud, setCloud] = useState(false);
   const [syncState, setSyncState] = useState<SyncState>(null);
   const [data, setData] = useState<AppData>(emptyData());
 
-  const cloudRef = useRef(false);
-  const userRef = useRef<string | null>(null);
+  // Refs so the debounced saver and auth listener see current values.
+  const uidRef = useRef<string | null>(null);       // Supabase user id (cloud writes)
+  const cacheKeyRef = useRef<string | null>(null);   // localStorage cache key
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Push the full state to the cloud (debounced). Local cache is written immediately.
+  // Persist: local cache immediately; cloud upsert (debounced) if signed in.
   const scheduleSync = useCallback((next: AppData) => {
-    const user = userRef.current;
-    if (user) saveCache(user, next);
-    if (!cloudRef.current || !user) return;
+    if (cacheKeyRef.current) saveCache(cacheKeyRef.current, next);
+    const uid = uidRef.current;
+    if (!cloud || !uid) return;
+    const sb = getSupabaseClient();
+    if (!sb) return;
     if (saveTimer.current) clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(async () => {
       setSyncState("syncing");
       try {
-        const res = await fetch("/api/state", {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(next),
+        const { error } = await sb.from("plb_app_state").upsert({
+          user_id: uid,
+          data: stripScreenshots(next),
+          updated_at: new Date().toISOString(),
         });
-        setSyncState(res.ok ? "ok" : "error");
+        setSyncState(error ? "error" : "ok");
       } catch {
         setSyncState("offline");
       }
     }, 600);
-  }, []);
-
-  const commit = useCallback((next: AppData) => {
-    setData(next);
-    scheduleSync(next);
-  }, [scheduleSync]);
+  }, [cloud]);
 
   const mutate = useCallback((fn: (draft: AppData) => void) => {
     setData((prev) => {
@@ -86,124 +93,127 @@ export function DataProvider({ children }: { children: ReactNode }) {
     });
   }, [scheduleSync]);
 
-  const replace = useCallback((next: AppData) => commit(next), [commit]);
+  const replace = useCallback((next: AppData) => {
+    setData(next);
+    scheduleSync(next);
+  }, [scheduleSync]);
 
-  const loadForUser = useCallback(async (user: string, isCloud: boolean) => {
-    userRef.current = user;
-    cloudRef.current = isCloud;
-    setCurrentUser(user);
-    setCloud(isCloud);
-    const cache = loadCache(user);
-    if (isCloud) {
-      try {
-        const res = await fetch("/api/state");
-        if (res.ok) {
-          const server = migrateData((await res.json()) as AppData);
-          commit(mergeScreenshots(server, cache));
-          setSyncState("ok");
-          setReady(true);
-          return;
-        }
-      } catch {
-        setSyncState("offline");
+  // Load a signed-in user's row from Supabase (RLS scopes it to them).
+  const loadCloudState = useCallback(async (uid: string) => {
+    const cache = loadCache(uid);
+    const sb = getSupabaseClient();
+    try {
+      const { data: row, error } = await sb!
+        .from("plb_app_state")
+        .select("data")
+        .eq("user_id", uid)
+        .maybeSingle();
+      if (!error) {
+        const server = migrateData((row?.data as AppData) ?? emptyData());
+        const merged = mergeScreenshots(server, cache);
+        setData(merged);
+        saveCache(uid, merged); // keep the offline mirror warm
+        setSyncState("ok");
+      } else {
+        setData(migrateData(cache ?? emptyData()));
+        setSyncState("error");
       }
+    } catch {
+      setData(migrateData(cache ?? emptyData()));
+      setSyncState("offline");
     }
-    // Local-only, or cloud fetch failed: fall back to cache.
-    setData(migrateData(cache || emptyData()));
     setReady(true);
-  }, [commit]);
+  }, []);
 
-  // Bootstrap: figure out whether we're in cloud or local mode and who's logged in.
-  useEffect(() => {
-    (async () => {
-      let isCloud = false;
-      let user: string | null = null;
-      try {
-        const res = await fetch("/api/auth/session");
-        const j = await res.json();
-        isCloud = !!j.cloud;
-        user = j.username || null;
-      } catch {
-        isCloud = false;
-      }
-      cloudRef.current = isCloud;
-      setCloud(isCloud);
-      if (!isCloud) user = localSession();
-      if (user) {
-        await loadForUser(user, isCloud);
+  const applySession = useCallback((session: Session | null) => {
+    const user = session?.user;
+    if (user) {
+      setCurrentUser(user.email ?? user.id);
+      if (uidRef.current !== user.id) {
+        uidRef.current = user.id;
+        cacheKeyRef.current = user.id;
+        loadCloudState(user.id);
       } else {
         setReady(true);
       }
-    })();
+    } else {
+      uidRef.current = null;
+      cacheKeyRef.current = null;
+      setCurrentUser(null);
+      setData(emptyData());
+      setSyncState(null);
+      setReady(true);
+    }
+  }, [loadCloudState]);
+
+  // Bootstrap: cloud → subscribe to Supabase Auth; local → read localStorage.
+  useEffect(() => {
+    if (cloud) {
+      const sb = getSupabaseClient();
+      if (!sb) { setReady(true); return; }
+      const { data: sub } = sb.auth.onAuthStateChange((_event, session) => {
+        applySession(session);
+      });
+      return () => sub.subscription.unsubscribe();
+    }
+    // Local-only
+    const u = localSession();
+    if (u) {
+      cacheKeyRef.current = u;
+      setCurrentUser(u);
+      setData(migrateData(loadCache(u) ?? emptyData()));
+    }
+    setReady(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const login = useCallback(async (u: string, p: string) => {
-    if (cloudRef.current) {
-      const res = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username: u, password: p }),
-      });
-      if (!res.ok) return { error: (await res.json()).error || "Login failed." };
-      await loadForUser(u, true);
-      return {};
+  const login = useCallback(async (identifier: string, password: string): Promise<AuthResult> => {
+    if (cloud) {
+      const sb = getSupabaseClient()!;
+      const { error } = await sb.auth.signInWithPassword({ email: identifier.trim(), password });
+      if (error) return { error: error.message };
+      return {}; // onAuthStateChange loads the state
     }
-    const r = localLogin(u.trim(), p);
+    const r = localLogin(identifier.trim(), password);
     if (r.error) return r;
-    await loadForUser(u.trim(), false);
+    cacheKeyRef.current = identifier.trim();
+    setCurrentUser(identifier.trim());
+    setData(migrateData(loadCache(identifier.trim()) ?? emptyData()));
     return {};
-  }, [loadForUser]);
+  }, [cloud]);
 
-  const signup = useCallback(async (u: string, p: string) => {
-    if (cloudRef.current) {
-      const res = await fetch("/api/auth/signup", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username: u, password: p }),
-      });
-      if (!res.ok) return { error: (await res.json()).error || "Sign up failed." };
-      await loadForUser(u.trim(), true);
+  const signup = useCallback(async (identifier: string, password: string): Promise<AuthResult> => {
+    if (cloud) {
+      const sb = getSupabaseClient()!;
+      const { data: res, error } = await sb.auth.signUp({ email: identifier.trim(), password });
+      if (error) return { error: error.message };
+      if (!res.session) return { needsConfirmation: true }; // email confirmation is on
       return {};
     }
-    const r = localSignup(u.trim(), p);
+    const r = localSignup(identifier.trim(), password);
     if (r.error) return r;
-    await loadForUser(u.trim(), false);
+    cacheKeyRef.current = identifier.trim();
+    setCurrentUser(identifier.trim());
+    setData(migrateData(loadCache(identifier.trim()) ?? emptyData()));
     return {};
-  }, [loadForUser]);
+  }, [cloud]);
 
   const logout = useCallback(async () => {
-    if (cloudRef.current) {
-      try { await fetch("/api/auth/logout", { method: "POST" }); } catch { /* ignore */ }
+    if (cloud) {
+      const sb = getSupabaseClient();
+      try { await sb?.auth.signOut(); } catch { /* ignore */ }
+      // onAuthStateChange(SIGNED_OUT) clears state.
     } else {
       localLogout();
+      cacheKeyRef.current = null;
+      setCurrentUser(null);
+      setData(emptyData());
     }
-    userRef.current = null;
-    setCurrentUser(null);
-    setData(emptyData());
-    setSyncState(null);
-  }, []);
-
-  const persistBug = useCallback((r: BugReport) => {
-    if (!cloudRef.current) return;
-    fetch("/api/bugs", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(r),
-    }).catch(() => { /* offline — local copy is source of truth */ });
-  }, []);
-
-  const removeBug = useCallback((id: string) => {
-    if (!cloudRef.current) return;
-    fetch(`/api/bugs?id=${encodeURIComponent(id)}`, { method: "DELETE" }).catch(() => {});
-  }, []);
+  }, [cloud]);
 
   return (
     <Ctx.Provider
-      value={{
-        ready, currentUser, cloud, syncState, data,
-        mutate, replace, login, signup, logout, persistBug, removeBug,
-      }}
+      value={{ ready, currentUser, cloud, syncState, data, mutate, replace, login, signup, logout }}
     >
       {children}
     </Ctx.Provider>

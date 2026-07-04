@@ -27,7 +27,16 @@ export function saveCache(user: string, data: AppData): void {
   }
 }
 
-// Server bug rows have no screenshot blob; re-attach any we cached locally.
+// Bug-report screenshots are large base64 blobs kept local-only — strip them
+// before writing state to the cloud so they don't bloat the jsonb row.
+export function stripScreenshots(data: AppData): AppData {
+  return {
+    ...data,
+    bugReports: (data.bugReports || []).map((b) => ({ ...b, screenshot: "" })),
+  };
+}
+
+// Cloud state has no screenshot blobs; re-attach any we cached locally.
 export function mergeScreenshots(server: AppData, cache: AppData | null): AppData {
   if (!cache) return server;
   const byId: Record<string, string | undefined> = {};
