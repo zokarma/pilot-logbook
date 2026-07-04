@@ -18,9 +18,16 @@ desktop.ini
 # Secrets — never commit credentials
 .env
 .env.*
+!.env.example
 *.key
 *.pem
 
-# Node (in case we add tooling later)
+# Node
 node_modules/
 npm-debug.log*
+
+# Next.js
+.next/
+out/
+next-env.d.ts
+*.tsbuildinfo
