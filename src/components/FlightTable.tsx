@@ -6,6 +6,9 @@ import { AIRCRAFT_TYPES, CREW_ROLES } from "@/lib/aircraft";
 import {
   flightsForCurrentPilot, flightDateStr, ifrHours, num, pilotName, syncFlightMirrors,
 } from "@/lib/logbook";
+import {
+  DEFAULT_FLIGHT_COLUMN_KEYS, FLIGHT_COLUMN_LABEL, normalizeFlightColumns,
+} from "@/lib/flightColumns";
 import { DayNight, Flight } from "@/lib/types";
 
 type InlineForm = {
@@ -63,6 +66,10 @@ export default function FlightTable({ onFullEdit }: { onFullEdit: (id: string) =
   const [form, setForm] = useState<InlineForm | null>(null);
   const [bulkOpen, setBulkOpen] = useState(false);
   const [bulk, setBulk] = useState(emptyBulk());
+  const [columnsOpen, setColumnsOpen] = useState(false);
+
+  const visibleCols = normalizeFlightColumns(data.flightColumns);
+  const hiddenCols = DEFAULT_FLIGHT_COLUMN_KEYS.filter((k) => !visibleCols.includes(k));
 
   const aircraftTypes = useMemo(() => {
     const codes = new Set(AIRCRAFT_TYPES.map((t) => t.code));
@@ -166,6 +173,28 @@ export default function FlightTable({ onFullEdit }: { onFullEdit: (id: string) =
     if (inlineId === id) cancelInline();
   }
 
+  /* ----- columns ----- */
+  function moveCol(key: string, dir: -1 | 1) {
+    mutate((d) => {
+      const cols = normalizeFlightColumns(d.flightColumns);
+      const i = cols.indexOf(key);
+      const j = i + dir;
+      if (i < 0 || j < 0 || j >= cols.length) return;
+      [cols[i], cols[j]] = [cols[j], cols[i]];
+      d.flightColumns = cols;
+    });
+  }
+  function toggleCol(key: string) {
+    mutate((d) => {
+      const cols = normalizeFlightColumns(d.flightColumns);
+      const i = cols.indexOf(key);
+      if (i >= 0) { if (cols.length > 1) cols.splice(i, 1); } // keep at least one column
+      else cols.push(key);
+      d.flightColumns = cols;
+    });
+  }
+  const resetCols = () => mutate((d) => { d.flightColumns = [...DEFAULT_FLIGHT_COLUMN_KEYS]; });
+
   /* ----- shared field controls ----- */
   const pilotOpts = (
     <>
@@ -184,7 +213,70 @@ export default function FlightTable({ onFullEdit }: { onFullEdit: (id: string) =
     </select>
   );
 
-  const cols = 16;
+  /* ----- per-column display + inline editors ----- */
+  function displayCell(key: string, fl: Flight): React.ReactNode {
+    switch (key) {
+      case "date": return <span className="whitespace-nowrap">{flightDateStr(fl)}</span>;
+      case "aircraft": return fl.aircraftType;
+      case "reg": return fl.registration || fl.civilIdent || "—";
+      case "route": return <span className="whitespace-nowrap font-medium">{fl.from || "?"} → {fl.to || "?"}</span>;
+      case "role": return <span className="whitespace-nowrap">{fl.loggedRole || "—"}</span>;
+      case "pic": return <span className="whitespace-nowrap">{pilotName(data, fl.picId) || fl.pic || "—"}</span>;
+      case "sic": return <span className="whitespace-nowrap">{pilotName(data, fl.sicId) || fl.sic || "—"}</span>;
+      case "soc": return <span className="whitespace-nowrap">{pilotName(data, fl.socId) || fl.soc || "—"}</span>;
+      case "se": return num(fl.se).toFixed(1);
+      case "me": return num(fl.me).toFixed(1);
+      case "xc": return num(fl.xc).toFixed(1);
+      case "ifr": return ifrHours(fl).toFixed(1);
+      case "takeoff": return fl.takeoff;
+      case "landing": return fl.landing;
+      default: return null;
+    }
+  }
+  function editCell(key: string, first: boolean): React.ReactNode {
+    if (!form) return null;
+    switch (key) {
+      case "date": return <input type="date" value={form.date} onChange={(e) => set("date", e.target.value)} className={cellIn} autoFocus={first} />;
+      case "aircraft": return <AircraftSelect value={form.aircraftType} onChange={(v) => set("aircraftType", v)} cls={cellIn} />;
+      case "reg": return <input value={form.registration} onChange={(e) => set("registration", e.target.value.toUpperCase())} className={cellIn + " uppercase w-20"} autoFocus={first} />;
+      case "route": return (
+        <div className="flex items-center gap-1">
+          <input value={form.from} onChange={(e) => set("from", e.target.value.toUpperCase())} className={cellIn + " uppercase w-16"} placeholder="From" autoFocus={first} />
+          <span className="text-slate-500">→</span>
+          <input value={form.to} onChange={(e) => set("to", e.target.value.toUpperCase())} className={cellIn + " uppercase w-16"} placeholder="To" />
+        </div>
+      );
+      case "role": return (
+        <select value={form.loggedRole} onChange={(e) => set("loggedRole", e.target.value)} className={cellIn}>
+          {CREW_ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
+        </select>
+      );
+      case "pic": return <select value={form.picId} onChange={(e) => set("picId", e.target.value)} className={cellIn}>{pilotOpts}</select>;
+      case "sic": return <select value={form.sicId} onChange={(e) => set("sicId", e.target.value)} className={cellIn}>{pilotOpts}</select>;
+      case "soc": return <select value={form.socId} onChange={(e) => set("socId", e.target.value)} className={cellIn}>{pilotOpts}</select>;
+      case "se": return <input type="number" step="0.1" min="0" value={form.se} onChange={(e) => set("se", e.target.value)} className={numIn} />;
+      case "me": return <input type="number" step="0.1" min="0" value={form.me} onChange={(e) => set("me", e.target.value)} className={numIn} />;
+      case "xc": return <input type="number" step="0.1" min="0" value={form.xc} onChange={(e) => set("xc", e.target.value)} className={numIn} />;
+      case "ifr": return (
+        <div className="flex items-center gap-1" title="IFR actual / simulated">
+          <input type="number" step="0.1" min="0" value={form.ifrActual} onChange={(e) => set("ifrActual", e.target.value)} className="w-11 bg-slate-900/70 border border-slate-700 rounded px-1 py-1 text-sm" />
+          <span className="text-slate-600 text-xs">/</span>
+          <input type="number" step="0.1" min="0" value={form.ifrSim} onChange={(e) => set("ifrSim", e.target.value)} className="w-11 bg-slate-900/70 border border-slate-700 rounded px-1 py-1 text-sm" />
+        </div>
+      );
+      case "takeoff": return (
+        <select value={form.takeoff} onChange={(e) => set("takeoff", e.target.value as DayNight)} className={cellIn}>
+          <option value="Day">Day</option><option value="Night">Night</option>
+        </select>
+      );
+      case "landing": return (
+        <select value={form.landing} onChange={(e) => set("landing", e.target.value as DayNight)} className={cellIn}>
+          <option value="Day">Day</option><option value="Night">Night</option>
+        </select>
+      );
+      default: return null;
+    }
+  }
 
   return (
     <div>
@@ -250,10 +342,50 @@ export default function FlightTable({ onFullEdit }: { onFullEdit: (id: string) =
         </div>
       )}
 
+      {/* Columns panel */}
+      {columnsOpen && (
+        <div className="card p-4 mb-3">
+          <div className="flex items-center justify-between mb-3">
+            <h4 className="font-semibold">Columns</h4>
+            <div className="flex items-center gap-3">
+              <button onClick={resetCols} className="text-xs text-slate-400 hover:text-slate-200">Reset to default</button>
+              <button onClick={() => setColumnsOpen(false)} className="text-slate-400 hover:text-slate-200 text-xl leading-none">&times;</button>
+            </div>
+          </div>
+          <p className="text-xs text-slate-400 mb-3">Tick to show a column; use the arrows to reorder. Saved to your logbook.</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+            {visibleCols.map((key, i) => (
+              <div key={key} className="flex items-center gap-2 rounded-lg border border-slate-700 bg-slate-900/40 px-2.5 py-1.5">
+                <input type="checkbox" checked readOnly onClick={() => toggleCol(key)} className="accent-cyan-500 w-4 h-4" />
+                <span className="text-sm text-slate-200 flex-1">{FLIGHT_COLUMN_LABEL[key]}</span>
+                <button onClick={() => moveCol(key, -1)} disabled={i === 0} className="text-slate-400 hover:text-white disabled:opacity-30 px-1" aria-label="Move up">↑</button>
+                <button onClick={() => moveCol(key, 1)} disabled={i === visibleCols.length - 1} className="text-slate-400 hover:text-white disabled:opacity-30 px-1" aria-label="Move down">↓</button>
+              </div>
+            ))}
+            {hiddenCols.map((key) => (
+              <div key={key} className="flex items-center gap-2 rounded-lg border border-slate-800 px-2.5 py-1.5">
+                <input type="checkbox" checked={false} readOnly onClick={() => toggleCol(key)} className="accent-cyan-500 w-4 h-4" />
+                <span className="text-sm text-slate-500 flex-1">{FLIGHT_COLUMN_LABEL[key]}</span>
+                <span className="text-[11px] text-slate-600">hidden</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {flights.length > 0 && (
-        <p className="text-xs text-slate-500 mb-2">
-          Tip: double-click a row to quick-edit · click checkboxes (Shift-click for a range) to select, then Bulk edit.
-        </p>
+        <div className="flex items-start justify-between gap-3 mb-2">
+          <p className="text-xs text-slate-500">
+            Tip: double-click a row to quick-edit · click checkboxes (Shift-click for a range) to select, then Bulk edit.
+          </p>
+          <button
+            onClick={() => setColumnsOpen((v) => !v)}
+            className="shrink-0 flex items-center gap-1.5 text-xs font-medium text-slate-300 bg-slate-800 hover:bg-slate-700 px-2.5 py-1.5 rounded-lg transition"
+          >
+            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="16" rx="1.5" /><path d="M9 4v16M15 4v16" /></svg>
+            Columns
+          </button>
+        </div>
       )}
 
       <div className="overflow-x-auto">
@@ -263,8 +395,8 @@ export default function FlightTable({ onFullEdit }: { onFullEdit: (id: string) =
               <th className="py-2 pr-2 w-8">
                 <input type="checkbox" checked={allSelected} onChange={toggleAll} className="accent-cyan-500 w-4 h-4" aria-label="Select all" />
               </th>
-              {["Date", "Aircraft", "Reg", "Route", "Role", "PIC", "Student / FO", "Third", "SE", "ME", "XC", "IFR", "T/O", "Ldg"].map((h) => (
-                <th key={h} className="py-2 pr-3 font-medium">{h}</th>
+              {visibleCols.map((key) => (
+                <th key={key} className="py-2 pr-3 font-medium">{FLIGHT_COLUMN_LABEL[key]}</th>
               ))}
               <th className="py-2 pr-3 font-medium text-right">Actions</th>
             </tr>
@@ -279,44 +411,9 @@ export default function FlightTable({ onFullEdit }: { onFullEdit: (id: string) =
                     <td className="py-1.5 pr-2 align-top pt-2">
                       <input type="checkbox" checked={isSel} readOnly onClick={(e) => onRowCheck(idx, fl.id, e.shiftKey)} className="accent-cyan-500 w-4 h-4" />
                     </td>
-                    <td className="py-1.5 pr-2"><input type="date" value={form.date} onChange={(e) => set("date", e.target.value)} className={cellIn} autoFocus /></td>
-                    <td className="py-1.5 pr-2"><AircraftSelect value={form.aircraftType} onChange={(v) => set("aircraftType", v)} cls={cellIn} /></td>
-                    <td className="py-1.5 pr-2"><input value={form.registration} onChange={(e) => set("registration", e.target.value.toUpperCase())} className={cellIn + " uppercase w-20"} /></td>
-                    <td className="py-1.5 pr-2">
-                      <div className="flex items-center gap-1">
-                        <input value={form.from} onChange={(e) => set("from", e.target.value.toUpperCase())} className={cellIn + " uppercase w-16"} placeholder="From" />
-                        <span className="text-slate-500">→</span>
-                        <input value={form.to} onChange={(e) => set("to", e.target.value.toUpperCase())} className={cellIn + " uppercase w-16"} placeholder="To" />
-                      </div>
-                    </td>
-                    <td className="py-1.5 pr-2">
-                      <select value={form.loggedRole} onChange={(e) => set("loggedRole", e.target.value)} className={cellIn}>
-                        {CREW_ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
-                      </select>
-                    </td>
-                    <td className="py-1.5 pr-2"><select value={form.picId} onChange={(e) => set("picId", e.target.value)} className={cellIn}>{pilotOpts}</select></td>
-                    <td className="py-1.5 pr-2"><select value={form.sicId} onChange={(e) => set("sicId", e.target.value)} className={cellIn}>{pilotOpts}</select></td>
-                    <td className="py-1.5 pr-2"><select value={form.socId} onChange={(e) => set("socId", e.target.value)} className={cellIn}>{pilotOpts}</select></td>
-                    <td className="py-1.5 pr-2"><input type="number" step="0.1" min="0" value={form.se} onChange={(e) => set("se", e.target.value)} className={numIn} /></td>
-                    <td className="py-1.5 pr-2"><input type="number" step="0.1" min="0" value={form.me} onChange={(e) => set("me", e.target.value)} className={numIn} /></td>
-                    <td className="py-1.5 pr-2"><input type="number" step="0.1" min="0" value={form.xc} onChange={(e) => set("xc", e.target.value)} className={numIn} /></td>
-                    <td className="py-1.5 pr-2">
-                      <div className="flex items-center gap-1" title="IFR actual / simulated">
-                        <input type="number" step="0.1" min="0" value={form.ifrActual} onChange={(e) => set("ifrActual", e.target.value)} className="w-11 bg-slate-900/70 border border-slate-700 rounded px-1 py-1 text-sm" />
-                        <span className="text-slate-600 text-xs">/</span>
-                        <input type="number" step="0.1" min="0" value={form.ifrSim} onChange={(e) => set("ifrSim", e.target.value)} className="w-11 bg-slate-900/70 border border-slate-700 rounded px-1 py-1 text-sm" />
-                      </div>
-                    </td>
-                    <td className="py-1.5 pr-2">
-                      <select value={form.takeoff} onChange={(e) => set("takeoff", e.target.value as DayNight)} className={cellIn}>
-                        <option value="Day">Day</option><option value="Night">Night</option>
-                      </select>
-                    </td>
-                    <td className="py-1.5 pr-2">
-                      <select value={form.landing} onChange={(e) => set("landing", e.target.value as DayNight)} className={cellIn}>
-                        <option value="Day">Day</option><option value="Night">Night</option>
-                      </select>
-                    </td>
+                    {visibleCols.map((key, ci) => (
+                      <td key={key} className="py-1.5 pr-2">{editCell(key, ci === 0)}</td>
+                    ))}
                     <td className="py-1.5 pr-3 text-right whitespace-nowrap align-middle">
                       <button onClick={saveInline} className="text-emerald-400 hover:text-emerald-300 font-medium mr-3">Save</button>
                       <button onClick={cancelInline} className="text-slate-400 hover:text-slate-200 font-medium">Cancel</button>
@@ -333,20 +430,9 @@ export default function FlightTable({ onFullEdit }: { onFullEdit: (id: string) =
                   <td className="py-2 pr-2" onDoubleClick={(e) => e.stopPropagation()}>
                     <input type="checkbox" checked={isSel} readOnly onClick={(e) => onRowCheck(idx, fl.id, e.shiftKey)} className="accent-cyan-500 w-4 h-4" />
                   </td>
-                  <td className="py-2 pr-3 whitespace-nowrap">{flightDateStr(fl)}</td>
-                  <td className="py-2 pr-3">{fl.aircraftType}</td>
-                  <td className="py-2 pr-3">{fl.registration || fl.civilIdent || "—"}</td>
-                  <td className="py-2 pr-3 whitespace-nowrap font-medium">{fl.from || "?"} → {fl.to || "?"}</td>
-                  <td className="py-2 pr-3 whitespace-nowrap">{fl.loggedRole || "—"}</td>
-                  <td className="py-2 pr-3 whitespace-nowrap">{pilotName(data, fl.picId) || fl.pic || "—"}</td>
-                  <td className="py-2 pr-3 whitespace-nowrap">{pilotName(data, fl.sicId) || fl.sic || "—"}</td>
-                  <td className="py-2 pr-3 whitespace-nowrap">{pilotName(data, fl.socId) || fl.soc || "—"}</td>
-                  <td className="py-2 pr-3">{num(fl.se).toFixed(1)}</td>
-                  <td className="py-2 pr-3">{num(fl.me).toFixed(1)}</td>
-                  <td className="py-2 pr-3">{num(fl.xc).toFixed(1)}</td>
-                  <td className="py-2 pr-3">{ifrHours(fl).toFixed(1)}</td>
-                  <td className="py-2 pr-3">{fl.takeoff}</td>
-                  <td className="py-2 pr-3">{fl.landing}</td>
+                  {visibleCols.map((key) => (
+                    <td key={key} className="py-2 pr-3">{displayCell(key, fl)}</td>
+                  ))}
                   <td className="py-2 pr-3 text-right whitespace-nowrap" onDoubleClick={(e) => e.stopPropagation()}>
                     <button onClick={() => startInline(fl)} className="text-cyan-400 hover:text-cyan-300 font-medium mr-3">Quick</button>
                     <button onClick={() => onFullEdit(fl.id)} className="text-slate-300 hover:text-white font-medium mr-3">Edit</button>

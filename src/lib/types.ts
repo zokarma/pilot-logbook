@@ -3,6 +3,8 @@
 // backward-compatible text mirrors (pic/sic/soc, year/month/day, civilIdent)
 // that the CSV export and Supabase schema rely on — keep both in sync.
 
+import { DEFAULT_FLIGHT_COLUMN_KEYS } from "./flightColumns";
+
 export type DayNight = "Day" | "Night";
 
 export interface Pilot {
@@ -114,6 +116,8 @@ export interface AppData {
   bugReports: BugReport[];
   // Per-user dashboard metric keys the user has hidden (local UI preference).
   dashboardHidden: string[];
+  // Ordered list of visible Logged Flights columns (keys from lib/flightColumns).
+  flightColumns: string[];
   // First-time setup profile (null until the wizard runs) + aviation documents.
   profile: UserProfile | null;
   documents: PilotDocument[];
@@ -129,6 +133,7 @@ export function emptyData(): AppData {
     lastLoggedRole: "Captain",
     bugReports: [],
     dashboardHidden: [],
+    flightColumns: [...DEFAULT_FLIGHT_COLUMN_KEYS],
     profile: null,
     documents: [],
   };
