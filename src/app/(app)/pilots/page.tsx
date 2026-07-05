@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useData } from "@/context/DataContext";
+import { uid } from "@/lib/id";
 import { pilotName } from "@/lib/logbook";
 import { applyDeletePilot, applyMerge, findDuplicateClusters, flightRefCount } from "@/lib/pilots";
 import { Pilot } from "@/lib/types";
@@ -28,7 +29,7 @@ export default function PilotsPage() {
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
-    const id = editingId || "p" + Date.now() + Math.random().toString(36).slice(2, 6);
+    const id = editingId || uid("p");
     mutate((d) => {
       const pilot: Pilot = {
         id,

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useData } from "@/context/DataContext";
+import { uid } from "@/lib/id";
 import { PilotDocument, UserProfile, Pilot } from "@/lib/types";
 import { PILOT_ROLES, documentStatus, STATUS_META, recalcDocument } from "@/lib/documents";
 import DocumentForm from "./DocumentForm";
@@ -49,7 +50,7 @@ export default function Onboarding() {
       }
       if (!pilotId) {
         const p: Pilot = {
-          id: "p" + Date.now() + Math.random().toString(36).slice(2, 6),
+          id: uid("p"),
           firstName: firstName.trim(),
           lastName: lastName.trim(),
           employeeNumber: "",

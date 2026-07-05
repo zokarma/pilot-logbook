@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { useData } from "@/context/DataContext";
 import { pilotName } from "@/lib/logbook";
+import { uid } from "@/lib/id";
 import { getRecentErrors } from "@/lib/recentErrors";
 import { APP_VERSION, BugReport } from "@/lib/types";
 
@@ -49,6 +50,12 @@ export default function BugReporter() {
   }
 
   function readImage(file: File) {
+    // Reject oversized files before reading them into memory; the data-URL
+    // length check below stays as a backstop (base64 inflates by ~4/3).
+    if (file.size > 2_000_000) {
+      setMsg({ text: "Screenshot too large — please use one under 2MB.", ok: false });
+      return;
+    }
     const reader = new FileReader();
     reader.onload = () => {
       const url = String(reader.result);
@@ -84,7 +91,7 @@ export default function BugReporter() {
     }
     const ctx = gatherContext();
     const report: BugReport = {
-      id: "bug_" + Date.now() + "_" + Math.random().toString(36).slice(2, 6),
+      id: uid("bug_"),
       username: currentUser || "(anonymous)",
       created_at: new Date().toISOString(),
       status: "open",

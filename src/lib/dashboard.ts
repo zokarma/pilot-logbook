@@ -66,9 +66,14 @@ export function computeCars(data: AppData) {
     const a = data.duty[keys[i]], b = data.duty[keys[i + 1]];
     if (a && a.end && b && b.start) {
       const aEnd = new Date(keys[i] + "T" + a.end);
+      // An end time earlier than the start time means the duty ran past
+      // midnight, so it actually ended the following day.
+      if (a.start && a.end < a.start) aEnd.setDate(aEnd.getDate() + 1);
       const bStart = new Date(keys[i + 1] + "T" + b.start);
-      let gapHrs = (bStart.getTime() - aEnd.getTime()) / 3600000;
-      if (gapHrs < 0) gapHrs += 24;
+      const gapHrs = (bStart.getTime() - aEnd.getTime()) / 3600000;
+      // Overlapping/inconsistent entries yield a negative gap — no meaningful
+      // rest period can be derived from them, so skip rather than wrap.
+      if (gapHrs < 0) continue;
       if (minGapHrs === null || gapHrs < minGapHrs) minGapHrs = gapHrs;
     }
   }

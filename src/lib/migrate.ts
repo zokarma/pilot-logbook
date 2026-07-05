@@ -4,6 +4,7 @@
 
 import { AppData, Flight, Pilot, emptyData } from "./types";
 import { normalizeFlightColumns } from "./flightColumns";
+import { uid } from "./id";
 
 export function migrateData(input: Partial<AppData> | null | undefined): AppData {
   const d = (input || emptyData()) as AppData;
@@ -40,7 +41,7 @@ export function migrateData(input: Partial<AppData> | null | undefined): AppData
     if (nameToId[key]) return nameToId[key];
     const parts = name.split(/\s+/);
     const p: Pilot = {
-      id: "p" + Date.now() + Math.random().toString(36).slice(2, 6),
+      id: uid("p"),
       firstName: parts[0] || name,
       lastName: parts.slice(1).join(" "),
       employeeNumber: "",

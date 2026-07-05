@@ -9,6 +9,14 @@ import { flightDate } from "@/lib/logbook";
 
 interface RouteAgg { count: number; aircraft: Set<string>; last: Date | null; a: string; b: string }
 
+// Leaflet renders string popup/tooltip content as HTML, and airport codes are
+// user-supplied (form input or CSV import) — escape them before interpolating.
+function esc(s: string): string {
+  return s.replace(/[&<>"']/g, (ch) =>
+    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch]!),
+  );
+}
+
 export default function RouteMapPage() {
   const { data } = useData();
   const mapRef = useRef<LeafletMap | null>(null);
@@ -70,8 +78,8 @@ export default function RouteMapPage() {
         const c = airportCoord(code);
         const known = !!AIRPORTS[code];
         const marker = L.circleMarker(c, { radius: 6, color: "#ffffff", weight: 2, fillColor: "#dc2626", fillOpacity: 1 }).addTo(layer);
-        marker.bindTooltip(code, { permanent: true, direction: "top", offset: [0, -8], className: "route-airport-label" });
-        if (!known) marker.bindPopup(`<b>${code}</b><br><span style="color:#94a3b8">Unknown ICAO — position estimated</span>`);
+        marker.bindTooltip(esc(code), { permanent: true, direction: "top", offset: [0, -8], className: "route-airport-label" });
+        if (!known) marker.bindPopup(`<b>${esc(code)}</b><br><span style="color:#94a3b8">Unknown ICAO — position estimated</span>`);
       });
       if (allLatLngs.length) map.fitBounds(L.latLngBounds(allLatLngs), { padding: [40, 40], maxZoom: 7 });
     })();

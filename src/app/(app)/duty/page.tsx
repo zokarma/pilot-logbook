@@ -51,7 +51,7 @@ export default function DutyPage() {
       for (let i = 0; i < startPad; i++) out.push(null);
       for (let d = 1; d <= daysInMonth; d++) out.push(new Date(y, m, d));
     } else {
-      const n = parseInt(dutyType);
+      const n = parseInt(dutyType, 10);
       const start = new Date(anchor.getFullYear(), anchor.getMonth(), anchor.getDate());
       for (let i = 0; i < n; i++) out.push(new Date(start.getFullYear(), start.getMonth(), start.getDate() + i));
       lbl = `${dstr(out[0]!)} → ${dstr(out[out.length - 1]!)} (${n} days)`;
@@ -74,7 +74,7 @@ export default function DutyPage() {
   function shift(dir: number) {
     if (dutyType === "month") setAnchor(new Date(anchor.getFullYear(), anchor.getMonth() + dir, 1));
     else {
-      const n = parseInt(dutyType);
+      const n = parseInt(dutyType, 10);
       setAnchor(new Date(anchor.getFullYear(), anchor.getMonth(), anchor.getDate() + dir * n));
     }
   }

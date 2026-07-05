@@ -12,6 +12,10 @@
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
 
+// CORS is deliberately "*": the app is served from varying origins (Vercel
+// previews, capacitor://localhost in the iOS shell), and this function
+// authorizes strictly by the caller's own JWT — the origin is never trusted,
+// and a caller can only ever delete their own account.
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
