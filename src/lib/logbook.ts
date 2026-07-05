@@ -51,6 +51,26 @@ export function flightsForCurrentPilot(data: AppData): Flight[] {
     .sort((a, b) => flightDate(b).getTime() - flightDate(a).getTime());
 }
 
+// Re-derive a flight's backward-compatible mirror fields (year/month/day,
+// civilIdent, upper-cased reg/route, pic/sic/soc names) from its canonical
+// fields. Mutates in place — call inside a mutate() draft after any edit so the
+// CSV export and legacy readers stay consistent. See FlightForm for the same
+// invariant on create.
+export function syncFlightMirrors(data: AppData, fl: Flight): void {
+  if (fl.date) {
+    const [y, m, d] = fl.date.split("-").map((n) => parseInt(n, 10));
+    if (y) { fl.year = y; fl.month = m; fl.day = d; }
+  }
+  fl.registration = (fl.registration || "").trim().toUpperCase();
+  fl.civilIdent = fl.registration;
+  fl.from = (fl.from || "").trim().toUpperCase();
+  fl.to = (fl.to || "").trim().toUpperCase();
+  fl.pic = pilotName(data, fl.picId);
+  fl.sic = pilotName(data, fl.sicId);
+  fl.soc = pilotName(data, fl.socId);
+  fl.updated_at = new Date().toISOString();
+}
+
 // "YYYY-MM-DD" for a Date, using local calendar fields.
 export function dstr(d: Date): string {
   const m = String(d.getMonth() + 1).padStart(2, "0");
