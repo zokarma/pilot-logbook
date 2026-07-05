@@ -6,9 +6,10 @@ import { useData } from "@/context/DataContext";
 import { installErrorCapture } from "@/lib/recentErrors";
 import Sidebar from "@/components/Sidebar";
 import TopBar from "@/components/TopBar";
+import Onboarding from "@/components/Onboarding";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
-  const { ready, currentUser } = useData();
+  const { ready, currentUser, data } = useData();
   const router = useRouter();
 
   useEffect(() => {
@@ -27,6 +28,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     );
   }
   if (!currentUser) return null;
+
+  // First-time users must complete the setup wizard before reaching the app.
+  if (!data.profile?.onboarded) return <Onboarding />;
 
   return (
     <div className="min-h-screen flex bg-slate-950">

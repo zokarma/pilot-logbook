@@ -1,9 +1,7 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useData, SyncState } from "@/context/DataContext";
-import { pilotName } from "@/lib/logbook";
 import BugReporter from "./BugReporter";
 
 const SYNC: Record<Exclude<SyncState, null>, { text: string; cls: string }> = {
@@ -14,9 +12,15 @@ const SYNC: Record<Exclude<SyncState, null>, { text: string; cls: string }> = {
 };
 
 export default function TopBar() {
-  const { data, currentUser, cloud, syncState, logout, mutate } = useData();
+  const { data, currentUser, cloud, syncState, logout } = useData();
   const router = useRouter();
   const sync = cloud && syncState ? SYNC[syncState] : null;
+
+  const profile = data.profile;
+  const holderName =
+    (profile?.displayName?.trim()) ||
+    [profile?.firstName, profile?.lastName].filter(Boolean).join(" ").trim();
+  const logbookTitle = holderName ? `${holderName}'s Logbook` : "Pilot Logbook";
 
   async function onLogout() {
     await logout();
@@ -44,23 +48,8 @@ export default function TopBar() {
         </div>
       </div>
       <div className="px-4 lg:px-8 pb-3 flex items-center gap-2 text-sm flex-wrap">
-        <span className="text-slate-400">Logbook for:</span>
-        {data.pilots.length ? (
-          <select
-            value={data.currentPilotId ?? ""}
-            onChange={(e) => mutate((d) => { d.currentPilotId = e.target.value || null; })}
-            className="bg-slate-800 text-slate-100 text-sm rounded-lg px-2 py-1 border border-slate-700 focus:outline-none focus:ring-2 focus:ring-brand-500/50"
-          >
-            {data.pilots.map((p) => (
-              <option key={p.id} value={p.id}>{pilotName(data, p.id) || "(unnamed)"}</option>
-            ))}
-          </select>
-        ) : (
-          <span className="text-xs text-amber-300">
-            No pilot profiles yet —{" "}
-            <Link href="/pilots" className="underline hover:text-white">add one in the Pilots tab</Link>
-          </span>
-        )}
+        <span className="font-semibold text-slate-200">{logbookTitle}</span>
+        {profile?.role && <span className="text-xs text-slate-500">· {profile.role}</span>}
       </div>
     </header>
   );

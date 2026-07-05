@@ -22,6 +22,8 @@ export function migrateData(input: Partial<AppData> | null | undefined): AppData
   if (typeof d.pilotName !== "string") d.pilotName = "";
   if (!Array.isArray(d.bugReports)) d.bugReports = [];
   if (!Array.isArray(d.dashboardHidden)) d.dashboardHidden = [];
+  if (!Array.isArray(d.documents)) d.documents = [];
+  if (typeof d.profile === "undefined") d.profile = null;
 
   // Build a quick name -> pilotId map; create profiles for any free-text PIC/SIC/SOC.
   const nameToId: Record<string, string> = {};
@@ -76,6 +78,29 @@ export function migrateData(input: Partial<AppData> | null | undefined): AppData
     ensurePilot(d.pilotName);
   }
   if (!d.currentPilotId && d.pilots.length) d.currentPilotId = d.pilots[0].id;
+
+  // Profile / onboarding. Brand-new users (no flights, no pilots) get a null
+  // profile so the first-time setup wizard runs. Existing users are never
+  // interrupted: synthesize a profile from their current pilot and mark it
+  // onboarded so they land straight in the app.
+  if (!d.profile) {
+    const hasData = d.flights.length > 0 || d.pilots.length > 0;
+    if (hasData) {
+      const primary =
+        d.pilots.find((p) => p.id === d.currentPilotId) || d.pilots[0] || null;
+      d.profile = {
+        firstName: primary?.firstName || "",
+        lastName: primary?.lastName || "",
+        role: d.lastLoggedRole || "Captain",
+        pilotId: primary?.id,
+        onboarded: true,
+      };
+    }
+  }
+  // Keep the profile pinned to a real pilot id if one exists.
+  if (d.profile && !d.profile.pilotId && d.currentPilotId) {
+    d.profile.pilotId = d.currentPilotId;
+  }
 
   return d;
 }

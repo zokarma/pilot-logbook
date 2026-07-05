@@ -8,6 +8,7 @@ export const DASH_METRICS: { section: string; items: [string, string][] }[] = [
   { section: "Flight Stats", items: [["totalTime", "Total Time"], ["currentMonth", "Current Month"], ["annualTotal", "Annual Total"], ["totalFlights", "Total Flights"]] },
   { section: "Flight Time Breakdown", items: [["pic", "PIC Hours"], ["dual", "Dual (SIC) Hours"], ["xc", "Cross Country"], ["day", "Day Hours"], ["night", "Night Hours"], ["ifr", "IFR Hours"], ["routes", "Unique Routes"]] },
   { section: "Active Duty", items: [["dailyDuty", "Daily Duty"], ["weeklyDuty", "Weekly Duty"]] },
+  { section: "Documents", items: [["documentStatus", "Document Status"]] },
   { section: "Panels", items: [["aircraftHours", "Hours by Aircraft Type"], ["currentPilot", "Current Pilot"], ["recentLogs", "Recent Logs"]] },
   { section: "CARs Compliance · Duty Tracker", items: [["carMonthly", "CAR 700.15 — Monthly"], ["carRest", "CAR 700.16 — Rest"]] },
 ];

@@ -8,6 +8,7 @@ import {
   currentPilot, flightDate, flightsForCurrentPilot, flightDateStr, ifrHours, num, pilotName, totalHours,
 } from "@/lib/logbook";
 import { DASH_METRICS, computeActiveDuty, computeCars, isHidden } from "@/lib/dashboard";
+import { documentStatus, STATUS_META } from "@/lib/documents";
 
 /* ---------- presentational helpers ---------- */
 function RingGauge({ pct, size = 96, color }: { pct: number; size?: number; color: string }) {
@@ -92,6 +93,13 @@ export default function DashboardPage() {
   fl.forEach((x) => { const t = x.aircraftType || "Unknown"; byType[t] = (byType[t] || 0) + totalHours(x); });
   const entries = Object.entries(byType).sort((a, b) => b[1] - a[1]);
   const maxType = entries.length ? entries[0][1] : 1;
+
+  const docsSorted = [...data.documents].sort((a, b) => {
+    const ai = documentStatus(a), bi = documentStatus(b);
+    const rank = (s: string) => (s === "expired" ? 0 : s === "expiring" ? 1 : s === "valid" ? 2 : 3);
+    if (rank(ai.status) !== rank(bi.status)) return rank(ai.status) - rank(bi.status);
+    return (ai.days ?? Infinity) - (bi.days ?? Infinity);
+  });
 
   const cp = currentPilot(data);
   const duty = computeActiveDuty(data);
@@ -192,6 +200,39 @@ export default function DashboardPage() {
         </div>
       )}
 
+      {/* Document Status */}
+      {!hidden("documentStatus") && (
+        <div>
+          <h3 className={sectionH}>Document Status</h3>
+          {data.documents.length === 0 ? (
+            <div className="card p-6 text-center">
+              <p className="text-slate-400 text-sm">No documents have been added yet.</p>
+              <Link href="/documents" className="inline-block mt-3 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition">
+                Add Documents
+              </Link>
+            </div>
+          ) : (
+            <div className="card p-2 sm:p-3">
+              <ul className="divide-y divide-slate-800">
+                {docsSorted.map((doc) => {
+                  const info = documentStatus(doc);
+                  const meta = STATUS_META[info.status];
+                  return (
+                    <li key={doc.id} className="flex items-center justify-between gap-3 px-3 py-2.5">
+                      <span className="text-sm font-medium text-slate-100 truncate">{doc.type}</span>
+                      <span className={"text-sm whitespace-nowrap " + meta.cls}>{meta.icon} {info.label}</span>
+                    </li>
+                  );
+                })}
+              </ul>
+              <div className="px-3 pt-2 pb-1 text-right">
+                <Link href="/documents" className="text-xs text-cyan-400 hover:text-cyan-300 font-medium">Manage documents →</Link>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Active Duty */}
       {dutyCards.length > 0 && (
         <div>
@@ -228,9 +269,9 @@ export default function DashboardPage() {
           {!hidden("currentPilot") && (
             <div className="card p-5">
               <h3 className="font-semibold mb-2">Current Pilot</h3>
-              <p className="text-sm text-slate-400 mb-3">All metrics on this page are for the pilot selected in the header.</p>
+              <p className="text-sm text-slate-400 mb-3">All metrics on this page are for your logbook.{data.profile?.role ? ` Role: ${data.profile.role}.` : ""}</p>
               {!cp ? (
-                <p className="text-slate-400 text-sm">No pilot selected. Add a profile in the Pilots tab.</p>
+                <p className="text-slate-400 text-sm">Profile not set up yet.</p>
               ) : (
                 <div className="text-sm space-y-2">
                   <div className="flex justify-between"><span className="text-slate-400">Name:</span><span className="font-medium">{pilotName(data, cp.id)}</span></div>
