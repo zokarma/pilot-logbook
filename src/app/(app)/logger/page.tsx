@@ -3,15 +3,16 @@
 import { useRef, useState } from "react";
 import { useData } from "@/context/DataContext";
 import FlightForm from "@/components/FlightForm";
+import FlightTable from "@/components/FlightTable";
 import {
-  currentPilot, flightsForCurrentPilot, flightDateStr, ifrHours, num, pilotName,
+  currentPilot, flightsForCurrentPilot, pilotName,
 } from "@/lib/logbook";
 import { flightDate } from "@/lib/logbook";
 import { toCSV, importCSV, parseCSV, detectStructuredLogbook, normalizeName } from "@/lib/csv";
 import { migrateData } from "@/lib/migrate";
 
 export default function LoggerPage() {
-  const { data, mutate, replace, currentUser } = useData();
+  const { data, replace, currentUser } = useData();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [csvMsg, setCsvMsg] = useState<{ text: string; kind: "ok" | "error" | "info" } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -22,11 +23,6 @@ export default function LoggerPage() {
   function edit(id: string) {
     setEditingId(id);
     window.scrollTo({ top: 0, behavior: "smooth" });
-  }
-  function del(id: string) {
-    if (!confirm("Delete this flight? This cannot be undone.")) return;
-    mutate((d) => { d.flights = d.flights.filter((x) => x.id !== id); });
-    if (editingId === id) setEditingId(null);
   }
 
   function exportCsv() {
@@ -106,43 +102,11 @@ export default function LoggerPage() {
         </div>
         {csvMsg && <p className={"text-sm mb-3 " + msgColor}>{csvMsg.text}</p>}
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-left text-slate-400 border-b border-slate-800">
-                {["Date", "Aircraft", "Reg", "Route", "Role", "PIC", "Student / FO", "Third", "SE", "ME", "XC", "IFR", "T/O", "Ldg"].map((h) => (
-                  <th key={h} className="py-2 pr-3 font-medium">{h}</th>
-                ))}
-                <th className="py-2 pr-3 font-medium text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {flights.map((fl) => (
-                <tr key={fl.id} className="border-b border-slate-800/60 hover:bg-slate-800/60">
-                  <td className="py-2 pr-3 whitespace-nowrap">{flightDateStr(fl)}</td>
-                  <td className="py-2 pr-3">{fl.aircraftType}</td>
-                  <td className="py-2 pr-3">{fl.registration || fl.civilIdent || "—"}</td>
-                  <td className="py-2 pr-3 whitespace-nowrap font-medium">{fl.from || "?"} → {fl.to || "?"}</td>
-                  <td className="py-2 pr-3 whitespace-nowrap">{fl.loggedRole || "—"}</td>
-                  <td className="py-2 pr-3 whitespace-nowrap">{pilotName(data, fl.picId) || fl.pic || "—"}</td>
-                  <td className="py-2 pr-3 whitespace-nowrap">{pilotName(data, fl.sicId) || fl.sic || "—"}</td>
-                  <td className="py-2 pr-3 whitespace-nowrap">{pilotName(data, fl.socId) || fl.soc || "—"}</td>
-                  <td className="py-2 pr-3">{num(fl.se).toFixed(1)}</td>
-                  <td className="py-2 pr-3">{num(fl.me).toFixed(1)}</td>
-                  <td className="py-2 pr-3">{num(fl.xc).toFixed(1)}</td>
-                  <td className="py-2 pr-3">{ifrHours(fl).toFixed(1)}</td>
-                  <td className="py-2 pr-3">{fl.takeoff}</td>
-                  <td className="py-2 pr-3">{fl.landing}</td>
-                  <td className="py-2 pr-3 text-right whitespace-nowrap">
-                    <button onClick={() => edit(fl.id)} className="text-cyan-400 hover:text-cyan-300 font-medium mr-3">Edit</button>
-                    <button onClick={() => del(fl.id)} className="text-red-500 hover:text-red-700 font-medium">Delete</button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        {!flights.length && <p className="text-center text-slate-400 py-8">No flights logged yet. Add your first flight above.</p>}
+        {flights.length ? (
+          <FlightTable onFullEdit={edit} />
+        ) : (
+          <p className="text-center text-slate-400 py-8">No flights logged yet. Add your first flight above.</p>
+        )}
       </div>
     </>
   );
