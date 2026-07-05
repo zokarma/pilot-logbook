@@ -74,6 +74,36 @@ export interface BugReport {
   screenshot?: string; // base64 data URL, local-only (never pushed to cloud)
 }
 
+// The primary account holder's profile, captured in the first-time setup wizard
+// and editable afterwards. Stored inside AppData (the single per-user JSONB blob),
+// so it inherits the same RLS scoping and offline mirroring as everything else.
+export interface UserProfile {
+  firstName: string;
+  lastName: string;
+  displayName?: string;
+  role: string; // one of PILOT_ROLES
+  dateOfBirth?: string; // "YYYY-MM-DD" — drives Transport Canada medical expiry math
+  pilotId?: string; // the Pilot profile that represents this account holder
+  onboarded: boolean; // has the setup wizard been completed / skipped
+}
+
+// How a document's expiry date was determined.
+export type DocExpiryMode = "auto" | "manual" | "none";
+
+// An aviation document (licence / medical / certificate) owned by the user.
+export interface PilotDocument {
+  id: string;
+  type: string; // one of the catalog values in lib/documents.ts (or free text)
+  number?: string;
+  issueDate?: string; // "YYYY-MM-DD"
+  examDate?: string; // medical examination date — basis for auto medical expiry
+  expiryDate?: string; // "YYYY-MM-DD"; empty when expiryMode === "none"
+  expiryMode: DocExpiryMode;
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface AppData {
   flights: Flight[];
   duty: Record<string, DutyEntry>;
@@ -84,6 +114,9 @@ export interface AppData {
   bugReports: BugReport[];
   // Per-user dashboard metric keys the user has hidden (local UI preference).
   dashboardHidden: string[];
+  // First-time setup profile (null until the wizard runs) + aviation documents.
+  profile: UserProfile | null;
+  documents: PilotDocument[];
 }
 
 export function emptyData(): AppData {
@@ -96,7 +129,9 @@ export function emptyData(): AppData {
     lastLoggedRole: "Captain",
     bugReports: [],
     dashboardHidden: [],
+    profile: null,
+    documents: [],
   };
 }
 
-export const APP_VERSION = "0.6.1";
+export const APP_VERSION = "0.7.0";

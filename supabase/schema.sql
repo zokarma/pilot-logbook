@@ -15,6 +15,29 @@ drop table if exists plb_app_state cascade;
 
 -- One row per user: the whole logbook (flights, duty, pilots, bug reports, …)
 -- as JSON, owned by the Supabase Auth user.
+--
+-- The `data` JSONB blob (shape defined in src/lib/types.ts → AppData) also holds
+-- the account holder's profile and their aviation documents. There is no
+-- separate relational table for these: the app is a single-blob, last-write-wins
+-- client with an offline mirror, so keeping them in `data` inherits the same RLS
+-- scoping, offline resilience and sync path as everything else. Shape:
+--
+--   data.profile = {
+--     firstName, lastName, displayName?, role,
+--     dateOfBirth?,   -- "YYYY-MM-DD", drives medical expiry math
+--     pilotId?,       -- the primary Pilot profile representing this account
+--     onboarded       -- bool: has the first-time setup wizard completed
+--   }
+--
+--   data.documents = [{
+--     id, type, number?, issueDate?, examDate?,
+--     expiryDate?,    -- "YYYY-MM-DD"; empty when expiryMode = 'none'
+--     expiryMode,     -- 'auto' | 'manual' | 'none'
+--     notes?, createdAt, updatedAt
+--   }, …]
+--
+-- Each document belongs to exactly one user by virtue of living in that user's
+-- row (enforced by the RLS policies below).
 create table plb_app_state (
   user_id uuid primary key references auth.users (id) on delete cascade,
   data jsonb not null default '{}'::jsonb,
