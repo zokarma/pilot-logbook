@@ -39,6 +39,7 @@ interface DataCtx {
   login: (identifier: string, password: string) => Promise<AuthResult>;
   signup: (identifier: string, password: string) => Promise<AuthResult>;
   logout: () => Promise<void>;
+  deleteAccount: () => Promise<{ error?: string }>;
 }
 
 const Ctx = createContext<DataCtx | null>(null);
@@ -211,9 +212,26 @@ export function DataProvider({ children }: { children: ReactNode }) {
     }
   }, [cloud]);
 
+  // Permanently delete the signed-in account via the delete-account Edge
+  // Function (which holds the service-role key server-side), then sign out.
+  const deleteAccount = useCallback(async (): Promise<{ error?: string }> => {
+    if (!cloud) return { error: "Account deletion is only available with cloud sync." };
+    const sb = getSupabaseClient();
+    if (!sb) return { error: "Not connected." };
+    try {
+      const { data: res, error } = await sb.functions.invoke("delete-account", { method: "POST" });
+      if (error) return { error: error.message };
+      if (res?.error) return { error: res.error };
+    } catch (e) {
+      return { error: e instanceof Error ? e.message : "Deletion failed." };
+    }
+    try { await sb.auth.signOut(); } catch { /* ignore */ }
+    return {};
+  }, [cloud]);
+
   return (
     <Ctx.Provider
-      value={{ ready, currentUser, cloud, syncState, data, mutate, replace, login, signup, logout }}
+      value={{ ready, currentUser, cloud, syncState, data, mutate, replace, login, signup, logout, deleteAccount }}
     >
       {children}
     </Ctx.Provider>
