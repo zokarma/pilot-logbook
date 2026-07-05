@@ -1,5 +1,6 @@
-// Simple non-cryptographic hash (djb2). Personal app, not production security.
-// Used both for the login gate and for deterministic unknown-airport coordinates.
+// Simple non-cryptographic hash (djb2). Used for deterministic unknown-airport
+// coordinates and to verify (then upgrade) legacy local-auth records — new
+// local-auth passwords are stored as salted SHA-256 digests in clientStore.
 export function hashStr(s: string): string {
   let h = 5381;
   for (let i = 0; i < s.length; i++) {

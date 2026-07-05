@@ -175,7 +175,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       if (error) return { error: error.message };
       return {}; // onAuthStateChange loads the state
     }
-    const r = localLogin(identifier.trim(), password);
+    const r = await localLogin(identifier.trim(), password);
     if (r.error) return r;
     cacheKeyRef.current = identifier.trim();
     setCurrentUser(identifier.trim());
@@ -202,7 +202,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       if (!res.session) return { needsConfirmation: true }; // email confirmation is on
       return {};
     }
-    const r = localSignup(identifier.trim(), password);
+    const r = await localSignup(identifier.trim(), password);
     if (r.error) return r;
     cacheKeyRef.current = identifier.trim();
     setCurrentUser(identifier.trim());

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useData } from "@/context/DataContext";
 import { AIRCRAFT_TYPES, CREW_ROLES } from "@/lib/aircraft";
+import { uid } from "@/lib/id";
 import { num, pilotName } from "@/lib/logbook";
 import { DayNight, Flight } from "@/lib/types";
 import AirportDatalist from "./AirportDatalist";
@@ -91,7 +92,7 @@ export default function FlightForm({
 
     const [y, m, d] = form.date.split("-").map((n) => parseInt(n, 10));
     const reg = form.registration.trim().toUpperCase();
-    const id = editingId || "f" + Date.now() + Math.random().toString(36).slice(2, 6);
+    const id = editingId || uid("f");
 
     mutate((draft) => {
       draft.lastLoggedRole = form.loggedRole || "Captain";

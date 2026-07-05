@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { uid } from "@/lib/id";
 import { PilotDocument, UserProfile, DocExpiryMode } from "@/lib/types";
 import {
   DOC_GROUPS, docTypeDef, computeAutoExpiry,
@@ -10,7 +11,7 @@ const inputCls = "w-full px-3 py-2 border border-slate-700 rounded-lg text-sm";
 const labelCls = "block text-xs font-medium text-slate-400 mb-1";
 
 function newId() {
-  return "doc" + Date.now() + Math.random().toString(36).slice(2, 6);
+  return uid("doc");
 }
 
 // Add/edit a single aviation document. On save it hands back the finished

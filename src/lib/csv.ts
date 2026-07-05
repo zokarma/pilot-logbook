@@ -6,6 +6,7 @@
 import { AppData, Flight } from "./types";
 import { migrateData } from "./migrate";
 import { num, pilotName } from "./logbook";
+import { uid } from "./id";
 
 export const CSV_FIELDS = [
   "date", "year", "month", "day", "aircraftType", "civilIdent", "pic", "sic",
@@ -265,7 +266,7 @@ function importStructuredLogbook(
     roleCounts[role as "Captain" | "Student"] = (roleCounts[role as "Captain" | "Student"] || 0) + 1;
 
     data.flights.push({
-      id: "f" + Date.now() + Math.random().toString(36).slice(2, 6),
+      id: uid("f"),
       year: y, month: m, day: d,
       date: `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`,
       aircraftType: fieldVals.aircraftType || "",
@@ -341,11 +342,12 @@ export function importCSV(data: AppData, text: string, ownerNames: string[]): Im
       if (!parsed) { skipped++; continue; }
       [y, m, d] = parsed;
     } else {
-      y = parseInt(get("year")); m = parseInt(get("month")); d = parseInt(get("day"));
+      y = parseInt(get("year"), 10); m = parseInt(get("month"), 10); d = parseInt(get("day"), 10);
+      if (!isNaN(y) && y < 100) y = expandTwoDigitYear(y);
     }
-    if (isNaN(y) || isNaN(m) || isNaN(d) || m < 1 || m > 12 || d < 1 || d > 31) { skipped++; continue; }
+    if (isNaN(y) || isNaN(m) || isNaN(d) || y < 1900 || y > 2200 || m < 1 || m > 12 || d < 1 || d > 31) { skipped++; continue; }
     data.flights.push({
-      id: "f" + Date.now() + Math.random().toString(36).slice(2, 6),
+      id: uid("f"),
       year: y, month: m, day: d,
       date: `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`,
       aircraftType: get("aircraftType"),

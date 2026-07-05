@@ -56,7 +56,9 @@ export function applyDeletePilot(draft: AppData, id: string): void {
   draft.pilots = draft.pilots.filter((p) => p.id !== id);
   const fallback = draft.pilots[0]?.id || null;
   draft.flights.forEach((f) => {
-    if (f.pilotId === id) f.pilotId = fallback;
+    // Clear ownership rather than reassigning to another pilot — migrateData
+    // re-points orphaned flights to their PIC on next load when one exists.
+    if (f.pilotId === id) f.pilotId = null;
     if (f.picId === id) { f.picId = ""; f.pic = ""; }
     if (f.sicId === id) { f.sicId = ""; f.sic = ""; }
     if (f.socId === id) { f.socId = ""; f.soc = ""; }

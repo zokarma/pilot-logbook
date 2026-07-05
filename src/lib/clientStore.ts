@@ -48,8 +48,15 @@ export function mergeScreenshots(server: AppData, cache: AppData | null): AppDat
 }
 
 // --- Local-only fallback auth (used when Supabase isn't configured) ---
+//
+// Passwords are stored as salted SHA-256 digests. This is an offline
+// convenience gate, not real security — the logbook data itself sits
+// unencrypted in localStorage — but salted digests at least aren't trivially
+// reversible. Records written by older versions used an unsalted djb2 hash
+// (no `salt` field); those are verified with the legacy hash on login and
+// upgraded in place.
 
-type LocalUsers = Record<string, { pass: string }>;
+type LocalUsers = Record<string, { pass: string; salt?: string }>;
 
 function loadLocalUsers(): LocalUsers {
   try { return JSON.parse(localStorage.getItem(LOCAL_USERS_KEY) || "{}") as LocalUsers; }
@@ -57,20 +64,48 @@ function loadLocalUsers(): LocalUsers {
 }
 function saveLocalUsers(u: LocalUsers) { localStorage.setItem(LOCAL_USERS_KEY, JSON.stringify(u)); }
 
-export function localSignup(username: string, password: string): { error?: string } {
+function randomSalt(): string {
+  const buf = new Uint8Array(16);
+  crypto.getRandomValues(buf);
+  return Array.from(buf, (b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+async function hashPassword(password: string, salt: string): Promise<string> {
+  // crypto.subtle is only exposed in secure contexts (https / localhost);
+  // fall back to the legacy hash rather than breaking auth entirely.
+  if (typeof crypto === "undefined" || !crypto.subtle) return hashStr(salt + ":" + password);
+  const data = new TextEncoder().encode(salt + ":" + password);
+  const digest = await crypto.subtle.digest("SHA-256", data);
+  return Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+const hasUser = (users: LocalUsers, name: string) =>
+  Object.prototype.hasOwnProperty.call(users, name);
+
+export async function localSignup(username: string, password: string): Promise<{ error?: string }> {
   const users = loadLocalUsers();
-  if (users[username]) return { error: "Username already exists. Try logging in." };
-  users[username] = { pass: hashStr(password) };
+  if (hasUser(users, username)) return { error: "Username already exists. Try logging in." };
+  const salt = randomSalt();
+  users[username] = { pass: await hashPassword(password, salt), salt };
   saveLocalUsers(users);
   saveCache(username, emptyData());
   localStorage.setItem(LOCAL_SESSION_KEY, username);
   return {};
 }
 
-export function localLogin(username: string, password: string): { error?: string } {
+export async function localLogin(username: string, password: string): Promise<{ error?: string }> {
   const users = loadLocalUsers();
-  if (!users[username]) return { error: "No such user. Please sign up." };
-  if (users[username].pass !== hashStr(password)) return { error: "Incorrect password." };
+  if (!hasUser(users, username)) return { error: "No such user. Please sign up." };
+  const rec = users[username];
+  if (rec.salt) {
+    if (rec.pass !== (await hashPassword(password, rec.salt))) return { error: "Incorrect password." };
+  } else {
+    // Legacy unsalted djb2 record — verify, then upgrade to a salted digest.
+    if (rec.pass !== hashStr(password)) return { error: "Incorrect password." };
+    const salt = randomSalt();
+    users[username] = { pass: await hashPassword(password, salt), salt };
+    saveLocalUsers(users);
+  }
   localStorage.setItem(LOCAL_SESSION_KEY, username);
   return {};
 }
