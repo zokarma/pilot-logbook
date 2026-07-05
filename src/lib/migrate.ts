@@ -3,6 +3,7 @@
 // data has it. Operates in place on the passed object and returns it.
 
 import { AppData, Flight, Pilot, emptyData } from "./types";
+import { normalizeFlightColumns } from "./flightColumns";
 
 export function migrateData(input: Partial<AppData> | null | undefined): AppData {
   const d = (input || emptyData()) as AppData;
@@ -22,6 +23,7 @@ export function migrateData(input: Partial<AppData> | null | undefined): AppData
   if (typeof d.pilotName !== "string") d.pilotName = "";
   if (!Array.isArray(d.bugReports)) d.bugReports = [];
   if (!Array.isArray(d.dashboardHidden)) d.dashboardHidden = [];
+  d.flightColumns = normalizeFlightColumns(d.flightColumns);
   if (!Array.isArray(d.documents)) d.documents = [];
   if (typeof d.profile === "undefined") d.profile = null;
 
