@@ -186,7 +186,18 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const signup = useCallback(async (identifier: string, password: string): Promise<AuthResult> => {
     if (cloud) {
       const sb = getSupabaseClient()!;
-      const { data: res, error } = await sb.auth.signUp({ email: identifier.trim(), password });
+      // Pin the confirmation-link redirect to the current origin's /login page.
+      // Without this, Supabase falls back to the dashboard "Site URL", which has
+      // leaked stale Vercel preview URLs into production emails. Landing on
+      // /login (rather than / → /logger) also avoids a client-side redirect
+      // racing detectSessionInUrl and dropping the auth token from the URL hash.
+      const emailRedirectTo =
+        typeof window !== "undefined" ? `${window.location.origin}/login/` : undefined;
+      const { data: res, error } = await sb.auth.signUp({
+        email: identifier.trim(),
+        password,
+        options: { emailRedirectTo },
+      });
       if (error) return { error: error.message };
       if (!res.session) return { needsConfirmation: true }; // email confirmation is on
       return {};
