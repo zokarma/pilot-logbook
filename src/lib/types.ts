@@ -106,6 +106,16 @@ export interface PilotDocument {
   updatedAt: string;
 }
 
+// A remembered CSV import mapping, keyed by a hash of the file's (normalized)
+// header row. Re-importing a file with the same shape skips the mapping step.
+export interface ImportTemplate {
+  id: string;
+  signature: string; // headerSignature() of the source file's headers
+  mapping: { header: string; field: string }[]; // mapped columns only
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface AppData {
   flights: Flight[];
   duty: Record<string, DutyEntry>;
@@ -121,6 +131,8 @@ export interface AppData {
   // First-time setup profile (null until the wizard runs) + aviation documents.
   profile: UserProfile | null;
   documents: PilotDocument[];
+  // Saved CSV column mappings from previous imports (lib/importMap).
+  importTemplates: ImportTemplate[];
 }
 
 export function emptyData(): AppData {
@@ -136,7 +148,8 @@ export function emptyData(): AppData {
     flightColumns: [...DEFAULT_FLIGHT_COLUMN_KEYS],
     profile: null,
     documents: [],
+    importTemplates: [],
   };
 }
 
-export const APP_VERSION = "0.7.1";
+export const APP_VERSION = "0.8.0";

@@ -4,17 +4,18 @@ import { useRef, useState } from "react";
 import { useData } from "@/context/DataContext";
 import FlightForm from "@/components/FlightForm";
 import FlightTable from "@/components/FlightTable";
+import ImportWizard, { WizardInput } from "@/components/ImportWizard";
 import {
   currentPilot, flightsForCurrentPilot, pilotName,
 } from "@/lib/logbook";
 import { flightDate } from "@/lib/logbook";
-import { toCSV, importCSV, parseCSV, detectStructuredLogbook, normalizeName } from "@/lib/csv";
-import { migrateData } from "@/lib/migrate";
+import { toCSV, parseCSV, detectStructuredLogbook, buildCombinedHeaders } from "@/lib/csv";
 
 export default function LoggerPage() {
-  const { data, replace, currentUser } = useData();
+  const { data, currentUser } = useData();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [csvMsg, setCsvMsg] = useState<{ text: string; kind: "ok" | "error" | "info" } | null>(null);
+  const [wizard, setWizard] = useState<WizardInput | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const flights = flightsForCurrentPilot(data);
@@ -38,41 +39,31 @@ export default function LoggerPage() {
     setCsvMsg({ text: `Exported ${data.flights.length} flight${data.flights.length === 1 ? "" : "s"}.`, kind: "ok" });
   }
 
+  // Parse the file and open the import wizard (mapping review → identity →
+  // preview). The wizard owns the rest of the flow.
   function onFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
     reader.onload = () => {
-      const text = String(reader.result);
-      let ownerNames: string[] = [];
-      const peek = parseCSV(text);
-      if (detectStructuredLogbook(peek) >= 0) {
-        if (!data.pilots.length) {
-          setCsvMsg({ text: "Add a Pilot Profile first — your logbook needs a pilot to own these flights.", kind: "error" });
-          return;
-        }
-        const suggested = cp ? `${(cp.firstName || "").charAt(0)}.${cp.lastName || ""}`.replace(/^\.|\.$/g, "") : "";
-        const reply = window.prompt(
-          "This looks like a multi-column logbook with PIC and Student columns.\n\n" +
-            "What name represents YOU in the spreadsheet?\n\n" +
-            "Examples:  B.Pearce   |   Smith, J   |   John Smith\n" +
-            "If your name appears in more than one form, separate variations with commas.",
-          suggested,
-        );
-        if (reply === null) return;
-        ownerNames = reply.split(",").map((s) => normalizeName(s.trim())).filter(Boolean);
-        if (!ownerNames.length && !confirm("No name entered — every flight will be imported as Captain by default. Continue?")) return;
+      const rows = parseCSV(String(reader.result));
+      if (rows.length < 2) {
+        setCsvMsg({ text: "Import failed: file has no data rows.", kind: "error" });
+        return;
       }
-      const working = migrateData(structuredClone(data));
-      const res = importCSV(working, text, ownerNames);
-      if (res.error) { setCsvMsg({ text: "Import failed: " + res.error, kind: "error" }); return; }
-      replace(res.data);
-      let m = `Imported ${res.added} flight${res.added === 1 ? "" : "s"}`;
-      if (res.roleCounts && (res.roleCounts.Captain || res.roleCounts.Student)) {
-        m += ` — ${res.roleCounts.Captain || 0} as Captain, ${res.roleCounts.Student || 0} as Student`;
+      if (!data.pilots.length) {
+        setCsvMsg({ text: "Add a Pilot Profile first — your logbook needs a pilot to own these flights.", kind: "error" });
+        return;
       }
-      if (res.skipped) m += `, skipped ${res.skipped} invalid row${res.skipped === 1 ? "" : "s"}`;
-      setCsvMsg({ text: m + ".", kind: res.added ? "ok" : "error" });
+      const structIdx = detectStructuredLogbook(rows);
+      const structured = structIdx >= 0;
+      setCsvMsg(null);
+      setWizard({
+        headers: structured ? buildCombinedHeaders(rows, structIdx) : rows[0],
+        rows,
+        dataStart: structured ? structIdx + 1 : 1,
+        structured,
+      });
     };
     reader.onerror = () => setCsvMsg({ text: "Could not read file.", kind: "error" });
     reader.readAsText(file);
@@ -108,6 +99,14 @@ export default function LoggerPage() {
           <p className="text-center text-slate-400 py-8">No flights logged yet. Add your first flight above.</p>
         )}
       </div>
+
+      {wizard && (
+        <ImportWizard
+          input={wizard}
+          onClose={() => setWizard(null)}
+          onDone={(msg) => { setWizard(null); setCsvMsg(msg); }}
+        />
+      )}
     </>
   );
 }
