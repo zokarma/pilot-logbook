@@ -5,7 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
 import { useData } from "@/context/DataContext";
 
-const NAV: { href: string; label: string; icon: React.ReactNode }[] = [
+export const NAV: { href: string; label: string; icon: React.ReactNode }[] = [
   {
     href: "/dashboard",
     label: "Dashboard",
@@ -99,12 +99,16 @@ export default function Sidebar() {
 
   return (
     <aside className="w-16 lg:w-60 shrink-0 bg-slate-900/80 border-r border-slate-800 flex flex-col py-5 sticky top-0 h-screen z-20">
-      <div className="flex items-center gap-2 px-3 lg:px-5 mb-8 justify-center lg:justify-start">
+      <Link
+        href="/dashboard"
+        title="Go to dashboard"
+        className="flex items-center gap-2 px-3 lg:px-5 mb-8 justify-center lg:justify-start hover:opacity-80 transition"
+      >
         <svg xmlns="http://www.w3.org/2000/svg" className="w-7 h-7 text-brand-400 shrink-0" viewBox="0 0 24 24" fill="currentColor">
           <path d="M21 16v-2l-8-5V3.5A1.5 1.5 0 0 0 11.5 2 1.5 1.5 0 0 0 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5L21 16z" />
         </svg>
-        <span className="hidden lg:inline font-bold text-lg tracking-tight text-white">LOGBOOK</span>
-      </div>
+        <span className="hidden lg:inline font-bold text-base tracking-tight text-white">pilotlogbook.ca</span>
+      </Link>
 
       <nav className="flex-1 flex flex-col gap-1 px-2 lg:px-3">
         {NAV.map((n) => (
