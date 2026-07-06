@@ -132,7 +132,9 @@ export function detectStructuredLogbook(rows: string[][]): number {
   return -1;
 }
 
-function buildCombinedHeaders(rows: string[][], groupRowIdx: number): string[] {
+// Flatten up to 3 stacked header rows (group / sub / sub-sub) into single
+// combined labels like "Single Engine Day". Exported for the import wizard.
+export function buildCombinedHeaders(rows: string[][], groupRowIdx: number): string[] {
   const h1 = rows[groupRowIdx] || [];
   const h2 = rows[groupRowIdx + 1] || [];
   const h3 = rows[groupRowIdx + 2] || [];
@@ -188,7 +190,7 @@ export function normalizeName(s: string): string {
 }
 
 // Decide which crew slot the owner sat in for this row.
-function ownerRoleForRow(picRaw: string, sicRaw: string, ownerNames: string[]): string | null {
+export function ownerRoleForRow(picRaw: string, sicRaw: string, ownerNames: string[]): string | null {
   if (!ownerNames || !ownerNames.length) return null;
   const picN = normalizeName(picRaw);
   const sicN = normalizeName(sicRaw);

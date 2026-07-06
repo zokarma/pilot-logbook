@@ -27,6 +27,7 @@ export function migrateData(input: Partial<AppData> | null | undefined): AppData
   d.flightColumns = normalizeFlightColumns(d.flightColumns);
   if (!Array.isArray(d.documents)) d.documents = [];
   if (typeof d.profile === "undefined") d.profile = null;
+  if (!Array.isArray(d.importTemplates)) d.importTemplates = [];
 
   // Build a quick name -> pilotId map; create profiles for any free-text PIC/SIC/SOC.
   const nameToId: Record<string, string> = {};
