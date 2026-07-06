@@ -1,8 +1,9 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useData, SyncState } from "@/context/DataContext";
 import BugReporter from "./BugReporter";
+import { NAV } from "./Sidebar";
 
 const SYNC: Record<Exclude<SyncState, null>, { text: string; cls: string }> = {
   syncing: { text: "↻ Syncing…", cls: "text-sky-300" },
@@ -14,7 +15,13 @@ const SYNC: Record<Exclude<SyncState, null>, { text: string; cls: string }> = {
 export default function TopBar() {
   const { data, currentUser, cloud, syncState, logout } = useData();
   const router = useRouter();
+  const pathname = usePathname();
   const sync = cloud && syncState ? SYNC[syncState] : null;
+
+  // Show the current page's name (from the same nav list the Sidebar uses).
+  // Normalise the trailing slash added by the static export before matching.
+  const currentPath = pathname.replace(/\/+$/, "") || "/";
+  const pageTitle = NAV.find((n) => n.href === currentPath)?.label ?? "Logbook";
 
   const profile = data.profile;
   const holderName =
@@ -30,7 +37,7 @@ export default function TopBar() {
   return (
     <header className="sticky top-0 z-10 bg-slate-950/90 backdrop-blur border-b border-slate-800">
       <div className="px-4 lg:px-8 py-4 flex items-center justify-between gap-3 flex-wrap">
-        <h1 className="text-xl font-bold text-white">LOGBOOK</h1>
+        <h1 className="text-xl font-bold text-white">{pageTitle}</h1>
         <div className="flex items-center gap-3 text-sm">
           {sync && <span className={"text-xs font-medium " + sync.cls}>{sync.text}</span>}
           <span className="hidden sm:inline text-slate-400">
