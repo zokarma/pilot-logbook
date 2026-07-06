@@ -133,6 +133,10 @@ export function DataProvider({ children }: { children: ReactNode }) {
       if (uidRef.current !== user.id) {
         uidRef.current = user.id;
         cacheKeyRef.current = user.id;
+        // Hold `ready` down while this user's row loads. Otherwise the layout
+        // renders with the previous (empty) data — whose null profile briefly
+        // flashes the onboarding wizard before the real state arrives.
+        setReady(false);
         loadCloudState(user.id);
       } else {
         setReady(true);
