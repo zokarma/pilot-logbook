@@ -80,7 +80,10 @@ export interface FmDocument {
 /* ------------------------------ tokens ------------------------------ */
 
 const RE_REG = /\b(C-?[FGI][A-Z]{3}|N[0-9]{1,5}[A-Z]{0,2})\b/; // Canadian + N-number
-const RE_ICAO = /\b(C[A-Z0-9]{3}|K[A-Z]{3})\b/g; // Canadian/US ICAO
+// Canadian/US ICAO. Second char must be a LETTER so aircraft-type designators
+// (C172, CRJ9…) aren't misread as airports; the aircraft type is also excluded
+// from the route candidates below.
+const RE_ICAO = /\b(C[A-Z][A-Z0-9]{2}|K[A-Z]{3})\b/g;
 const RE_HOURS = /\b([0-9]{1,2}[.,][0-9])\b/g; // decimal tenths, logbook style
 const RE_TYPE = /\b(C-?1[5-9][0-9]|C-?2[0-9]{2}|PA-?[0-9]{2}|DA-?[0-9]{2}|BE-?[0-9]{2}|DHC-?[0-9]|CRJ-?[0-9]{3}|B7[0-9]{2}|A2[0-9]{2}|A3[0-9]{2}|PC-?12|SR2[02])\b/;
 
@@ -88,7 +91,10 @@ const ROLE_WORDS: [RegExp, string][] = [
   [/\b(pic|p1|capt|captain|self)\b/i, "Captain"],
   [/\b(sic|p2|fo|firstofficer|first officer|co-?pilot)\b/i, "First Officer"],
   [/\b(dual received|dual rec)\b/i, "Dual Received"],
-  [/\b(dual given|instructor|instr)\b/i, "Dual Given"],
+  // Only an explicit "dual given"/"DG" means giving instruction; a bare
+  // "Instructor <name>" column is just the crew name, so it must NOT flip a
+  // student's dual-received row to Dual Given. Plain "dual" stays neutral.
+  [/\b(dual given|dg)\b/i, "Dual Given"],
   [/\bdual\b/i, "Dual"],
   [/\b(student|stud)\b/i, "Student"],
 ];
@@ -163,8 +169,10 @@ function parseFlightLine(raw: string, ocrConf: number): ScannedFlight | null {
   if (type) f.aircraftType = field(type[1].replace("-", "").toUpperCase(), 0.7 * base);
 
   const icaos = [...text.matchAll(RE_ICAO)].map((m) => m[1].toUpperCase())
-    // registration fragments like "C-GABC" can false-positive as ICAO codes
-    .filter((c) => !f.registration || !f.registration.value.replace("-", "").includes(c));
+    // Registration fragments ("C-GABC") and aircraft types ("CRJ900") can
+    // false-positive as ICAO codes — drop anything contained in either.
+    .filter((c) => (!f.registration || !f.registration.value.replace("-", "").includes(c))
+      && !(f.aircraftType && f.aircraftType.value.includes(c)));
   if (icaos.length >= 2) {
     f.from = field(icaos[0], 0.8 * base);
     f.to = field(icaos[1], 0.8 * base);
