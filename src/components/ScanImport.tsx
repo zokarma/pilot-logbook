@@ -19,7 +19,28 @@ import {
   ScannedFlight, ScannedDocument, ConfidentField, LOW_CONFIDENCE,
   parseFlightsFromOcr, parseDocumentFromOcr, combineFlights, combineDocument,
 } from "@/lib/scan";
-import { scanAvailability, scanDocuments } from "@/lib/scanBridge";
+import { scanAvailability, scanDocuments, AiReason } from "@/lib/scanBridge";
+
+// Actionable one-liner shown in the confirm sheet when the on-device AI model
+// didn't run, so the pilot knows how to turn it on (extraction is far better
+// with it). null = AI ran, no notice needed.
+function aiNotice(reason: AiReason): string | null {
+  switch (reason) {
+    case "available": return null;
+    case "not-enabled":
+      return "Basic OCR only. For much better accuracy, turn on Apple Intelligence in Settings → Apple Intelligence & Siri, then scan again.";
+    case "model-downloading":
+      return "Basic OCR only — Apple Intelligence is still downloading its model. Try again once it finishes (Settings → Apple Intelligence & Siri).";
+    case "device-not-eligible":
+      return "Basic OCR only — this iPhone doesn't support Apple Intelligence (needs iPhone 15 Pro or newer). Check the highlighted fields carefully.";
+    case "os-too-old":
+      return "Basic OCR only — update to iOS 26 to enable on-device AI extraction.";
+    case "framework-missing":
+      return "Basic OCR only — this build can't reach the on-device AI model.";
+    default:
+      return "Basic OCR only — on-device AI extraction is unavailable. Check the highlighted fields carefully.";
+  }
+}
 
 type Mode = "flights" | "document";
 type Phase = "idle" | "scanning" | "review" | "error";
@@ -99,6 +120,7 @@ export default function ScanImport({ mode }: { mode: Mode }) {
   const { mutate } = useData();
   const [available, setAvailable] = useState(false);
   const [ai, setAi] = useState(false);
+  const [aiReason, setAiReason] = useState<AiReason>("unavailable");
   const [phase, setPhase] = useState<Phase>("idle");
   const [err, setErr] = useState("");
   const [flightRows, setFlightRows] = useState<FlightRow[]>([]);
@@ -110,6 +132,7 @@ export default function ScanImport({ mode }: { mode: Mode }) {
       if (!alive) return;
       setAvailable(a.docCamera);
       setAi(a.appleIntelligence);
+      setAiReason(a.aiReason);
     });
     return () => { alive = false; };
   }, []);
@@ -215,6 +238,9 @@ export default function ScanImport({ mode }: { mode: Mode }) {
                   {ai ? "Read on-device with Apple Intelligence. " : "Read on-device. "}
                   Check highlighted fields before saving — nothing is saved until you tap Save.
                 </p>
+                {!ai && aiNotice(aiReason) && (
+                  <p className="text-xs text-amber-300 mt-1">{aiNotice(aiReason)}</p>
+                )}
               </div>
               <button onClick={close} className="text-slate-400 hover:text-slate-200 text-2xl leading-none">&times;</button>
             </div>

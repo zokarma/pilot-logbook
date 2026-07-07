@@ -30,16 +30,35 @@ public class ScanPlugin: CAPPlugin, CAPBridgedPlugin, VNDocumentCameraViewContro
 
     @objc func availability(_ call: CAPPluginCall) {
         var appleIntelligence = false
+        // A human-readable reason the on-device model is/ isn't usable, so the
+        // confirm sheet can tell the pilot how to turn it on instead of
+        // silently falling back to basic OCR.
+        var aiReason = "unavailable"
         #if canImport(FoundationModels)
         if #available(iOS 26.0, *) {
-            if case .available = SystemLanguageModel.default.availability {
+            switch SystemLanguageModel.default.availability {
+            case .available:
                 appleIntelligence = true
+                aiReason = "available"
+            case .unavailable(.deviceNotEligible):
+                aiReason = "device-not-eligible"
+            case .unavailable(.appleIntelligenceNotEnabled):
+                aiReason = "not-enabled"
+            case .unavailable(.modelNotReady):
+                aiReason = "model-downloading"
+            case .unavailable:
+                aiReason = "unavailable"
             }
+        } else {
+            aiReason = "os-too-old"
         }
+        #else
+        aiReason = "framework-missing"
         #endif
         call.resolve([
             "docCamera": VNDocumentCameraViewController.isSupported,
-            "appleIntelligence": appleIntelligence
+            "appleIntelligence": appleIntelligence,
+            "aiReason": aiReason
         ])
     }
 

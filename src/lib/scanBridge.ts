@@ -7,8 +7,24 @@
 import { isNativeApp } from "./native";
 import { ScanPluginResult } from "./scan";
 
+// Why the on-device model is or isn't usable — surfaced in the confirm sheet.
+export type AiReason =
+  | "available"
+  | "not-enabled"        // Apple Intelligence off in Settings
+  | "model-downloading"  // enabled, model still downloading
+  | "device-not-eligible"
+  | "os-too-old"         // iOS < 26
+  | "framework-missing"  // built against an SDK without FoundationModels
+  | "unavailable";
+
+export interface ScanAvailability {
+  docCamera: boolean;
+  appleIntelligence: boolean;
+  aiReason: AiReason;
+}
+
 interface ScanPluginApi {
-  availability(): Promise<{ docCamera: boolean; appleIntelligence: boolean }>;
+  availability(): Promise<ScanAvailability>;
   scan(options: { extract?: "flights" | "document" }): Promise<ScanPluginResult>;
 }
 
@@ -20,13 +36,15 @@ function plugin(): ScanPluginApi | null {
   return (cap?.Plugins?.Scan as ScanPluginApi | undefined) ?? null;
 }
 
-export async function scanAvailability(): Promise<{ docCamera: boolean; appleIntelligence: boolean }> {
+export async function scanAvailability(): Promise<ScanAvailability> {
   const p = plugin();
-  if (!p) return { docCamera: false, appleIntelligence: false };
+  if (!p) return { docCamera: false, appleIntelligence: false, aiReason: "unavailable" };
   try {
-    return await p.availability();
+    const a = await p.availability();
+    // aiReason ?? default guards an older native build that predates it.
+    return { docCamera: a.docCamera, appleIntelligence: a.appleIntelligence, aiReason: a.aiReason ?? "unavailable" };
   } catch {
-    return { docCamera: false, appleIntelligence: false };
+    return { docCamera: false, appleIntelligence: false, aiReason: "unavailable" };
   }
 }
 
