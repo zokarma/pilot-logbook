@@ -12,13 +12,14 @@
 import {
   createContext, useCallback, useContext, useEffect, useRef, useState, ReactNode,
 } from "react";
-import type { Session } from "@supabase/supabase-js";
+import type { AuthChangeEvent, Session } from "@supabase/supabase-js";
 import { AppData, emptyData } from "@/lib/types";
 import { migrateData } from "@/lib/migrate";
 import { deepEqual, mergeAppData, sameStamp, stampChanges } from "@/lib/merge";
 import { getSupabaseClient, supabaseConfigured } from "@/lib/supabaseClient";
 import {
   loadCache, saveCache, loadBase, saveBase, SyncBase, mergeScreenshots, stripScreenshots,
+  loadLastUser, saveLastUser, clearLastUser,
   localLogin, localSignup, localSession, localLogout,
 } from "@/lib/clientStore";
 
@@ -66,6 +67,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const baseRef = useRef<SyncBase | null>(null);     // last synced server state (merge ancestor)
   const pushingRef = useRef(false);                  // a push is in flight
   const repushRef = useRef(false);                   // a push fired while one was in flight
+  // uid whose mirror we showed at boot before Supabase restored the session.
+  const optimisticRef = useRef<string | null>(null);
 
   // Write the current state to plb_app_state without clobbering another
   // client's changes. The blob is one row per user, so a blind upsert is
@@ -243,22 +246,42 @@ export function DataProvider({ children }: { children: ReactNode }) {
     setReady(true);
   }, [pushState]);
 
-  const applySession = useCallback((session: Session | null) => {
+  const applySession = useCallback((event: AuthChangeEvent, session: Session | null) => {
     const user = session?.user;
     if (user) {
       setCurrentUser(user.email ?? user.id);
+      saveLastUser({ uid: user.id, email: user.email ?? user.id });
       if (uidRef.current !== user.id) {
         uidRef.current = user.id;
         cacheKeyRef.current = user.id;
         // Hold `ready` down while this user's row loads. Otherwise the layout
         // renders with the previous (empty) data — whose null profile briefly
         // flashes the onboarding wizard before the real state arrives.
-        setReady(false);
+        // Exception: we already booted from this same user's mirror — keep the
+        // shell up and let loadCloudState merge the server row in behind it.
+        if (optimisticRef.current !== user.id) setReady(false);
+        optimisticRef.current = null;
         loadCloudState(user.id);
       } else {
+        optimisticRef.current = null;
         setReady(true);
       }
     } else {
+      // No session. If we booted from a remembered user's mirror and the
+      // device is offline, keep the logbook open — a pilot must never be
+      // locked out mid-trip because a token couldn't refresh. Supabase emits
+      // again once connectivity returns.
+      if (
+        event !== "SIGNED_OUT" &&
+        optimisticRef.current &&
+        typeof navigator !== "undefined" &&
+        !navigator.onLine
+      ) {
+        setReady(true);
+        return;
+      }
+      if (event === "SIGNED_OUT") clearLastUser();
+      optimisticRef.current = null;
       uidRef.current = null;
       cacheKeyRef.current = null;
       baseRef.current = null;
@@ -276,8 +299,28 @@ export function DataProvider({ children }: { children: ReactNode }) {
     if (cloud) {
       const sb = getSupabaseClient();
       if (!sb) { setReady(true); return; }
-      const { data: sub } = sb.auth.onAuthStateChange((_event, session) => {
-        applySession(session);
+      // Mirror-first boot: if a remembered user has a local mirror, show it
+      // NOW — before (or entirely without) the network. Startup goes from
+      // network-bound to instant, and an offline launch still opens the
+      // logbook. uidRef stays null, so nothing pushes to the cloud until the
+      // real session confirms; edits land in the mirror and merge-sync later.
+      const remembered = loadLastUser();
+      if (remembered) {
+        const cache = loadCache(remembered.uid);
+        if (cache) {
+          optimisticRef.current = remembered.uid;
+          cacheKeyRef.current = remembered.uid;
+          baseRef.current = loadBase(remembered.uid);
+          const local = migrateData(cache);
+          dataRef.current = local;
+          setData(local);
+          setCurrentUser(remembered.email);
+          setSyncState("offline");
+          setReady(true);
+        }
+      }
+      const { data: sub } = sb.auth.onAuthStateChange((event, session) => {
+        applySession(event, session);
       });
       // Back online after offline edits → sync (pushState merges, so this
       // also pulls in anything other clients wrote meanwhile).
@@ -355,7 +398,19 @@ export function DataProvider({ children }: { children: ReactNode }) {
     if (cloud) {
       const sb = getSupabaseClient();
       try { await sb?.auth.signOut(); } catch { /* ignore */ }
-      // onAuthStateChange(SIGNED_OUT) clears state.
+      // onAuthStateChange(SIGNED_OUT) normally clears state, but clear
+      // explicitly too: during an offline mirror-first boot there is no live
+      // session, so signOut may emit nothing.
+      clearLastUser();
+      optimisticRef.current = null;
+      uidRef.current = null;
+      cacheKeyRef.current = null;
+      baseRef.current = null;
+      setCurrentUser(null);
+      const empty = emptyData();
+      dataRef.current = empty;
+      setData(empty);
+      setSyncState(null);
     } else {
       localLogout();
       cacheKeyRef.current = null;

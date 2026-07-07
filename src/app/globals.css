@@ -6,6 +6,37 @@ html,
 body {
   -webkit-text-size-adjust: 100%;
   color-scheme: dark;
+  /* App-shell feel in the Capacitor webview: no grey tap flash, no
+     rubber-band overscroll flashing the body background. */
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior-y: none;
+}
+
+/* iOS auto-zooms the page when a focused control's font is under 16px —
+   the single biggest "this is a website" tell on the phone. */
+@media (pointer: coarse) {
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
+}
+
+/* Notch / home-indicator insets (viewport-fit=cover). Zero on the website. */
+.safe-top {
+  padding-top: env(safe-area-inset-top);
+}
+.safe-left {
+  padding-left: env(safe-area-inset-left);
+}
+.safe-right {
+  padding-right: env(safe-area-inset-right);
+}
+.safe-screen {
+  padding-top: max(1rem, env(safe-area-inset-top));
+  padding-right: max(1rem, env(safe-area-inset-right));
+  padding-bottom: max(1rem, env(safe-area-inset-bottom));
+  padding-left: max(1rem, env(safe-area-inset-left));
 }
 
 body {
@@ -86,6 +117,113 @@ textarea:focus {
 .nav-item {
   transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
 }
+
+/* ---------------------------------------------------------------------------
+   Light theme. The app is authored dark-first with Tailwind slate utilities;
+   [data-theme="light"] (set on <html> by the TopBar toggle + root-layout boot
+   script) remaps the palette wholesale. Keep the selector list in sync with
+   the utilities actually used in src/ (grep bg-slate/text-slate/etc.).
+--------------------------------------------------------------------------- */
+:root[data-theme="light"] {
+  color-scheme: light;
+}
+[data-theme="light"] body {
+  color: #0f172a;
+  background:
+    radial-gradient(1200px 600px at 10% -10%, rgba(8, 145, 178, 0.08), transparent),
+    #f1f5f9;
+}
+
+/* Backgrounds */
+[data-theme="light"] .bg-slate-950 { background-color: #f1f5f9; }
+[data-theme="light"] .bg-slate-950\/95 { background-color: rgba(248, 250, 252, 0.95); }
+[data-theme="light"] .bg-slate-900,
+[data-theme="light"] .bg-slate-900\/80,
+[data-theme="light"] .bg-slate-900\/70,
+[data-theme="light"] .bg-slate-900\/60,
+[data-theme="light"] .bg-slate-900\/40 { background-color: #ffffff; }
+[data-theme="light"] .bg-slate-800,
+[data-theme="light"] .bg-slate-800\/80,
+[data-theme="light"] .bg-slate-800\/70,
+[data-theme="light"] .bg-slate-800\/60 { background-color: #e2e8f0; }
+[data-theme="light"] .bg-slate-700,
+[data-theme="light"] .bg-slate-700\/50 { background-color: #cbd5e1; }
+[data-theme="light"] .hover\:bg-slate-800:hover,
+[data-theme="light"] .hover\:bg-slate-800\/60:hover { background-color: #e2e8f0; }
+[data-theme="light"] .hover\:bg-slate-700:hover { background-color: #cbd5e1; }
+
+/* Text */
+[data-theme="light"] .text-white { color: #0f172a; }
+[data-theme="light"] .hover\:text-white:hover { color: #020617; }
+[data-theme="light"] .text-slate-100 { color: #1e293b; }
+[data-theme="light"] .text-slate-200 { color: #334155; }
+[data-theme="light"] .hover\:text-slate-200:hover { color: #334155; }
+[data-theme="light"] .text-slate-300 { color: #475569; }
+[data-theme="light"] .text-slate-400 { color: #64748b; }
+[data-theme="light"] .text-slate-500 { color: #64748b; }
+[data-theme="light"] .text-slate-600 { color: #94a3b8; }
+[data-theme="light"] .hover\:text-slate-100:hover { color: #1e293b; }
+
+/* Accent text: the -300/-400 tints are tuned for dark surfaces; deepen them
+   for contrast on light ones. */
+[data-theme="light"] .text-emerald-300, [data-theme="light"] .text-emerald-400,
+[data-theme="light"] .hover\:text-emerald-300:hover { color: #059669; }
+[data-theme="light"] .text-amber-300, [data-theme="light"] .text-amber-400,
+[data-theme="light"] .hover\:text-amber-200:hover { color: #b45309; }
+[data-theme="light"] .text-red-300, [data-theme="light"] .text-red-400,
+[data-theme="light"] .hover\:text-red-300:hover, [data-theme="light"] .hover\:text-red-400:hover { color: #dc2626; }
+[data-theme="light"] .text-sky-300, [data-theme="light"] .text-sky-400,
+[data-theme="light"] .hover\:text-sky-300:hover { color: #0284c7; }
+[data-theme="light"] .text-cyan-400, [data-theme="light"] .hover\:text-cyan-300:hover { color: #0891b2; }
+[data-theme="light"] .text-brand-200, [data-theme="light"] .text-brand-300,
+[data-theme="light"] .text-brand-400 { color: #0891b2; }
+[data-theme="light"] .text-yellow-400 { color: #a16207; }
+[data-theme="light"] .text-orange-300 { color: #c2410c; }
+[data-theme="light"] .text-violet-300, [data-theme="light"] .text-violet-400 { color: #7c3aed; }
+[data-theme="light"] .text-indigo-400 { color: #4f46e5; }
+[data-theme="light"] .text-teal-400 { color: #0d9488; }
+
+/* Borders */
+[data-theme="light"] .border-slate-600,
+[data-theme="light"] .hover\:border-slate-600:hover { border-color: #94a3b8; }
+[data-theme="light"] .border-slate-700 { border-color: #cbd5e1; }
+[data-theme="light"] .border-slate-800,
+[data-theme="light"] .border-slate-800\/60 { border-color: #e2e8f0; }
+[data-theme="light"] .divide-slate-800 > :not([hidden]) ~ :not([hidden]) { border-color: #e2e8f0; }
+
+/* Saturated action buttons keep white text (declared after the text remaps
+   above so equal-specificity cascade resolves in their favour). */
+[data-theme="light"] .bg-brand-600, [data-theme="light"] .bg-brand-700,
+[data-theme="light"] .hover\:bg-brand-700:hover,
+[data-theme="light"] .bg-red-600, [data-theme="light"] .bg-red-600\/90,
+[data-theme="light"] .hover\:bg-red-600:hover { color: #ffffff; }
+
+/* Surfaces */
+[data-theme="light"] .card {
+  background: #ffffff;
+  border-color: #e2e8f0;
+  box-shadow: 0 10px 30px -18px rgba(2, 6, 23, 0.25);
+}
+[data-theme="light"] .modal-card {
+  background: #ffffff;
+  border-color: #e2e8f0;
+  box-shadow: 0 25px 50px -12px rgba(2, 6, 23, 0.3);
+}
+
+/* Form controls */
+[data-theme="light"] input,
+[data-theme="light"] select,
+[data-theme="light"] textarea {
+  background-color: #ffffff;
+  border-color: #cbd5e1;
+  color: #0f172a;
+}
+[data-theme="light"] input::placeholder,
+[data-theme="light"] textarea::placeholder { color: #94a3b8; }
+
+/* Scrollbars */
+[data-theme="light"] ::-webkit-scrollbar-track { background: #e2e8f0; }
+[data-theme="light"] ::-webkit-scrollbar-thumb { background: #94a3b8; }
 
 /* Always-visible airport labels on the route map */
 .leaflet-tooltip.route-airport-label {

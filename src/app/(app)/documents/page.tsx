@@ -7,6 +7,7 @@ import {
   documentStatus, STATUS_META, docTypeDef, recalcDocument, EXPIRING_SOON_DAYS,
 } from "@/lib/documents";
 import DocumentForm from "@/components/DocumentForm";
+import ScanImport from "@/components/ScanImport";
 
 export default function DocumentsPage() {
   const { data, mutate } = useData();
@@ -62,6 +63,7 @@ export default function DocumentsPage() {
               Recalculate expiries
             </button>
           )}
+          {!showForm && <ScanImport mode="document" />}
           {!showForm && (
             <button onClick={() => { setAdding(true); setEditingId(null); }} className="bg-brand-600 hover:bg-brand-700 text-white font-medium px-4 py-2 rounded-lg transition">
               + Add Document

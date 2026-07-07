@@ -5,6 +5,7 @@ import { useData } from "@/context/DataContext";
 import FlightForm from "@/components/FlightForm";
 import FlightTable from "@/components/FlightTable";
 import ImportWizard, { WizardInput } from "@/components/ImportWizard";
+import ScanImport from "@/components/ScanImport";
 import {
   currentPilot, flightsForCurrentPilot, pilotName,
 } from "@/lib/logbook";
@@ -86,6 +87,7 @@ export default function LoggerPage() {
             </span>
           </div>
           <div className="flex items-center gap-2">
+            <ScanImport mode="flights" />
             <button onClick={exportCsv} className="text-sm bg-slate-800 hover:bg-slate-700 text-slate-200 font-medium px-3 py-1.5 rounded-lg transition">Export CSV</button>
             <button onClick={() => fileRef.current?.click()} className="text-sm bg-slate-800 hover:bg-slate-700 text-slate-200 font-medium px-3 py-1.5 rounded-lg transition">Import CSV</button>
             <input ref={fileRef} type="file" accept=".csv,text/csv" className="hidden" onChange={onFile} />
