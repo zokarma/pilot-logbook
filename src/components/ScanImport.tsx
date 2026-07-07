@@ -125,6 +125,9 @@ export default function ScanImport({ mode }: { mode: Mode }) {
   const [err, setErr] = useState("");
   const [flightRows, setFlightRows] = useState<FlightRow[]>([]);
   const [docRow, setDocRow] = useState<DocRow | null>(null);
+  // Raw capture, for the diagnostics panel (what OCR actually read + whether
+  // the AI model returned anything) — the only way to tune against real docs.
+  const [raw, setRaw] = useState<{ text: string; hadFm: boolean; lineCount: number } | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -144,6 +147,11 @@ export default function ScanImport({ mode }: { mode: Mode }) {
     setPhase("scanning");
     try {
       const result = await scanDocuments(mode);
+      setRaw({
+        text: result.pages.map((p) => p.text).join("\n"),
+        hadFm: mode === "flights" ? !!result.fmFlights?.length : !!result.fmDocument,
+        lineCount: result.pages.reduce((n, p) => n + p.lines.length, 0),
+      });
       if (mode === "flights") {
         const heur = parseFlightsFromOcr(result.pages);
         const flights = combineFlights(result.fmFlights, heur);
@@ -210,7 +218,7 @@ export default function ScanImport({ mode }: { mode: Mode }) {
   }
 
   function close() {
-    setPhase("idle"); setFlightRows([]); setDocRow(null); setErr("");
+    setPhase("idle"); setFlightRows([]); setDocRow(null); setErr(""); setRaw(null);
   }
 
   const label = mode === "flights" ? "Scan Logbook" : "Scan Document";
@@ -258,6 +266,22 @@ export default function ScanImport({ mode }: { mode: Mode }) {
 
               {phase === "review" && mode === "document" && docRow && (
                 <DocReview row={docRow} onChange={(patch) => setDocRow((d) => d ? { ...d, ...patch } : d)} />
+              )}
+
+              {raw && (
+                <details className="rounded-lg border border-slate-800 bg-slate-900/40 text-xs">
+                  <summary className="cursor-pointer px-3 py-2 text-slate-400 select-none">
+                    Raw scan data (for troubleshooting)
+                  </summary>
+                  <div className="px-3 pb-3 space-y-2">
+                    <p className="text-slate-500">
+                      AI model: <span className="text-slate-300">{ai ? "on" : `off (${aiReason})`}</span>
+                      {" · "}AI returned data: <span className="text-slate-300">{raw.hadFm ? "yes" : "no"}</span>
+                      {" · "}{raw.lineCount} OCR lines
+                    </p>
+                    <pre className="whitespace-pre-wrap break-words text-slate-400 max-h-56 overflow-y-auto bg-slate-950/60 rounded p-2">{raw.text || "(no text recognised)"}</pre>
+                  </div>
+                </details>
               )}
             </div>
 
