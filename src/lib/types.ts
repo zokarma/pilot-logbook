@@ -14,6 +14,7 @@ export interface Pilot {
   employeeNumber: string;
   licenseNumber: string;
   createdAt: string;
+  updatedAt?: string; // stamped on change (lib/merge) — drives sync conflict resolution
 }
 
 export interface Flight {
@@ -56,6 +57,7 @@ export interface DutyEntry {
   end?: string;
   hours?: number;
   operationType?: string;
+  updatedAt?: string; // stamped on change (lib/merge) — drives sync conflict resolution
 }
 
 export interface BugReport {
@@ -74,6 +76,7 @@ export interface BugReport {
   app_state: Record<string, unknown>;
   recent_errors: unknown[];
   screenshot?: string; // base64 data URL, local-only (never pushed to cloud)
+  updatedAt?: string; // stamped on change (lib/merge) — drives sync conflict resolution
 }
 
 // The primary account holder's profile, captured in the first-time setup wizard
@@ -152,4 +155,4 @@ export function emptyData(): AppData {
   };
 }
 
-export const APP_VERSION = "0.8.0";
+export const APP_VERSION = "0.9.0";

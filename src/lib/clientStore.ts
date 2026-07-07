@@ -7,6 +7,7 @@ import { AppData, emptyData } from "./types";
 import { hashStr } from "./hash";
 
 const cacheKey = (u: string) => "plb_cache_" + u;
+const baseKey = (u: string) => "plb_base_" + u;
 const LOCAL_USERS_KEY = "plb_local_users";
 const LOCAL_SESSION_KEY = "plb_local_session";
 
@@ -22,6 +23,32 @@ export function loadCache(user: string): AppData | null {
 export function saveCache(user: string, data: AppData): void {
   try {
     localStorage.setItem(cacheKey(user), JSON.stringify(data));
+  } catch {
+    /* quota / disabled storage — ignore */
+  }
+}
+
+// The last state this client synced with the server — the common ancestor for
+// the three-way merge in lib/merge. `data` is stored screenshot-stripped;
+// `updatedAt` is the server row's updated_at at that moment (the freshness
+// token pushState checks before writing).
+export interface SyncBase {
+  data: AppData;
+  updatedAt: string | null;
+}
+
+export function loadBase(user: string): SyncBase | null {
+  try {
+    const raw = localStorage.getItem(baseKey(user));
+    return raw ? (JSON.parse(raw) as SyncBase) : null;
+  } catch {
+    return null;
+  }
+}
+
+export function saveBase(user: string, base: SyncBase): void {
+  try {
+    localStorage.setItem(baseKey(user), JSON.stringify(base));
   } catch {
     /* quota / disabled storage — ignore */
   }

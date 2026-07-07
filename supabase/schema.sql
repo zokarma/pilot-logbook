@@ -18,9 +18,13 @@ drop table if exists plb_app_state cascade;
 --
 -- The `data` JSONB blob (shape defined in src/lib/types.ts → AppData) also holds
 -- the account holder's profile and their aviation documents. There is no
--- separate relational table for these: the app is a single-blob, last-write-wins
--- client with an offline mirror, so keeping them in `data` inherits the same RLS
--- scoping, offline resilience and sync path as everything else. Shape:
+-- separate relational table for these: the app is a single-blob client with an
+-- offline mirror, so keeping them in `data` inherits the same RLS scoping,
+-- offline resilience and sync path as everything else. Concurrent writers are
+-- reconciled CLIENT-side: before writing, the app three-way merges its state
+-- against this row per entity (src/lib/merge.ts) and uses `updated_at` as an
+-- optimistic-concurrency token (conditional UPDATE … WHERE updated_at = seen),
+-- so two devices editing offline no longer overwrite each other. Shape:
 --
 --   data.profile = {
 --     firstName, lastName, displayName?, role,
