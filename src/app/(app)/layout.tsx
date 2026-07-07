@@ -37,7 +37,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       <Sidebar />
       <div className="flex-1 flex flex-col min-w-0">
         <TopBar />
-        <main className="flex-1 w-full px-4 lg:px-8 pt-6 pb-24 fade-in">{children}</main>
+        <main className="flex-1 w-full px-4 lg:px-8 pt-6 pb-24 fade-in safe-right">{children}</main>
       </div>
     </div>
   );

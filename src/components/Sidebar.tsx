@@ -98,7 +98,7 @@ export default function Sidebar() {
       : "text-slate-400 border-transparent hover:bg-slate-800/60 hover:text-slate-100");
 
   return (
-    <aside className="w-16 lg:w-60 shrink-0 bg-slate-900/80 border-r border-slate-800 flex flex-col py-5 sticky top-0 h-screen z-20">
+    <aside className="w-16 lg:w-60 shrink-0 bg-slate-900/80 border-r border-slate-800 flex flex-col py-5 sticky top-0 h-screen z-20 safe-top safe-left">
       <Link
         href="/dashboard"
         title="Go to dashboard"
