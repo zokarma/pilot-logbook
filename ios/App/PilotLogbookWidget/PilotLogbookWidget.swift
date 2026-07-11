@@ -68,7 +68,7 @@ struct LogbookProvider: TimelineProvider {
 // MARK: - Design tokens
 
 private let bgColor     = Color(red: 0.04, green: 0.07, blue: 0.13)
-private let accentColor = Color(red: 0.36, green: 0.87, blue: 0.87)
+private let widgetAccent = Color(red: 0.36, green: 0.87, blue: 0.87)
 
 private func hoursStr(_ h: Double) -> String { String(format: "%.1f", h) }
 
@@ -77,7 +77,7 @@ private func expiryTint(days: Int) -> Color {
     case ..<0:    return .secondary
     case 0...30:  return Color(red: 1.0, green: 0.4,  blue: 0.4)
     case 31...90: return Color(red: 1.0, green: 0.78, blue: 0.2)
-    default:      return accentColor
+    default:      return widgetAccent
     }
 }
 
@@ -99,6 +99,58 @@ struct HourCell: View {
     }
 }
 
+// MARK: - Lock screen views
+
+struct CircularLockScreenView: View {
+    let entry: LogbookEntry
+    private var d: WidgetData { entry.widgetData }
+    var body: some View {
+        Gauge(value: min(d.hoursThisMonth, 100), in: 0...100) {
+            Image(systemName: "airplane")
+                .widgetAccentable()
+        } currentValueLabel: {
+            Text(hoursStr(d.hoursThisMonth))
+                .font(.system(.caption, design: .rounded, weight: .bold))
+                .minimumScaleFactor(0.5)
+        }
+        .gaugeStyle(.accessoryCircular)
+    }
+}
+
+struct RectangularLockScreenView: View {
+    let entry: LogbookEntry
+    private var d: WidgetData { entry.widgetData }
+    var body: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Label("Hours", systemImage: "airplane")
+                .font(.caption2.bold())
+                .widgetAccentable()
+            HStack(spacing: 12) {
+                lockCell("Today", d.hoursToday)
+                lockCell("Month", d.hoursThisMonth)
+                lockCell("Year",  d.hoursThisYear)
+            }
+        }
+    }
+    private func lockCell(_ label: String, _ hours: Double) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text(hoursStr(hours))
+                .font(.system(size: 13, weight: .bold, design: .rounded))
+            Text(label)
+                .font(.system(size: 9))
+                .foregroundStyle(.secondary)
+        }
+    }
+}
+
+struct InlineLockScreenView: View {
+    let entry: LogbookEntry
+    private var d: WidgetData { entry.widgetData }
+    var body: some View {
+        Label("\(hoursStr(d.hoursThisMonth))h this month", systemImage: "airplane")
+    }
+}
+
 // MARK: - Stats — small
 
 struct SmallStatsView: View {
@@ -109,7 +161,7 @@ struct SmallStatsView: View {
         VStack(alignment: .leading, spacing: 4) {
             Label("Hours", systemImage: "airplane")
                 .font(.caption2.bold())
-                .foregroundStyle(accentColor)
+                .foregroundStyle(widgetAccent)
             Spacer(minLength: 0)
             Text(hoursStr(d.hoursThisMonth))
                 .font(.system(size: 34, weight: .bold, design: .rounded))
@@ -119,7 +171,7 @@ struct SmallStatsView: View {
                 .font(.caption2)
                 .foregroundStyle(.secondary)
             if d.nextExpiryDays >= 0 && !d.nextExpiryLabel.isEmpty {
-                Divider().overlay(Color.white.opacity(0.12))
+                Rectangle().fill(Color.white.opacity(0.12)).frame(height: 0.5)
                 Text(shortExpiry)
                     .font(.caption2.bold())
                     .foregroundStyle(expiryTint(days: d.nextExpiryDays))
@@ -150,14 +202,14 @@ struct MediumStatsView: View {
         VStack(alignment: .leading, spacing: 8) {
             Label("Pilot Logbook", systemImage: "airplane")
                 .font(.caption.bold())
-                .foregroundStyle(accentColor)
+                .foregroundStyle(widgetAccent)
             HStack(spacing: 0) {
                 HourCell(label: "Today", hours: d.hoursToday)
                 HourCell(label: "Month", hours: d.hoursThisMonth)
                 HourCell(label: "Year",  hours: d.hoursThisYear)
             }
             if d.nextExpiryDays >= 0 && !d.nextExpiryLabel.isEmpty {
-                Divider().overlay(Color.white.opacity(0.12))
+                Rectangle().fill(Color.white.opacity(0.12)).frame(height: 0.5)
                 Label(expiryLine, systemImage: "exclamationmark.triangle.fill")
                     .font(.caption2.bold())
                     .foregroundStyle(expiryTint(days: d.nextExpiryDays))
@@ -183,16 +235,24 @@ struct MediumStatsView: View {
 // MARK: - Stats widget
 
 struct StatsEntryView: View {
-    @Environment(\.widgetFamily) var family
+    @Environment(\.widgetFamily) private var family
     let entry: LogbookEntry
+
+    private var isLockScreen: Bool {
+        family == .accessoryCircular || family == .accessoryRectangular || family == .accessoryInline
+    }
+
     var body: some View {
         Group {
             switch family {
-            case .systemMedium: MediumStatsView(entry: entry)
-            default:            SmallStatsView(entry: entry)
+            case .systemMedium:         MediumStatsView(entry: entry)
+            case .accessoryCircular:    CircularLockScreenView(entry: entry)
+            case .accessoryRectangular: RectangularLockScreenView(entry: entry)
+            case .accessoryInline:      InlineLockScreenView(entry: entry)
+            default:                    SmallStatsView(entry: entry)
             }
         }
-        .containerBackground(bgColor, for: .widget)
+        .containerBackground(isLockScreen ? .clear : bgColor, for: .widget)
         .widgetURL(loggerURL)
     }
 }
@@ -205,7 +265,7 @@ struct StatsWidget: Widget {
         }
         .configurationDisplayName("Hours Summary")
         .description("Today, month, and year flight hours plus your next document expiry.")
-        .supportedFamilies([.systemSmall, .systemMedium])
+        .supportedFamilies([.systemSmall, .systemMedium, .accessoryCircular, .accessoryRectangular, .accessoryInline])
     }
 }
 
@@ -216,7 +276,7 @@ struct LogFlightView: View {
         VStack(spacing: 8) {
             Image(systemName: "plus.circle.fill")
                 .font(.system(size: 36))
-                .foregroundStyle(accentColor)
+                .foregroundStyle(widgetAccent)
             Text("Log Flight")
                 .font(.caption.bold())
                 .foregroundStyle(.white)
@@ -248,6 +308,24 @@ struct LogFlightWidget: Widget {
 }
 
 #Preview("Stats medium", as: .systemMedium) {
+    StatsWidget()
+} timeline: {
+    LogbookEntry(date: .now, widgetData: .placeholder)
+}
+
+#Preview("Lock screen circular", as: .accessoryCircular) {
+    StatsWidget()
+} timeline: {
+    LogbookEntry(date: .now, widgetData: .placeholder)
+}
+
+#Preview("Lock screen rectangular", as: .accessoryRectangular) {
+    StatsWidget()
+} timeline: {
+    LogbookEntry(date: .now, widgetData: .placeholder)
+}
+
+#Preview("Lock screen inline", as: .accessoryInline) {
     StatsWidget()
 } timeline: {
     LogbookEntry(date: .now, widgetData: .placeholder)
