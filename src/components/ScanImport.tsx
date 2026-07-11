@@ -65,6 +65,7 @@ type Phase = "idle" | "scanning" | "review" | "error";
 // set of field keys the scan flagged as low-confidence.
 type FlightRow = {
   include: boolean;
+  dup?: boolean; // matches a flight already in the logbook
   low: Set<string>;
   date: string; aircraftType: string; registration: string; loggedRole: string;
   from: string; to: string; takeoff: DayNight; landing: DayNight;
@@ -132,8 +133,15 @@ function resolvePilot(draft: AppData, name: string): string {
   return p.id;
 }
 
+// A flight already in the logbook with the same date, registration and route
+// is almost certainly the same flight re-scanned.
+function dupKey(date: string, reg: string, from: string, to: string): string {
+  return [date.trim(), reg.replace(/-/g, "").trim().toUpperCase(),
+    from.trim().toUpperCase(), to.trim().toUpperCase()].join("|");
+}
+
 export default function ScanImport({ mode }: { mode: Mode }) {
-  const { mutate } = useData();
+  const { data, mutate } = useData();
   const [available, setAvailable] = useState(false);
   const [ai, setAi] = useState(false);
   const [aiReason, setAiReason] = useState<AiReason>("unavailable");
@@ -174,7 +182,18 @@ export default function ScanImport({ mode }: { mode: Mode }) {
         const heur = parseFlightsFromOcr(result.pages);
         const flights = combineFlights(result.fmFlights, heur);
         if (!flights.length) { setErr("No flights could be read from that image. Try a clearer photo, or add the flight manually."); setPhase("error"); return; }
-        setFlightRows(flights.map(flightToRow));
+        // Flag rows that duplicate an existing flight and exclude them by
+        // default — re-scanning an already-imported page shouldn't double up.
+        const existing = new Set(data.flights.map((f) =>
+          dupKey(f.date ?? "", f.registration || f.civilIdent || "", f.from ?? "", f.to ?? "")));
+        setFlightRows(flights.map((s) => {
+          const r = flightToRow(s);
+          if (existing.has(dupKey(r.date, r.registration, r.from, r.to))) {
+            r.dup = true;
+            r.include = false;
+          }
+          return r;
+        }));
       } else {
         const heur = parseDocumentFromOcr(result.pages);
         const doc = combineDocument(result.fmDocument, heur);
@@ -389,7 +408,10 @@ function FlightReview({ row, onChange }: { row: FlightRow; onChange: (p: Partial
           <input type="checkbox" checked={row.include} onChange={(e) => onChange({ include: e.target.checked })} />
           Include this flight
         </label>
-        {row.low.size > 0 && <span className="text-xs text-amber-300">{row.low.size} field{row.low.size === 1 ? "" : "s"} to check</span>}
+        <span className="flex items-center gap-2">
+          {row.dup && <span className="text-xs font-medium text-red-400">Already in your logbook</span>}
+          {row.low.size > 0 && <span className="text-xs text-amber-300">{row.low.size} field{row.low.size === 1 ? "" : "s"} to check</span>}
+        </span>
       </div>
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
         <Labeled label="Date" low={row.low.has("date")}>
