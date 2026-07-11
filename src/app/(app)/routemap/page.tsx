@@ -1,9 +1,10 @@
 "use client";
 
 import "leaflet/dist/leaflet.css";
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { Map as LeafletMap, LayerGroup } from "leaflet";
 import { useData } from "@/context/DataContext";
+import { isNativeApp } from "@/lib/native";
 import { AIRPORTS, airportCoord } from "@/lib/airports";
 import { flightDate } from "@/lib/logbook";
 
@@ -22,6 +23,13 @@ export default function RouteMapPage() {
   const mapRef = useRef<LeafletMap | null>(null);
   const layerRef = useRef<LayerGroup | null>(null);
   const divRef = useRef<HTMLDivElement>(null);
+
+  // In the native app, contain Leaflet's internal z-index (panes 400,
+  // controls 1000) in its own stacking context so the map can't paint over the
+  // sticky top bar / sidebar when scrolling. Set after mount (isNativeApp is
+  // false during prerender) — safe because the map is client-only anyway.
+  const [native, setNative] = useState(false);
+  useEffect(() => { setNative(isNativeApp()); }, []);
 
   const pid = data.currentPilotId;
   const flights = useMemo(
@@ -100,7 +108,7 @@ export default function RouteMapPage() {
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
       <div className="lg:col-span-2 card p-5">
         {!flights.length && <p className="text-xs text-slate-400 mb-2">No routes yet — log a flight with From/To airports.</p>}
-        <div ref={divRef} style={{ height: 500 }} className="border border-slate-800 rounded-lg overflow-hidden" />
+        <div ref={divRef} style={{ height: 500 }} className={"border border-slate-800 rounded-lg overflow-hidden" + (native ? " relative z-0" : "")} />
       </div>
       <div className="card p-5">
         <h3 className="font-semibold mb-3">Routes Flown</h3>
