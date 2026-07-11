@@ -34,20 +34,33 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   }, []);
 
   // Handle deep links from the iOS widget (pilotlogbook://new-flight → open logger + form).
+  // Two paths: appUrlOpen fires when the app is warm; getLaunchUrl covers a cold
+  // launch, where the event is emitted before this listener exists. The
+  // new-flight intent is ALSO parked in sessionStorage because on a cold start
+  // the logger page may not be mounted yet (auth/data still loading) when the
+  // event is dispatched — the logger consumes the flag on mount.
   useEffect(() => {
     const cap = (window as unknown as { Capacitor?: { Plugins?: Record<string, unknown> } }).Capacitor;
     const app = cap?.Plugins?.App as
-      | { addListener: (e: string, fn: (d: { url: string }) => void) => { remove: () => void } }
+      | {
+          addListener: (e: string, fn: (d: { url: string }) => void) => { remove: () => void };
+          getLaunchUrl?: () => Promise<{ url: string } | null | undefined>;
+        }
       | undefined;
     if (!app?.addListener) return;
-    const handle = app.addListener("appUrlOpen", (data) => {
-      if (data.url.includes("new-flight")) {
+
+    const handleUrl = (url: string) => {
+      if (url.includes("new-flight")) {
+        try { sessionStorage.setItem("plb_pending_new_flight", "1"); } catch { /* ignore */ }
         router.push("/logger");
         setTimeout(() => window.dispatchEvent(new Event("plb-new-flight")), 350);
-      } else if (data.url.includes("logger")) {
+      } else if (url.includes("logger")) {
         router.push("/logger");
       }
-    });
+    };
+
+    const handle = app.addListener("appUrlOpen", (data) => handleUrl(data.url));
+    void app.getLaunchUrl?.().then((d) => { if (d?.url) handleUrl(d.url); });
     return () => { handle.remove(); };
   }, [router]);
 

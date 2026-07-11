@@ -20,8 +20,18 @@ export default function LoggerPage() {
   const fileRef = useRef<HTMLInputElement>(null);
 
   // Auto-open the new-flight form when the widget "Log Flight" button is tapped.
+  // The event covers the warm-app case; the sessionStorage flag (parked by the
+  // app layout's deep-link handler) covers a cold launch where this page wasn't
+  // mounted yet when the event fired.
   useEffect(() => {
-    function onNewFlight() { setFormOpen(true); window.scrollTo({ top: 0, behavior: "smooth" }); }
+    function onNewFlight() {
+      try { sessionStorage.removeItem("plb_pending_new_flight"); } catch { /* ignore */ }
+      setFormOpen(true);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+    try {
+      if (sessionStorage.getItem("plb_pending_new_flight")) onNewFlight();
+    } catch { /* ignore */ }
     window.addEventListener("plb-new-flight", onNewFlight);
     return () => window.removeEventListener("plb-new-flight", onNewFlight);
   }, []);
