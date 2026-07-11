@@ -168,7 +168,9 @@ export default function ScanImport({ mode }: { mode: Mode }) {
   if (!available) return null;
 
   // Shared pipeline for both the camera scan and an uploaded photo/PDF.
-  async function runScan(run: () => Promise<ScanPluginResult>) {
+  // `append` = the pilot is adding pages from the confirm sheet: new rows join
+  // the ones already under review, and failures return to review, not idle.
+  async function runScan(run: () => Promise<ScanPluginResult>, append = false) {
     setErr("");
     setPhase("scanning");
     try {
@@ -181,19 +183,26 @@ export default function ScanImport({ mode }: { mode: Mode }) {
       if (mode === "flights") {
         const heur = parseFlightsFromOcr(result.pages);
         const flights = combineFlights(result.fmFlights, heur);
-        if (!flights.length) { setErr("No flights could be read from that image. Try a clearer photo, or add the flight manually."); setPhase("error"); return; }
+        if (!flights.length) {
+          setErr("No flights could be read from that image. Try a clearer photo, or add the flight manually.");
+          // When adding pages, keep the rows already reviewed instead of
+          // dropping the pilot back to an empty error screen.
+          setPhase(append ? "review" : "error");
+          return;
+        }
         // Flag rows that duplicate an existing flight and exclude them by
         // default — re-scanning an already-imported page shouldn't double up.
         const existing = new Set(data.flights.map((f) =>
           dupKey(f.date ?? "", f.registration || f.civilIdent || "", f.from ?? "", f.to ?? "")));
-        setFlightRows(flights.map((s) => {
+        const rows = flights.map((s) => {
           const r = flightToRow(s);
           if (existing.has(dupKey(r.date, r.registration, r.from, r.to))) {
             r.dup = true;
             r.include = false;
           }
           return r;
-        }));
+        });
+        setFlightRows((prev) => (append ? [...prev, ...rows] : rows));
       } else {
         const heur = parseDocumentFromOcr(result.pages);
         const doc = combineDocument(result.fmDocument, heur);
@@ -203,17 +212,19 @@ export default function ScanImport({ mode }: { mode: Mode }) {
       setPhase("review");
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      if (msg === "cancelled") { setPhase("idle"); return; } // pilot dismissed the camera
+      if (msg === "cancelled") { setPhase(append ? "review" : "idle"); return; } // pilot dismissed the camera
       setErr(msg);
-      setPhase("error");
+      setPhase(append ? "review" : "error");
     }
   }
 
   function startScan() {
-    void runScan(() => scanDocuments(mode));
+    // From the confirm sheet this adds a page to the batch under review.
+    void runScan(() => scanDocuments(mode), phase === "review");
   }
 
   async function onUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const append = phase === "review";
     // Copy the File objects out of the live FileList BEFORE resetting the input —
     // on WebKit, clearing input.value empties the FileList we'd otherwise read.
     const picked = e.target.files ? Array.from(e.target.files) : [];
@@ -223,9 +234,9 @@ export default function ScanImport({ mode }: { mode: Mode }) {
     try {
       images = await filesToBase64(picked);
     } catch {
-      setErr("Could not read that file."); setPhase("error"); return;
+      setErr("Could not read that file."); setPhase(append ? "review" : "error"); return;
     }
-    await runScan(() => scanImages(mode, images));
+    await runScan(() => scanImages(mode, images), append);
   }
 
   function saveFlights() {
@@ -331,7 +342,7 @@ export default function ScanImport({ mode }: { mode: Mode }) {
             </div>
 
             <div className="flex-1 overflow-y-auto p-5 space-y-4">
-              {phase === "error" && <p className="text-sm text-amber-300">{err}</p>}
+              {err && <p className="text-sm text-amber-300">{err}</p>}
 
               {phase === "review" && mode === "flights" && flightRows.map((r, i) => (
                 <FlightReview
@@ -363,7 +374,13 @@ export default function ScanImport({ mode }: { mode: Mode }) {
             </div>
 
             {phase === "review" && (
-              <div className="p-5 border-t border-slate-800 flex items-center justify-end gap-2">
+              <div className="p-5 border-t border-slate-800 flex items-center justify-end gap-2 flex-wrap">
+                {mode === "flights" && (
+                  <span className="flex items-center gap-2 mr-auto">
+                    <button onClick={startScan} className="text-sm bg-slate-800 hover:bg-slate-700 text-slate-200 font-medium px-3 py-2 rounded-lg transition">+ Scan next page</button>
+                    <button onClick={() => fileRef.current?.click()} className="text-sm bg-slate-800 hover:bg-slate-700 text-slate-200 font-medium px-3 py-2 rounded-lg transition">+ Add pages</button>
+                  </span>
+                )}
                 <button onClick={close} className="text-sm bg-slate-800 hover:bg-slate-700 text-slate-200 font-medium px-4 py-2 rounded-lg transition">Cancel</button>
                 <button
                   onClick={mode === "flights" ? saveFlights : saveDoc}
