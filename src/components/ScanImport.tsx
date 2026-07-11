@@ -9,17 +9,33 @@
 // editable; low-confidence fields are highlighted for review; the pilot taps
 // Save to commit. Nothing touches AppData until then.
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useData } from "@/context/DataContext";
 import { DayNight, Flight, Pilot, PilotDocument, DocExpiryMode, AppData } from "@/lib/types";
 import { uid } from "@/lib/id";
 import { num, syncFlightMirrors } from "@/lib/logbook";
 import { docTypeDef, recalcDocument, DOC_TYPES } from "@/lib/documents";
 import {
-  ScannedFlight, ScannedDocument, ConfidentField, LOW_CONFIDENCE,
+  ScannedFlight, ScannedDocument, ConfidentField, LOW_CONFIDENCE, ScanPluginResult,
   parseFlightsFromOcr, parseDocumentFromOcr, combineFlights, combineDocument,
 } from "@/lib/scan";
-import { scanAvailability, scanDocuments, AiReason } from "@/lib/scanBridge";
+import { scanAvailability, scanDocuments, scanImages, AiReason } from "@/lib/scanBridge";
+
+// Read picked files to base64 (data-URL prefix included; the native side
+// strips it). Used by the Upload path so photos/PDFs run the same OCR pipeline.
+function filesToBase64(files: File[]): Promise<string[]> {
+  return Promise.all(
+    files.map(
+      (f) =>
+        new Promise<string>((resolve, reject) => {
+          const r = new FileReader();
+          r.onload = () => resolve(String(r.result));
+          r.onerror = () => reject(new Error("Could not read file."));
+          r.readAsDataURL(f);
+        }),
+    ),
+  );
+}
 
 // Actionable one-liner shown in the confirm sheet when the on-device AI model
 // didn't run, so the pilot knows how to turn it on (extraction is far better
@@ -128,6 +144,7 @@ export default function ScanImport({ mode }: { mode: Mode }) {
   // Raw capture, for the diagnostics panel (what OCR actually read + whether
   // the AI model returned anything) — the only way to tune against real docs.
   const [raw, setRaw] = useState<{ text: string; hadFm: boolean; lineCount: number } | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     let alive = true;
@@ -142,11 +159,12 @@ export default function ScanImport({ mode }: { mode: Mode }) {
 
   if (!available) return null;
 
-  async function startScan() {
+  // Shared pipeline for both the camera scan and an uploaded photo/PDF.
+  async function runScan(run: () => Promise<ScanPluginResult>) {
     setErr("");
     setPhase("scanning");
     try {
-      const result = await scanDocuments(mode);
+      const result = await run();
       setRaw({
         text: result.pages.map((p) => p.text).join("\n"),
         hadFm: mode === "flights" ? !!result.fmFlights?.length : !!result.fmDocument,
@@ -155,12 +173,12 @@ export default function ScanImport({ mode }: { mode: Mode }) {
       if (mode === "flights") {
         const heur = parseFlightsFromOcr(result.pages);
         const flights = combineFlights(result.fmFlights, heur);
-        if (!flights.length) { setErr("No flights could be read from that scan. Try again with better lighting, or add the flight manually."); setPhase("error"); return; }
+        if (!flights.length) { setErr("No flights could be read from that image. Try a clearer photo, or add the flight manually."); setPhase("error"); return; }
         setFlightRows(flights.map(flightToRow));
       } else {
         const heur = parseDocumentFromOcr(result.pages);
         const doc = combineDocument(result.fmDocument, heur);
-        if (!doc) { setErr("No document details could be read from that scan. Try again, or add the document manually."); setPhase("error"); return; }
+        if (!doc) { setErr("No document details could be read from that image. Try a clearer photo, or add the document manually."); setPhase("error"); return; }
         setDocRow(docToRow(doc));
       }
       setPhase("review");
@@ -170,6 +188,25 @@ export default function ScanImport({ mode }: { mode: Mode }) {
       setErr(msg);
       setPhase("error");
     }
+  }
+
+  function startScan() {
+    void runScan(() => scanDocuments(mode));
+  }
+
+  async function onUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    // Copy the File objects out of the live FileList BEFORE resetting the input —
+    // on WebKit, clearing input.value empties the FileList we'd otherwise read.
+    const picked = e.target.files ? Array.from(e.target.files) : [];
+    e.target.value = ""; // allow re-picking the same file
+    if (!picked.length) return;
+    let images: string[];
+    try {
+      images = await filesToBase64(picked);
+    } catch {
+      setErr("Could not read that file."); setPhase("error"); return;
+    }
+    await runScan(() => scanImages(mode, images));
   }
 
   function saveFlights() {
@@ -225,16 +262,37 @@ export default function ScanImport({ mode }: { mode: Mode }) {
 
   return (
     <>
-      <button
-        onClick={startScan}
-        disabled={phase === "scanning"}
-        className="text-sm bg-brand-600 hover:bg-brand-700 disabled:opacity-60 text-white font-medium px-3 py-1.5 rounded-lg transition inline-flex items-center gap-1.5"
-      >
-        <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2M3 12h18" />
-        </svg>
-        {phase === "scanning" ? "Scanning…" : label}
-      </button>
+      <span className="inline-flex items-center gap-2">
+        <button
+          onClick={startScan}
+          disabled={phase === "scanning"}
+          className="text-sm bg-brand-600 hover:bg-brand-700 disabled:opacity-60 text-white font-medium px-3 py-1.5 rounded-lg transition inline-flex items-center gap-1.5"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2M3 12h18" />
+          </svg>
+          {phase === "scanning" ? "Scanning…" : label}
+        </button>
+        <button
+          onClick={() => fileRef.current?.click()}
+          disabled={phase === "scanning"}
+          title="Upload a photo or PDF instead of using the camera"
+          className="text-sm bg-slate-800 hover:bg-slate-700 disabled:opacity-60 text-slate-200 font-medium px-3 py-1.5 rounded-lg transition inline-flex items-center gap-1.5"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12" />
+          </svg>
+          Upload
+        </button>
+        <input
+          ref={fileRef}
+          type="file"
+          accept="image/*,application/pdf"
+          multiple
+          className="hidden"
+          onChange={onUpload}
+        />
+      </span>
 
       {(phase === "review" || phase === "error") && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 safe-screen" onClick={(e) => { if (e.target === e.currentTarget) close(); }}>
