@@ -7,9 +7,8 @@ import FlightTable from "@/components/FlightTable";
 import ImportWizard, { WizardInput } from "@/components/ImportWizard";
 import ScanImport from "@/components/ScanImport";
 import {
-  currentPilot, flightsForCurrentPilot, pilotName,
+  currentPilot, flightsForCurrentPilot, pilotName, flightDate,
 } from "@/lib/logbook";
-import { flightDate } from "@/lib/logbook";
 import { toCSV, parseCSV, detectStructuredLogbook, buildCombinedHeaders } from "@/lib/csv";
 
 export default function LoggerPage() {

@@ -58,7 +58,8 @@ export interface ScannedDocument {
 }
 
 // Shape returned by the native plugin.
-export interface OcrLine { text: string; confidence: number }
+export interface OcrFrag { t: string; x: number }
+export interface OcrLine { text: string; confidence: number; frags?: OcrFrag[] }
 export interface OcrPage { text: string; lines: OcrLine[] }
 export interface ScanPluginResult {
   pages: OcrPage[];
@@ -85,7 +86,9 @@ const RE_REG = /\b(C-?[FGI][A-Z]{3}|N[0-9]{1,5}[A-Z]{0,2})\b/; // Canadian + N-n
 // from the route candidates below.
 const RE_ICAO = /\b(C[A-Z][A-Z0-9]{2}|K[A-Z]{3})\b/g;
 const RE_HOURS = /\b([0-9]{1,2}[.,][0-9])\b/g; // decimal tenths, logbook style
-const RE_TYPE = /\b(C-?1[5-9][0-9]|C-?2[0-9]{2}|PA-?[0-9]{2}|DA-?[0-9]{2}|BE-?[0-9]{2}|DHC-?[0-9]|CRJ-?[0-9]{3}|B7[0-9]{2}|A2[0-9]{2}|A3[0-9]{2}|PC-?12|SR2[02])\b/;
+const RE_TYPE = /\b(C-?1[5-9][0-9]|C-?2[0-9]{2}|C-?4[0-9]{2}|PA-?[0-9]{1,2}|DA-?[0-9]{2}|BE-?[0-9]{2}|DHC-?[0-9]|CRJ-?[0-9]{3}|B7[0-9]{2}|B1[89][0-9]{2}|A[23][0-9]{2}|PC-?12|SR-?2[02]|R-?[2-6][024]|EC-?1[0-9]{2}|AS-?3[0-9]{2}|AT-?[47][0-9]|SF-?50)\b/i;
+// Subset of RE_TYPE that are clearly multi-engine — hours go to `me` not `se`.
+const RE_TYPE_ME = /\b(DHC-?[6-9]|CRJ-?[0-9]{3}|B7[0-9]{2}|B1[89][0-9]{2}|A[23][0-9]{2}|AT-?[47][0-9]|BE-?5[0-9]|BE-?76|PA-?44)\b/i;
 
 const ROLE_WORDS: [RegExp, string][] = [
   [/\b(pic|p1|capt|captain|self)\b/i, "Captain"],
@@ -100,6 +103,34 @@ const ROLE_WORDS: [RegExp, string][] = [
 ];
 
 const clampConf = (n: number) => Math.max(0, Math.min(1, n));
+
+// Year/month printed once as a page header (common in Canadian TC logbooks).
+// Carried forward across pages so a multi-page scan stays consistent.
+interface DateContext { year?: number; month?: number }
+const MONTH_NAMES = [
+  ["january","jan"],["february","feb"],["march","mar"],["april","apr"],
+  ["may","may"],["june","jun"],["july","jul"],["august","aug"],
+  ["september","sep"],["october","oct"],["november","nov"],["december","dec"],
+];
+
+function extractPageDateContext(page: OcrPage): DateContext {
+  const ctx: DateContext = {};
+  for (const line of page.lines) {
+    const t = line.text;
+    if (!ctx.year) {
+      const m = t.match(/\b(20[0-9]{2}|19[0-9]{2})\b/);
+      if (m) ctx.year = parseInt(m[1], 10);
+    }
+    if (!ctx.month) {
+      const tl = t.toLowerCase();
+      for (let i = 0; i < MONTH_NAMES.length; i++) {
+        if (MONTH_NAMES[i].some((n) => tl.includes(n))) { ctx.month = i + 1; break; }
+      }
+    }
+    if (ctx.year && ctx.month) break;
+  }
+  return ctx;
+}
 
 // csv.parseAnyDate returns a [y, m, d] tuple; scans want "YYYY-MM-DD".
 function parseDateStr(s: string): string | null {
@@ -128,34 +159,56 @@ function overallOf(fields: (CF<unknown> | undefined)[]): number {
 // fills in around it with pattern-based confidence.
 export function parseFlightsFromOcr(pages: OcrPage[]): ScannedFlight[] {
   const out: ScannedFlight[] = [];
+  let carryCtx: DateContext = {};
   for (const page of pages) {
+    const pageCtx = extractPageDateContext(page);
+    // Carry year/month forward across pages (header may appear on first page only).
+    const ctx: DateContext = {
+      year: pageCtx.year ?? carryCtx.year,
+      month: pageCtx.month ?? carryCtx.month,
+    };
+    if (ctx.year || ctx.month) carryCtx = ctx;
     for (const line of page.lines) {
-      const f = parseFlightLine(line.text, line.confidence);
+      const f = parseFlightLine(line.text, line.confidence, ctx, line.frags);
       if (f) out.push(f);
     }
   }
   return out;
 }
 
-function parseFlightLine(raw: string, ocrConf: number): ScannedFlight | null {
+function parseFlightLine(raw: string, ocrConf: number, ctx?: DateContext, frags?: OcrFrag[]): ScannedFlight | null {
   const text = raw.trim();
   if (text.length < 6) return null;
 
   // Date anchors the row. Try whole segments first, then token windows.
   let date: string | null = null;
+  let dateConf = 0.9;
   const tokens = text.split(/\s+/);
   for (let w = 3; w >= 1 && !date; w--) {
     for (let i = 0; i + w <= tokens.length && !date; i++) {
       date = parseDateStr(tokens.slice(i, i + w).join(" "));
     }
   }
+  // Day-only fallback: Canadian TC logbooks print year/month once as a header;
+  // each row only has the day number. Combine with the page's date context.
+  if (!date && ctx?.year && ctx?.month) {
+    for (const token of tokens) {
+      const n = parseInt(token, 10);
+      if (n >= 1 && n <= 31 && /^\d{1,2}$/.test(token)) {
+        const m = String(ctx.month).padStart(2, "0");
+        const d = String(n).padStart(2, "0");
+        date = `${ctx.year}-${m}-${d}`;
+        dateConf = 0.7; // lower because the year/month came from a header, not this row
+        break;
+      }
+    }
+  }
   if (!date) return null;
 
   const f: ScannedFlight = { overall: 0, source: raw };
-  // OCR line confidence scales everything on the line.
   const base = clampConf(0.35 + 0.65 * ocrConf);
 
-  f.date = field(date, 0.9 * base);
+  f.date = field(date, dateConf * base);
 
   const reg = text.match(RE_REG);
   if (reg) {
@@ -166,11 +219,9 @@ function parseFlightLine(raw: string, ocrConf: number): ScannedFlight | null {
   }
 
   const type = text.match(RE_TYPE);
-  if (type) f.aircraftType = field(type[1].replace("-", "").toUpperCase(), 0.7 * base);
+  if (type) f.aircraftType = field(type[1].replace(/[-]/g, "").toUpperCase(), 0.7 * base);
 
   const icaos = [...text.matchAll(RE_ICAO)].map((m) => m[1].toUpperCase())
-    // Registration fragments ("C-GABC") and aircraft types ("CRJ900") can
-    // false-positive as ICAO codes — drop anything contained in either.
     .filter((c) => (!f.registration || !f.registration.value.replace("-", "").includes(c))
       && !(f.aircraftType && f.aircraftType.value.includes(c)));
   if (icaos.length >= 2) {
@@ -189,22 +240,30 @@ function parseFlightLine(raw: string, ocrConf: number): ScannedFlight | null {
     f.landing = field("Night" as DayNight, 0.5 * base);
   }
 
-  // Hour columns OCR as bare decimals with no headers attached; without
-  // positional information the first decimal is *probably* the block/total
-  // time. Assign conservatively and let the confirm sheet sort it out.
-  const hours = [...text.matchAll(RE_HOURS)]
+  // Hour columns are on the right side of a logbook page (x > 0.5 in normalized
+  // Vision coords). When fragment positions are available, restrict candidates to
+  // that zone so day/registration numbers in the left columns don't pollute the
+  // hour fields. Without position data fall back to scanning the full line.
+  const hourSource = frags && frags.length > 0
+    ? frags.filter((fr) => fr.x > 0.5).map((fr) => fr.t).join(" ")
+    : text;
+  const hours = [...hourSource.matchAll(RE_HOURS)]
     .map((m) => parseFloat(m[1].replace(",", ".")))
     .filter((n) => n > 0 && n <= 24);
   if (hours.length) {
-    f.se = field(hours[0], 0.4 * base);
+    const isME = f.aircraftType ? RE_TYPE_ME.test(f.aircraftType.value) : false;
+    if (isME) {
+      f.me = field(hours[0], 0.4 * base);
+    } else {
+      f.se = field(hours[0], 0.4 * base);
+    }
     if (/\b(xc|x-c|cross)\b/i.test(text) && hours.length > 1) {
       f.xc = field(hours[1], 0.45 * base);
     }
   }
 
-  f.overall = overallOf([f.date, f.registration, f.aircraftType, f.from, f.to, f.se]);
-  // A date alone isn't a flight; require one more aviation signal.
-  if (!f.registration && !f.from && !f.aircraftType && !f.se) return null;
+  f.overall = overallOf([f.date, f.registration, f.aircraftType, f.from, f.to, f.se, f.me]);
+  if (!f.registration && !f.from && !f.aircraftType && !f.se && !f.me) return null;
   return f;
 }
 

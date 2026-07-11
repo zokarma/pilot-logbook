@@ -256,12 +256,9 @@ public class ScanPlugin: CAPPlugin, CAPBridgedPlugin, VNDocumentCameraViewContro
                     continue
                 }
                 rows.append(current.sorted { $0.minX < $1.minX })
-                current = [f]
-                rowAvgY = f.midY
-            } else {
-                current = [f]
-                rowAvgY = f.midY
             }
+            current = [f]
+            rowAvgY = f.midY
         }
         if !current.isEmpty { rows.append(current.sorted { $0.minX < $1.minX }) }
         return rows
