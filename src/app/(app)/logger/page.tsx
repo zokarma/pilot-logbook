@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useData } from "@/context/DataContext";
 import FlightForm from "@/components/FlightForm";
 import FlightTable from "@/components/FlightTable";
@@ -15,16 +15,30 @@ import { toCSV, parseCSV, detectStructuredLogbook, buildCombinedHeaders } from "
 export default function LoggerPage() {
   const { data, currentUser } = useData();
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [formOpen, setFormOpen] = useState(false);
   const [csvMsg, setCsvMsg] = useState<{ text: string; kind: "ok" | "error" | "info" } | null>(null);
   const [wizard, setWizard] = useState<WizardInput | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  // Auto-open the new-flight form when the widget "Log Flight" button is tapped.
+  useEffect(() => {
+    function onNewFlight() { setFormOpen(true); window.scrollTo({ top: 0, behavior: "smooth" }); }
+    window.addEventListener("plb-new-flight", onNewFlight);
+    return () => window.removeEventListener("plb-new-flight", onNewFlight);
+  }, []);
 
   const flights = flightsForCurrentPilot(data);
   const cp = currentPilot(data);
 
   function edit(id: string) {
     setEditingId(id);
+    setFormOpen(true);
     window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  function closeForm() {
+    setEditingId(null);
+    setFormOpen(false);
   }
 
   function exportCsv() {
@@ -75,7 +89,21 @@ export default function LoggerPage() {
 
   return (
     <>
-      <FlightForm editingId={editingId} onDone={() => setEditingId(null)} />
+      {formOpen || editingId ? (
+        <FlightForm editingId={editingId} onDone={closeForm} />
+      ) : (
+        <div className="mb-6">
+          <button
+            onClick={() => setFormOpen(true)}
+            className="inline-flex items-center gap-2 bg-brand-600 hover:bg-brand-700 text-white font-medium px-5 py-2.5 rounded-lg transition"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 5v14M5 12h14" />
+            </svg>
+            Add a Flight
+          </button>
+        </div>
+      )}
 
       <div className="card p-5">
         <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
