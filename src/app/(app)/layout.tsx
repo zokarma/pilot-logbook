@@ -33,6 +33,24 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     installErrorCapture();
   }, []);
 
+  // Handle deep links from the iOS widget (pilotlogbook://new-flight → open logger + form).
+  useEffect(() => {
+    const cap = (window as unknown as { Capacitor?: { Plugins?: Record<string, unknown> } }).Capacitor;
+    const app = cap?.Plugins?.App as
+      | { addListener: (e: string, fn: (d: { url: string }) => void) => { remove: () => void } }
+      | undefined;
+    if (!app?.addListener) return;
+    const handle = app.addListener("appUrlOpen", (data) => {
+      if (data.url.includes("new-flight")) {
+        router.push("/logger");
+        setTimeout(() => window.dispatchEvent(new Event("plb-new-flight")), 350);
+      } else if (data.url.includes("logger")) {
+        router.push("/logger");
+      }
+    });
+    return () => { handle.remove(); };
+  }, [router]);
+
   useEffect(() => {
     if (ready && !currentUser) router.replace("/login");
   }, [ready, currentUser, router]);

@@ -44,6 +44,39 @@ interface DataCtx {
   deleteAccount: () => Promise<{ error?: string }>;
 }
 
+// Push logbook summary to the iOS home-screen widget via WidgetPlugin.
+// Fire-and-forget: failures are silent (web browser has no plugin).
+function writeWidgetData(data: AppData): void {
+  const cap = (window as unknown as { Capacitor?: { Plugins?: Record<string, unknown> } }).Capacitor;
+  const plugin = cap?.Plugins?.Widget as
+    | { setData: (d: Record<string, unknown>) => Promise<void> }
+    | undefined;
+  if (!plugin?.setData) return;
+
+  const today = new Date().toISOString().slice(0, 10);
+  const month = today.slice(0, 7);
+  const year  = today.slice(0, 4);
+  const sum = (prefix: string) =>
+    (data.flights ?? []).filter((f) => (f.date ?? "").startsWith(prefix))
+      .reduce((t, f) => t + (f.se ?? 0) + (f.me ?? 0), 0);
+
+  let nextExpiryLabel = "", nextExpiryDate = "", nextExpiryDays = -1;
+  const now = Date.now();
+  for (const doc of data.documents ?? []) {
+    if (!doc.expiryDate) continue;
+    const ms = new Date(doc.expiryDate).getTime();
+    const days = Math.ceil((ms - now) / 86_400_000);
+    if (days < 0) continue;
+    if (nextExpiryDays < 0 || days < nextExpiryDays) {
+      nextExpiryDays = days; nextExpiryDate = doc.expiryDate; nextExpiryLabel = doc.type ?? "";
+    }
+  }
+  void plugin.setData({
+    hoursToday: sum(today), hoursThisMonth: sum(month), hoursThisYear: sum(year),
+    nextExpiryLabel, nextExpiryDate, nextExpiryDays,
+  });
+}
+
 const Ctx = createContext<DataCtx | null>(null);
 
 export function useData(): DataCtx {
@@ -170,6 +203,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   // Persist: local cache immediately; cloud push (debounced) if signed in.
   const scheduleSync = useCallback((next: AppData) => {
     if (cacheKeyRef.current) saveCache(cacheKeyRef.current, next);
+    writeWidgetData(next);
     if (!cloud || !uidRef.current) return;
     if (saveTimer.current) clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(() => { void pushState(); }, 600);
