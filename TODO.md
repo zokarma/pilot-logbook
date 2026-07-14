@@ -62,6 +62,14 @@ Work through top to bottom; each section unblocks the next.
 
 ## Later / nice-to-have
 
+- [ ] **Marketing home page** before the login screen (currently `/` redirects
+      straight to the app): what the app does, screenshots, App Store badge,
+      Sign Up / Log In buttons, and a footer link to `/privacy`. Native app
+      should keep launching straight into the logbook.
+- [ ] **403studio.ca**: upload the standalone privacy policy
+      (`~/Desktop/pilot-logbook-privacy-policy.html`) or just link to
+      `https://pilotlogbook.ca/privacy`; add a Pilot Logbook product blurb.
+
 - [ ] OCR tuning round 2 with real raw-scan samples (Claude).
 - [ ] iPad layout pass, then re-enable iPad destination.
 - [ ] Duplicate guard for the CSV Import Wizard (scan sheet already has it).
