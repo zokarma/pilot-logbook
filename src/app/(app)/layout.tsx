@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useData } from "@/context/DataContext";
 import { installErrorCapture } from "@/lib/recentErrors";
@@ -8,13 +8,61 @@ import Sidebar from "@/components/Sidebar";
 import TopBar from "@/components/TopBar";
 import Onboarding from "@/components/Onboarding";
 
+const NAV_OPEN_KEY = "plb_nav_open";
+
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { ready, currentUser, data } = useData();
   const router = useRouter();
 
+  // Sidebar visibility — per-device preference, defaulting open on desktop
+  // and hidden on phones (full-screen content). Read after mount so the
+  // prerendered HTML and first client render agree.
+  const [navOpen, setNavOpen] = useState(true);
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(NAV_OPEN_KEY);
+      setNavOpen(stored !== null ? stored === "1" : window.innerWidth >= 1024);
+    } catch { /* keep default */ }
+  }, []);
+  const setNav = useCallback((open: boolean) => {
+    setNavOpen(open);
+    try { localStorage.setItem(NAV_OPEN_KEY, open ? "1" : "0"); } catch { /* ignore */ }
+  }, []);
+
   useEffect(() => {
     installErrorCapture();
   }, []);
+
+  // Handle deep links from the iOS widget (pilotlogbook://new-flight → open logger + form).
+  // Two paths: appUrlOpen fires when the app is warm; getLaunchUrl covers a cold
+  // launch, where the event is emitted before this listener exists. The
+  // new-flight intent is ALSO parked in sessionStorage because on a cold start
+  // the logger page may not be mounted yet (auth/data still loading) when the
+  // event is dispatched — the logger consumes the flag on mount.
+  useEffect(() => {
+    const cap = (window as unknown as { Capacitor?: { Plugins?: Record<string, unknown> } }).Capacitor;
+    const app = cap?.Plugins?.App as
+      | {
+          addListener: (e: string, fn: (d: { url: string }) => void) => { remove: () => void };
+          getLaunchUrl?: () => Promise<{ url: string } | null | undefined>;
+        }
+      | undefined;
+    if (!app?.addListener) return;
+
+    const handleUrl = (url: string) => {
+      if (url.includes("new-flight")) {
+        try { sessionStorage.setItem("plb_pending_new_flight", "1"); } catch { /* ignore */ }
+        router.push("/logger");
+        setTimeout(() => window.dispatchEvent(new Event("plb-new-flight")), 350);
+      } else if (url.includes("logger")) {
+        router.push("/logger");
+      }
+    };
+
+    const handle = app.addListener("appUrlOpen", (data) => handleUrl(data.url));
+    void app.getLaunchUrl?.().then((d) => { if (d?.url) handleUrl(d.url); });
+    return () => { handle.remove(); };
+  }, [router]);
 
   useEffect(() => {
     if (ready && !currentUser) router.replace("/login");
@@ -34,10 +82,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-screen flex bg-slate-950">
-      <Sidebar />
+      <Sidebar open={navOpen} onClose={() => setNav(false)} />
       <div className="flex-1 flex flex-col min-w-0">
-        <TopBar />
-        <main className="flex-1 w-full px-4 lg:px-8 pt-6 pb-24 fade-in">{children}</main>
+        <TopBar navOpen={navOpen} onToggleNav={() => setNav(!navOpen)} />
+        <main className="flex-1 w-full px-4 lg:px-8 pt-6 pb-24 fade-in safe-right">{children}</main>
       </div>
     </div>
   );

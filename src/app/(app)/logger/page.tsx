@@ -1,29 +1,53 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useData } from "@/context/DataContext";
 import FlightForm from "@/components/FlightForm";
 import FlightTable from "@/components/FlightTable";
 import ImportWizard, { WizardInput } from "@/components/ImportWizard";
+import ScanImport from "@/components/ScanImport";
 import {
-  currentPilot, flightsForCurrentPilot, pilotName,
+  currentPilot, flightsForCurrentPilot, pilotName, flightDate,
 } from "@/lib/logbook";
-import { flightDate } from "@/lib/logbook";
 import { toCSV, parseCSV, detectStructuredLogbook, buildCombinedHeaders } from "@/lib/csv";
 
 export default function LoggerPage() {
   const { data, currentUser } = useData();
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [formOpen, setFormOpen] = useState(false);
   const [csvMsg, setCsvMsg] = useState<{ text: string; kind: "ok" | "error" | "info" } | null>(null);
   const [wizard, setWizard] = useState<WizardInput | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  // Auto-open the new-flight form when the widget "Log Flight" button is tapped.
+  // The event covers the warm-app case; the sessionStorage flag (parked by the
+  // app layout's deep-link handler) covers a cold launch where this page wasn't
+  // mounted yet when the event fired.
+  useEffect(() => {
+    function onNewFlight() {
+      try { sessionStorage.removeItem("plb_pending_new_flight"); } catch { /* ignore */ }
+      setFormOpen(true);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+    try {
+      if (sessionStorage.getItem("plb_pending_new_flight")) onNewFlight();
+    } catch { /* ignore */ }
+    window.addEventListener("plb-new-flight", onNewFlight);
+    return () => window.removeEventListener("plb-new-flight", onNewFlight);
+  }, []);
 
   const flights = flightsForCurrentPilot(data);
   const cp = currentPilot(data);
 
   function edit(id: string) {
     setEditingId(id);
+    setFormOpen(true);
     window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  function closeForm() {
+    setEditingId(null);
+    setFormOpen(false);
   }
 
   function exportCsv() {
@@ -74,7 +98,21 @@ export default function LoggerPage() {
 
   return (
     <>
-      <FlightForm editingId={editingId} onDone={() => setEditingId(null)} />
+      {formOpen || editingId ? (
+        <FlightForm editingId={editingId} onDone={closeForm} />
+      ) : (
+        <div className="mb-6">
+          <button
+            onClick={() => setFormOpen(true)}
+            className="inline-flex items-center gap-2 bg-brand-600 hover:bg-brand-700 text-white font-medium px-5 py-2.5 rounded-lg transition"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 5v14M5 12h14" />
+            </svg>
+            Add a Flight
+          </button>
+        </div>
+      )}
 
       <div className="card p-5">
         <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
@@ -86,6 +124,7 @@ export default function LoggerPage() {
             </span>
           </div>
           <div className="flex items-center gap-2">
+            <ScanImport mode="flights" />
             <button onClick={exportCsv} className="text-sm bg-slate-800 hover:bg-slate-700 text-slate-200 font-medium px-3 py-1.5 rounded-lg transition">Export CSV</button>
             <button onClick={() => fileRef.current?.click()} className="text-sm bg-slate-800 hover:bg-slate-700 text-slate-200 font-medium px-3 py-1.5 rounded-lg transition">Import CSV</button>
             <input ref={fileRef} type="file" accept=".csv,text/csv" className="hidden" onChange={onFile} />

@@ -129,9 +129,9 @@ export default function FlightForm({
     <div className="card p-5 mb-6">
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-lg font-semibold">{editing ? "Edit Flight" : "Log a Flight"}</h2>
-        {editing && (
-          <button onClick={onDone} className="text-sm text-slate-400 hover:text-slate-200">Cancel edit</button>
-        )}
+        <button onClick={onDone} className="text-sm text-slate-400 hover:text-slate-200">
+          {editing ? "Cancel edit" : "Close"}
+        </button>
       </div>
       <form onSubmit={submit} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <Field label="Date">

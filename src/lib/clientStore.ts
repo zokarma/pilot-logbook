@@ -10,6 +10,40 @@ const cacheKey = (u: string) => "plb_cache_" + u;
 const baseKey = (u: string) => "plb_base_" + u;
 const LOCAL_USERS_KEY = "plb_local_users";
 const LOCAL_SESSION_KEY = "plb_local_session";
+const LAST_USER_KEY = "plb_last_user";
+
+// The last cloud user who signed in on this device. Lets the app open their
+// mirrored logbook instantly on launch (before — or entirely without — the
+// network), so a pilot is never locked out mid-trip by an expired token.
+export interface LastUser {
+  uid: string;
+  email: string;
+}
+
+export function loadLastUser(): LastUser | null {
+  try {
+    const raw = localStorage.getItem(LAST_USER_KEY);
+    return raw ? (JSON.parse(raw) as LastUser) : null;
+  } catch {
+    return null;
+  }
+}
+
+export function saveLastUser(u: LastUser): void {
+  try {
+    localStorage.setItem(LAST_USER_KEY, JSON.stringify(u));
+  } catch {
+    /* ignore */
+  }
+}
+
+export function clearLastUser(): void {
+  try {
+    localStorage.removeItem(LAST_USER_KEY);
+  } catch {
+    /* ignore */
+  }
+}
 
 export function loadCache(user: string): AppData | null {
   try {

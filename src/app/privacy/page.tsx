@@ -10,65 +10,65 @@ export default function PrivacyPage() {
   return (
     <div className="min-h-screen flex justify-center p-4 sm:p-8">
       <div className="w-full max-w-2xl card p-6 sm:p-8 my-6">
-        <h1 className="text-2xl font-bold text-white mb-1">Privacy Policy</h1>
-        <p className="text-sm text-slate-400 mb-6">Last updated: July 4, 2026</p>
+        <h1 className="text-2xl font-bold text-white mb-1">Privacy Policy — Pilot Logbook</h1>
+        <p className="text-sm text-slate-400 mb-6">Last updated: July 14, 2026</p>
 
         <div className="space-y-6 text-sm text-slate-300 leading-relaxed">
           <p>
-            Pilot Logbook (&quot;the app&quot;) is a personal flight-logging tool. This policy
-            explains what data we collect, how it&apos;s stored, and the choices you have. By
-            creating an account you agree to this policy.
+            Pilot Logbook is built and published by 403 Studio. We understand the critical nature
+            of flight deck data and are committed to maintaining the absolute confidentiality of
+            your logs and duty metrics. This policy outlines how your data is handled.
           </p>
 
           <section>
-            <h2 className="text-base font-semibold text-white mb-2">What we collect</h2>
-            <ul className="list-disc pl-5 space-y-1">
-              <li><b>Account:</b> your email address and a password (used only to sign you in).</li>
-              <li><b>Logbook data you enter:</b> flights, pilot profiles, duty days, and related notes.</li>
-              <li><b>Bug reports (if you file one):</b> your description plus basic diagnostics (app version, current tab, browser/device info). Screenshots you attach stay on your device and are never uploaded.</li>
-            </ul>
-          </section>
-
-          <section>
-            <h2 className="text-base font-semibold text-white mb-2">How it&apos;s stored</h2>
+            <h2 className="text-base font-semibold text-white mb-2">1. Flight Data &amp; Privacy</h2>
             <p>
-              Your data is stored in our cloud database (Supabase) and mirrored to your device for
-              offline use. Access is protected by Row Level Security, so <b>you can only ever read or
-              write your own data</b> — no other user can access it. Authentication is handled by
-              Supabase Auth.
+              Pilot Logbook allows you to log flight entries, block times, air times, landing
+              counts, night calculations, duty tracking parameters, and aviation documents. Your
+              flight logs are securely backed up on our Supabase server and can be accessed by PC
+              or on your iOS device using your own credentials—which we do not have access to. We
+              will <b>never</b> share, sell, or monetize your flight logs.
             </p>
           </section>
 
           <section>
-            <h2 className="text-base font-semibold text-white mb-2">How we use it</h2>
+            <h2 className="text-base font-semibold text-white mb-2">2. Cloud Synchronization &amp; Accounts</h2>
             <p>
-              We use your data solely to provide the app&apos;s features (storing and displaying your
-              logbook, syncing across your devices, and responding to bug reports). We do <b>not</b>
-              sell your data, and we do <b>not</b> share it with third parties for advertising.
+              By signing into your Pilot Logbook account on your iPhone or iPad, your logbook data
+              is synchronized securely with our website database. This ensures your logs are backed
+              up and accessible from any supported browser on PC or iOS devices.
             </p>
           </section>
 
           <section>
-            <h2 className="text-base font-semibold text-white mb-2">Third-party services</h2>
+            <h2 className="text-base font-semibold text-white mb-2">3. Device Permissions &amp; SDKs</h2>
             <p>
-              We rely on Supabase (database, authentication) and Resend (sending account-confirmation
-              emails). These providers process data only to deliver those functions on our behalf.
+              Pilot Logbook requests camera access for one purpose only: scanning your paper
+              logbook pages and aviation documents so you can import them without retyping.
+              <b> All scanning is processed entirely on your device</b>—text recognition and AI
+              extraction run locally, and your scanned images are never uploaded to our servers or
+              any third party. Only the entries you review and save become part of your logbook.
+              The app does not request access to GPS Location Services, Contacts, or Microphone,
+              and does not integrate any third-party behavioral tracking SDKs. If you add the home
+              screen widget, your hour totals and next document expiry are stored on your device
+              only.
             </p>
           </section>
 
           <section>
-            <h2 className="text-base font-semibold text-white mb-2">Deleting your account and data</h2>
+            <h2 className="text-base font-semibold text-white mb-2">4. GDPR &amp; CCPA Rights</h2>
             <p>
-              You can permanently delete your account at any time from within the app
-              (<b>Log&nbsp;Out menu → Delete account</b>). Deletion removes your account and all
-              associated logbook data from our database. You may also email us to request deletion.
+              You have full control over your data. You can access, export, modify, or delete your
+              account and all associated flight logs at any time directly through the app settings
+              or by logging into your profile on our website.
             </p>
           </section>
 
           <section>
-            <h2 className="text-base font-semibold text-white mb-2">Contact</h2>
+            <h2 className="text-base font-semibold text-white mb-2">5. Contact Information</h2>
             <p>
-              Questions or deletion requests: <a href="mailto:privacy@pilotlogbook.ca" className="text-cyan-400 hover:text-cyan-300">privacy@pilotlogbook.ca</a>.
+              If you have questions regarding data privacy on the flight deck, please contact us
+              at: <a href="mailto:support@403studio.ca" className="text-cyan-400 hover:text-cyan-300">support@403studio.ca</a>
             </p>
           </section>
         </div>
