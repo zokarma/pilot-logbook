@@ -104,18 +104,27 @@ function mergeById<T>(
   return out;
 }
 
-// Same three-way logic for the duty Record<dateKey, DutyEntry>.
+// Same three-way logic for the duty Record<dateKey, DutyEntry>. The entry's
+// updatedAt is hoisted onto the wrapper (and stripped from the inner entry) so
+// mergeById reads the stamp where it lives — otherwise every duty conflict
+// looks unstamped, ties always keep local, and two devices editing the same
+// duty day never converge.
 function mergeDuty(
   base: Record<string, DutyEntry> | undefined,
   local: Record<string, DutyEntry>,
   remote: Record<string, DutyEntry>,
 ): Record<string, DutyEntry> {
-  type Keyed = { key: string; entry: DutyEntry };
+  type Keyed = { key: string; updatedAt?: string; entry: DutyEntry };
   const toList = (rec: Record<string, DutyEntry> | undefined): Keyed[] =>
-    Object.entries(rec ?? {}).map(([key, entry]) => ({ key, entry }));
+    Object.entries(rec ?? {}).map(([key, entry]) => {
+      const { updatedAt, ...rest } = entry;
+      return { key, updatedAt, entry: rest as DutyEntry };
+    });
   const merged = mergeById(toList(base), toList(local), toList(remote), (k) => k.key, "updatedAt");
   const out: Record<string, DutyEntry> = {};
-  for (const { key, entry } of merged) out[key] = entry;
+  for (const k of merged) {
+    out[k.key] = k.updatedAt !== undefined ? { ...k.entry, updatedAt: k.updatedAt } : k.entry;
+  }
   return out;
 }
 
