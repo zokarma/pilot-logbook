@@ -50,21 +50,17 @@ export function run(): Suite {
     ];
     const text = toCSV(flights);
 
-    // The app's own export header contains "Single Engine", which trips
-    // detectStructuredLogbook — this check documents whether the app can
-    // re-import its own backup.
-    const own = importCSV(mkData(), text, []);
+    // Backup round-trip: the app must be able to re-import its OWN export.
+    // Regression guard for D2 — "Single Engine" in the flat export header used
+    // to trip detectStructuredLogbook and route the backup into the structured
+    // path, where it died with "Couldn't find a Date column".
+    const res = importCSV(mkData(), text, []);
     s.check(
       "the app can re-import its OWN export (backup round-trip)",
-      own.added === 3,
-      `added=${own.added} error=${own.error ?? "none"} — "Single Engine" in the export header routes the file into the structured-logbook path, whose mangled headers then fail`,
+      res.added === 3 && res.skipped === 0,
+      `added=${res.added} error=${res.error ?? "none"}`,
     );
-
-    // Field fidelity, isolated from the detector defect: same rows, with the
-    // one trigger header renamed to its field alias ("se").
-    const res = importCSV(mkData(), text.replace("Single Engine", "se"), []);
     const [g1, g2, g3] = [res.data.flights[0], res.data.flights[1], res.data.flights[2]];
-    s.check("round-trip (patched header): all rows re-imported", res.added === 3 && res.skipped === 0);
     s.check("round-trip: dates survive", g1?.date === "2026-07-01" && g3?.date === "2026-07-03");
     s.check("round-trip: gnarly notes survive exactly", g1?.notes === 'He said "go, now"\nthen left');
     s.check("round-trip: night takeoff/landing survive", g2?.takeoff === "Night" && g2?.landing === "Night");
@@ -72,10 +68,8 @@ export function run(): Suite {
     s.check("round-trip: registration restored from the Registration column", g1?.registration === "C-GABC");
     s.check("round-trip: logged role survives", g3?.loggedRole === "First Officer");
 
-    if (res.added === 3) {
-      const again = importCSV(clone(res.data), text.replace("Single Engine", "se"), []);
-      s.probe("re-importing the same file", `no dedupe on flat import — importing the same CSV twice yields ${again.data.flights.length} flights from 3 rows. The scan confirm sheet flags duplicates; the CSV path does not.`);
-    }
+    const again = importCSV(clone(res.data), text, []);
+    s.probe("re-importing the same file", `no dedupe on flat import — importing the same CSV twice yields ${again.data.flights.length} flights from 3 rows. The scan confirm sheet flags duplicates; the CSV path does not.`);
   }
 
   // -- rejection / skip accounting --

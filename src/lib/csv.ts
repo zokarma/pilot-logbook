@@ -127,7 +127,20 @@ export function parseAnyDate(input: string, fallbackYear?: number | null): [numb
 
 export function detectStructuredLogbook(rows: string[][]): number {
   for (let i = 0; i < Math.min(8, rows.length); i++) {
-    if (rows[i].some((c) => /single\s*engine/i.test(c || ""))) return i;
+    const row = rows[i];
+    if (!row.some((c) => /single\s*engine/i.test(c || ""))) continue;
+    // The app's own flat export header ALSO contains "Single Engine" (as a
+    // complete column beside a Date column), so this alone can't distinguish a
+    // grouped Transport-Canada logbook from a flat backup. In a structured
+    // logbook "SINGLE ENGINE" is a group header spanning sub-columns, with the
+    // real field names (incl. Date) on a lower row; in a flat export the same
+    // row is itself a usable header. Only take the structured branch when this
+    // row is NOT a flat header (no standalone Date / Year-Month-Day columns).
+    const cells = row.map((c) => (c || "").trim().toLowerCase());
+    const hasFlatDate = cells.includes("date");
+    const hasYMD = cells.includes("year") && cells.includes("month") && cells.includes("day");
+    if (hasFlatDate || hasYMD) continue;
+    return i;
   }
   return -1;
 }

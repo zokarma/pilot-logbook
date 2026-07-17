@@ -103,6 +103,12 @@ export function run(): Suite {
     const le = mkData({ duty: { d: { on: true, hours: 9, updatedAt: stampAt(1000) } } });
     const re = mkData({ duty: { d: { on: true, hours: 12, updatedAt: stampAt(2000) } } });
     s.check("duty: concurrent edit resolves to newer stamp", mergeAppData(be, le, re).duty["d"].hours === 12);
+    // D1 regression: both devices must land on the same value (the fix that
+    // makes mergeById actually see the duty entry's updatedAt).
+    const dutyA = mergeAppData(be, le, re).duty["d"].hours;
+    const dutyB = mergeAppData(be, re, le).duty["d"].hours;
+    s.check("duty: both devices converge on the newer value", dutyA === 12 && dutyB === 12);
+    s.check("duty: merged entry keeps its updatedAt stamp", mergeAppData(be, le, re).duty["d"].updatedAt === stampAt(2000));
   }
 
   // -- singleton fields: changed-from-base side wins --

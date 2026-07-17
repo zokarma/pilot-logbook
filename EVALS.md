@@ -13,14 +13,14 @@ npx tsx evals/run.ts
 - **probe** = recorded behavior worth knowing (design limits, domain-accuracy
   gaps, guard-rail assumptions). Probes never fail the run.
 
-**Last run: 2026-07-17 — 187/189 checks passed, 2 real defects found, 16 probes.**
+**Last run: 2026-07-17 — 190/190 checks passed, 16 probes. Both defects below are now FIXED (their checks are green and stay in the suite as regression tests).**
 
 | # | Feature | Suite | Result | Why it ranks here |
 |---|---------|-------|--------|-------------------|
-| 1 | Sync merge engine (`merge.ts`) | `evals/merge.eval.ts` | ⚠️ 24/25 | Silent data loss on a legal record is the worst possible failure |
+| 1 | Sync merge engine (`merge.ts`) | `evals/merge.eval.ts` | ✅ 27/27 | Silent data loss on a legal record is the worst possible failure |
 | 2 | Data migration (`migrate.ts`) | `evals/migrate.eval.ts` | ✅ 22/22 | Runs on every load for every user; a bad upgrade corrupts everyone at once |
 | 3 | TC document expiry math (`documents.ts`) | `evals/documents.eval.ts` | ✅ 28/28 | A wrong expiry can tell a pilot an invalid medical is valid |
-| 4 | CSV import/export (`csv.ts`) | `evals/csv.eval.ts` | ⚠️ 31/32 | The de-facto backup/restore path; row corruption multiplies |
+| 4 | CSV import/export (`csv.ts`) | `evals/csv.eval.ts` | ✅ 31/31 | The de-facto backup/restore path; row corruption multiplies |
 | 5 | OCR scan parser (`scan.ts`) | `evals/scan.eval.ts` | ✅ 33/33 | Newest data-entry path; heuristic accuracy + honest confidence flagging |
 | 6 | Pilot dedupe & merge (`pilots.ts`) | `evals/pilots.eval.ts` | ✅ 17/17 | Destructive ops that rewrite flight references |
 | 7 | IDs & flight mirrors (`id.ts`, `logbook.ts`) | `evals/core.eval.ts` | ✅ 12/12 | Duplicate ids / drifting mirrors corrupt everything downstream |
@@ -29,50 +29,45 @@ npx tsx evals/run.ts
 
 ---
 
-## Defects found (failing checks — fix these)
+## Defects found and FIXED
 
-### D1 · HIGH — Duty entries ignore their `updatedAt` in conflict resolution
-`merge.ts` · shown by `duty: concurrent edit resolves to newer stamp`
+### D1 · HIGH — Duty entries ignored their `updatedAt` in conflict resolution ✅ FIXED
+`merge.ts` · regression-guarded by `duty: both devices converge on the newer value`
 
-`mergeDuty` wraps each entry as `{ key, entry }` before calling `mergeById(…, "updatedAt")`,
-but the stamp comparator reads `updatedAt` off that **wrapper**, where it never
-exists. Both sides always look unstamped, so ties always keep local:
+`mergeDuty` wrapped each entry as `{ key, entry }` before calling
+`mergeById(…, "updatedAt")`, but the stamp comparator read `updatedAt` off that
+**wrapper**, where it never existed. Both sides always looked unstamped, so ties
+always kept local, and two devices editing the same duty day **never converged**
+— the server held one device's value while the other kept displaying its own.
+Flights/pilots/documents were unaffected (their stamps live on the entity).
 
-- Two devices editing the same duty day **never converge** — after the sync
-  settles, the server holds one device's value while the other device keeps
-  displaying its own (its merged result equals its local state, so it never
-  re-pushes).
-- Flights/pilots/documents are unaffected (their stamps live on the entity itself).
+**Fix applied:** `mergeDuty` now hoists `updatedAt` onto the wrapper and strips
+it from the inner entry, so `mergeById`/`pickNewer` see the stamp; the entry's
+stamp is restored on unwrap. Evals now assert both devices converge on the newer
+value and the merged entry keeps its stamp.
 
-**Fix sketch:** hoist the stamp when building the keyed list —
-`{ key, updatedAt: entry.updatedAt, entry: {…entry, updatedAt: undefined} }` —
-and restore it when unwrapping; then the existing `pickNewer`/`sameIgnoringStamp`
-logic works unchanged. Add the eval as the regression test.
-
-### D2 · HIGH — The app cannot re-import its own CSV export
-`csv.ts` · shown by `the app can re-import its OWN export (backup round-trip)`
+### D2 · HIGH — The app could not re-import its own CSV export ✅ FIXED
+`csv.ts` · regression-guarded by `the app can re-import its OWN export (backup round-trip)`
 
 `toCSV` writes a header containing **"Single Engine"**, and
-`detectStructuredLogbook` treats any early row containing that phrase as a
-structured Transport-Canada logbook. The app's own flat export therefore routes
-into `importStructuredLogbook`, `buildCombinedHeaders` mashes the header with the
-first two *data* rows, no Date column is found, and the import dies with
-*"Couldn't find a Date column in this logbook."* The same misdetection feeds the
-live Import Wizard (`logger/page.tsx` runs `detectStructuredLogbook` → passes
-`buildCombinedHeaders` output as the wizard's headers), so the wizard's suggested
-mappings are polluted too — a pilot restoring a backup sees garbage column names.
+`detectStructuredLogbook` treated any early row containing that phrase as a
+structured Transport-Canada logbook. The app's own flat export therefore routed
+into `importStructuredLogbook`, `buildCombinedHeaders` mashed the header with the
+first two *data* rows, no Date column was found, and the import died with
+*"Couldn't find a Date column in this logbook."* The same misdetection fed the
+live Import Wizard (`logger/page.tsx`), polluting its suggested mappings too.
 
-**Fix sketch:** try the flat header map first and prefer it when it yields a
-Date (or Year/Month/Day) column; or require structural evidence for the
-structured branch (e.g. the "Single Engine" row must NOT also parse as a
-complete flat header — the export's row 0 matches `CSV_HEADERS` exactly).
-Either way, `importCSV(toCSV(x))` re-importing cleanly is the regression test.
+**Fix applied:** `detectStructuredLogbook` now skips a "Single Engine" row that
+is itself a usable flat header (one that also carries a standalone `Date`, or
+`Year`+`Month`+`Day`, column) — a grouped TC logbook keeps its real field-name
+header on a *lower* row, so genuine structured detection is unchanged. Backup
+round-trip (`importCSV(toCSV(x))`) now re-imports cleanly.
 
 ---
 
 ## Findings by feature (probes — decide, then fix or accept)
 
-### 1 · Sync merge engine — 24/25
+### 1 · Sync merge engine — 27/27 (D1 fixed)
 Verified: offline adds union; deletes propagate via base with **edit-beats-delete**
 in both directions; newer-stamp wins for flights/pilots; no-base degrades to a
 lossless union; unknown top-level keys survive; `stampChanges` stamps exactly the
@@ -119,7 +114,7 @@ and the expired path; manual docs untouched by recalc.
   is conservative. *Improve:* an ops-context toggle on the profile, or a note in
   the Documents UI.
 
-### 4 · CSV import/export — 31/32
+### 4 · CSV import/export — 31/31 (D2 fixed)
 Verified: RFC-4180 parsing (quoted commas/quotes/newlines, CRLF); the full date
 matrix incl. D/M-day>12 disambiguation and the 49/50 two-digit-year split; flat
 round-trip fidelity for dates, gnarly notes, night flags, hours, registration,
@@ -222,5 +217,6 @@ has sane lat/lon; the autocomplete list covers the DB and is pre-sorted.
 ## Suggested cadence
 
 Run `npx tsx evals/run.ts` before every release (it's seconds, no network).
-D1/D2 stay as red checks until fixed — they double as regression tests. When a
-finding is fixed, flip its probe into a hard check in the same commit.
+The run is fully green today; the D1/D2 checks now double as regression tests.
+When another finding (F-series probe) is fixed, flip its probe into a hard check
+in the same commit.
