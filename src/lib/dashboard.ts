@@ -3,7 +3,7 @@
 
 import { AppData } from "./types";
 import { dstr, flightDate, totalHours } from "./logbook";
-import { operationLimits } from "./dutyLimits";
+import { effectiveLimits } from "./dutyLimits";
 
 export const DASH_METRICS: { section: string; items: [string, string][] }[] = [
   { section: "Flight Stats", items: [["totalTime", "Total Time"], ["currentMonth", "Current Month"], ["annualTotal", "Annual Total"], ["totalFlights", "Total Flights"]] },
@@ -20,7 +20,7 @@ export function isHidden(data: AppData, key: string): boolean {
 
 // Active Duty — today + trailing 7 days of recorded duty hours.
 export function computeActiveDuty(data: AppData) {
-  const limits = operationLimits(data.profile?.carsSubpart);
+  const limits = effectiveLimits(data.profile);
   const todayKey = dstr(new Date());
   const todayEntry = data.duty[todayKey];
   const dailyHrs = todayEntry && todayEntry.hours ? +todayEntry.hours : 0;
@@ -42,11 +42,11 @@ export function computeActiveDuty(data: AppData) {
   return { dailyHrs, dailyCap, dailyPct, weeklyHrs, weeklyCap, weeklyPct, operation: limits.label };
 }
 
-// CARs Part VII reference gauges.
-// Monthly: rolling 28-day flight time vs 192h. Rest: smallest recorded gap
-// between consecutive duty days (trailing 14 days) vs the 12h minimum.
+// CARs Part VII reference gauges, using the limit set for the pilot's operation.
+// Monthly: rolling 28-day flight time vs that operation's cap. Rest: smallest
+// recorded gap between consecutive duty days (trailing 14 days) vs the minimum.
 export function computeCars(data: AppData) {
-  const limits = operationLimits(data.profile?.carsSubpart);
+  const limits = effectiveLimits(data.profile);
   const pid = data.currentPilotId;
   const fl = data.flights.filter((x) => !pid || x.pilotId === pid);
   const now = new Date();
