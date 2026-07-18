@@ -20,6 +20,7 @@ import {
   parseFlightsFromOcr, parseDocumentFromOcr, combineFlights, combineDocument,
 } from "@/lib/scan";
 import { scanAvailability, scanDocuments, scanImages, AiReason } from "@/lib/scanBridge";
+import { cloudScanAvailable, cloudExtract } from "@/lib/cloudScan";
 
 // Read picked files to base64 (data-URL prefix included; the native side
 // strips it). Used by the Upload path so photos/PDFs run the same OCR pipeline.
@@ -153,6 +154,11 @@ export default function ScanImport({ mode }: { mode: Mode }) {
   // the AI model returned anything) — the only way to tune against real docs.
   const [raw, setRaw] = useState<{ text: string; hadFm: boolean; lineCount: number } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  // Cloud AI (scan-extract Edge Function): the ONLY engine on the website
+  // (no on-device OCR there), an explicit opt-in for uploads in the iOS app.
+  const cloudOk = cloudScanAvailable();
+  const [useCloud, setUseCloud] = useState(false);
+  const [usedCloud, setUsedCloud] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -165,7 +171,9 @@ export default function ScanImport({ mode }: { mode: Mode }) {
     return () => { alive = false; };
   }, []);
 
-  if (!available) return null;
+  // Native camera OR cloud AI must be usable; otherwise (local-only website)
+  // the scan UI hides itself entirely.
+  if (!available && !cloudOk) return null;
 
   // Shared pipeline for both the camera scan and an uploaded photo/PDF.
   // `append` = the pilot is adding pages from the confirm sheet: new rows join
@@ -236,7 +244,34 @@ export default function ScanImport({ mode }: { mode: Mode }) {
     } catch {
       setErr("Could not read that file."); setPhase(append ? "review" : "error"); return;
     }
-    await runScan(() => scanImages(mode, images), append);
+    if (!append) setUsedCloud(false);
+
+    if (available) {
+      // iOS: on-device OCR always runs; cloud AI replaces the on-device model
+      // extraction when the pilot opted in. A cloud failure never kills the
+      // scan — the on-device result still shows, with a notice.
+      await runScan(async () => {
+        const res = await scanImages(mode, images);
+        if (useCloud && cloudOk) {
+          try {
+            const fm = await cloudExtract(mode, images);
+            if (mode === "flights" && fm.flights?.length) res.fmFlights = fm.flights;
+            if (mode === "document" && fm.document) res.fmDocument = fm.document;
+            setUsedCloud(true);
+          } catch (e) {
+            setErr(`Cloud AI unavailable (${e instanceof Error ? e.message : "error"}) — showing on-device results.`);
+          }
+        }
+        return res;
+      }, append);
+    } else {
+      // Website: no on-device OCR — cloud AI is the whole pipeline.
+      await runScan(async () => {
+        const fm = await cloudExtract(mode, images);
+        setUsedCloud(true);
+        return { pages: [], fmFlights: fm.flights, fmDocument: fm.document };
+      }, append);
+    }
   }
 
   function saveFlights() {
@@ -285,35 +320,44 @@ export default function ScanImport({ mode }: { mode: Mode }) {
   }
 
   function close() {
-    setPhase("idle"); setFlightRows([]); setDocRow(null); setErr(""); setRaw(null);
+    setPhase("idle"); setFlightRows([]); setDocRow(null); setErr(""); setRaw(null); setUsedCloud(false);
   }
 
   const label = mode === "flights" ? "Scan Logbook" : "Scan Document";
 
   return (
     <>
-      <span className="inline-flex items-center gap-2">
-        <button
-          onClick={startScan}
-          disabled={phase === "scanning"}
-          className="text-sm bg-brand-600 hover:bg-brand-700 disabled:opacity-60 text-white font-medium px-3 py-1.5 rounded-lg transition inline-flex items-center gap-1.5"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2M3 12h18" />
-          </svg>
-          {phase === "scanning" ? "Scanning…" : label}
-        </button>
+      <span className="inline-flex items-center gap-2 flex-wrap">
+        {available && (
+          <button
+            onClick={startScan}
+            disabled={phase === "scanning"}
+            className="text-sm bg-brand-600 hover:bg-brand-700 disabled:opacity-60 text-white font-medium px-3 py-1.5 rounded-lg transition inline-flex items-center gap-1.5"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2M3 12h18" />
+            </svg>
+            {phase === "scanning" ? "Scanning…" : label}
+          </button>
+        )}
         <button
           onClick={() => fileRef.current?.click()}
           disabled={phase === "scanning"}
-          title="Upload a photo or PDF instead of using the camera"
-          className="text-sm bg-slate-800 hover:bg-slate-700 disabled:opacity-60 text-slate-200 font-medium px-3 py-1.5 rounded-lg transition inline-flex items-center gap-1.5"
+          title={available ? "Upload a photo or PDF instead of using the camera" : "Upload a photo or PDF — extracted with cloud AI"}
+          className={"text-sm disabled:opacity-60 font-medium px-3 py-1.5 rounded-lg transition inline-flex items-center gap-1.5 " +
+            (available ? "bg-slate-800 hover:bg-slate-700 text-slate-200" : "bg-brand-600 hover:bg-brand-700 text-white")}
         >
           <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12" />
           </svg>
-          Upload
+          {available ? "Upload" : (phase === "scanning" ? "Scanning…" : (mode === "flights" ? "Scan Logbook (AI)" : "Scan Document (AI)"))}
         </button>
+        {available && cloudOk && (
+          <label className="flex items-center gap-1.5 text-xs text-slate-400 select-none" title="Uploads only: the image is sent securely to our AI service for extraction. Camera scans always stay on-device.">
+            <input type="checkbox" checked={useCloud} onChange={(e) => setUseCloud(e.target.checked)} />
+            AI-enhance uploads (cloud)
+          </label>
+        )}
         <input
           ref={fileRef}
           type="file"
@@ -331,10 +375,12 @@ export default function ScanImport({ mode }: { mode: Mode }) {
               <div>
                 <h3 className="text-lg font-semibold">Confirm scan</h3>
                 <p className="text-xs text-slate-400">
-                  {ai ? "Read on-device with Apple Intelligence. " : "Read on-device. "}
+                  {usedCloud
+                    ? "Extracted with cloud AI — your image was sent securely for processing. "
+                    : ai ? "Read on-device with Apple Intelligence. " : "Read on-device. "}
                   Check highlighted fields before saving — nothing is saved until you tap Save.
                 </p>
-                {!ai && aiNotice(aiReason) && (
+                {available && !usedCloud && !ai && aiNotice(aiReason) && (
                   <p className="text-xs text-amber-300 mt-1">{aiNotice(aiReason)}</p>
                 )}
               </div>
@@ -377,7 +423,9 @@ export default function ScanImport({ mode }: { mode: Mode }) {
               <div className="p-5 border-t border-slate-800 flex items-center justify-end gap-2 flex-wrap">
                 {mode === "flights" && (
                   <span className="flex items-center gap-2 mr-auto">
-                    <button onClick={startScan} className="text-sm bg-slate-800 hover:bg-slate-700 text-slate-200 font-medium px-3 py-2 rounded-lg transition">+ Scan next page</button>
+                    {available && (
+                      <button onClick={startScan} className="text-sm bg-slate-800 hover:bg-slate-700 text-slate-200 font-medium px-3 py-2 rounded-lg transition">+ Scan next page</button>
+                    )}
                     <button onClick={() => fileRef.current?.click()} className="text-sm bg-slate-800 hover:bg-slate-700 text-slate-200 font-medium px-3 py-2 rounded-lg transition">+ Add pages</button>
                   </span>
                 )}
