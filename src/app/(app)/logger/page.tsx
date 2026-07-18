@@ -16,6 +16,7 @@ export default function LoggerPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [csvMsg, setCsvMsg] = useState<{ text: string; kind: "ok" | "error" | "info" } | null>(null);
+  const [pdfBusy, setPdfBusy] = useState(false);
   const [wizard, setWizard] = useState<WizardInput | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -48,6 +49,21 @@ export default function LoggerPage() {
   function closeForm() {
     setEditingId(null);
     setFormOpen(false);
+  }
+
+  async function exportPdf() {
+    if (!data.flights.length) { setCsvMsg({ text: "No flights to export.", kind: "error" }); return; }
+    setPdfBusy(true);
+    try {
+      // Dynamic import keeps jsPDF (~400 KB) out of the page bundle.
+      const { generateLogbookPdf } = await import("@/lib/pdfRender");
+      await generateLogbookPdf(data, `logbook_${currentUser}_${new Date().toISOString().slice(0, 10)}.pdf`);
+      setCsvMsg({ text: "PDF exported (summary + logbook pages).", kind: "ok" });
+    } catch (e) {
+      setCsvMsg({ text: `PDF export failed: ${e instanceof Error ? e.message : String(e)}`, kind: "error" });
+    } finally {
+      setPdfBusy(false);
+    }
   }
 
   function exportCsv() {
@@ -126,6 +142,7 @@ export default function LoggerPage() {
           <div className="flex items-center gap-2">
             <ScanImport mode="flights" />
             <button onClick={exportCsv} className="text-sm bg-slate-800 hover:bg-slate-700 text-slate-200 font-medium px-3 py-1.5 rounded-lg transition">Export CSV</button>
+            <button onClick={() => void exportPdf()} disabled={pdfBusy} className="text-sm bg-slate-800 hover:bg-slate-700 disabled:opacity-60 text-slate-200 font-medium px-3 py-1.5 rounded-lg transition">{pdfBusy ? "Building PDF…" : "Export PDF"}</button>
             <button onClick={() => fileRef.current?.click()} className="text-sm bg-slate-800 hover:bg-slate-700 text-slate-200 font-medium px-3 py-1.5 rounded-lg transition">Import CSV</button>
             <input ref={fileRef} type="file" accept=".csv,text/csv" className="hidden" onChange={onFile} />
           </div>
