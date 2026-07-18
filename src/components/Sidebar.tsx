@@ -43,6 +43,15 @@ export const NAV: { href: string; label: string; icon: React.ReactNode }[] = [
     ),
   },
   {
+    href: "/currency",
+    label: "Currency",
+    icon: (
+      <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="12" cy="13" r="8" /><path d="M12 9v4l2.5 2.5" /><path d="M9 2h6" />
+      </svg>
+    ),
+  },
+  {
     href: "/duty",
     label: "Duty Tracker",
     icon: (

@@ -20,14 +20,15 @@ type FormState = {
   picId: string; sicId: string; socId: string; from: string; to: string;
   takeoff: DayNight; landing: DayNight;
   se: string; me: string; xc: string; dayHours: string; nightHours: string;
-  ifrActual: string; ifrSim: string; notes: string;
+  ifrActual: string; ifrSim: string; landings: string; approaches: string; notes: string;
 };
 
 function blankForm(role: string): FormState {
   return {
     date: todayStr(), aircraftType: "", registration: "", loggedRole: role,
     picId: "", sicId: "", socId: "", from: "", to: "", takeoff: "Day", landing: "Day",
-    se: "0", me: "0", xc: "0", dayHours: "0", nightHours: "0", ifrActual: "0", ifrSim: "0", notes: "",
+    se: "0", me: "0", xc: "0", dayHours: "0", nightHours: "0", ifrActual: "0", ifrSim: "0",
+    landings: "1", approaches: "0", notes: "",
   };
 }
 
@@ -64,6 +65,7 @@ export default function FlightForm({
         se: String(editing.se ?? 0), me: String(editing.me ?? 0), xc: String(editing.xc ?? 0),
         dayHours: String(editing.dayHours ?? 0), nightHours: String(editing.nightHours ?? 0),
         ifrActual: String(editing.ifrActual ?? 0), ifrSim: String(editing.ifrSim ?? 0),
+        landings: String(editing.landings ?? 1), approaches: String(editing.approaches ?? 0),
         notes: editing.notes || "",
       });
     } else {
@@ -142,6 +144,7 @@ export default function FlightForm({
         se: num(form.se), me: num(form.me), xc: num(form.xc),
         dayHours: num(form.dayHours), nightHours: num(form.nightHours),
         ifrActual: num(form.ifrActual), ifrSim: num(form.ifrSim),
+        landings: num(form.landings), approaches: num(form.approaches),
         notes: form.notes.trim(),
         year: y, month: m, day: d, civilIdent: reg,
         pic: pilotName(draft, form.picId), sic: pilotName(draft, form.sicId), soc: pilotName(draft, form.socId),
@@ -265,6 +268,8 @@ export default function FlightForm({
         <NumField label="Night (hrs)" value={form.nightHours} onChange={(v) => set("nightHours", v)} />
         <NumField label="IFR Actual (hrs)" value={form.ifrActual} onChange={(v) => set("ifrActual", v)} />
         <NumField label="IFR Simulated (hrs)" value={form.ifrSim} onChange={(v) => set("ifrSim", v)} />
+        <NumField label="Landings (count)" value={form.landings} onChange={(v) => set("landings", v)} />
+        <NumField label="Approaches (count)" value={form.approaches} onChange={(v) => set("approaches", v)} />
         <div className="sm:col-span-2 lg:col-span-4">
           <label className="block text-xs font-medium text-slate-400 mb-1">Notes / Remarks</label>
           <textarea rows={2} value={form.notes} onChange={(e) => set("notes", e.target.value)} className={inputCls} />

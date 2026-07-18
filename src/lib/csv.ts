@@ -11,14 +11,14 @@ import { uid } from "./id";
 export const CSV_FIELDS = [
   "date", "year", "month", "day", "aircraftType", "civilIdent", "pic", "sic",
   "soc", "from", "to", "takeoff", "landing", "se", "me", "xc", "dayHours",
-  "nightHours", "ifrActual", "ifrSim", "loggedRole", "notes",
+  "nightHours", "ifrActual", "ifrSim", "landings", "approaches", "loggedRole", "notes",
 ] as const;
 
 export const CSV_HEADERS = [
   "Date", "Year", "Month", "Day", "Aircraft Type", "Registration", "PIC", "SIC",
   "SOC", "ICAO From", "ICAO To", "Takeoff", "Landing", "Single Engine",
   "Multi Engine", "Cross Country", "Day Hours", "Night Hours", "IFR Actual",
-  "IFR Simulated", "Logged Role", "Notes",
+  "IFR Simulated", "Landings", "Approaches", "Logged Role", "Notes",
 ];
 
 function csvCell(v: unknown): string {
@@ -375,6 +375,10 @@ export function importCSV(data: AppData, text: string, ownerNames: string[]): Im
       se: num(get("se")), me: num(get("me")), xc: num(get("xc")),
       dayHours: num(get("dayHours")), nightHours: num(get("nightHours")),
       ifrActual: num(get("ifrActual")), ifrSim: num(get("ifrSim")),
+      // Currency counts: absent/blank stays undefined so lib/currency's
+      // legacy defaults (1 landing, 0 approaches) apply.
+      ...(get("landings") !== "" ? { landings: num(get("landings")) } : {}),
+      ...(get("approaches") !== "" ? { approaches: num(get("approaches")) } : {}),
       loggedRole: get("loggedRole") || "Captain",
       notes: get("notes"),
     } as Flight);
