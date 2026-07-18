@@ -40,6 +40,11 @@ export interface Flight {
   ifrActual: number;
   ifrSim: number;
   notes: string;
+  // Currency inputs (optional; older flights won't have them). A flight with
+  // no `landings` counts as ONE takeoff + ONE landing (classified day/night by
+  // the takeoff/landing fields); `approaches` defaults to 0. See lib/currency.
+  landings?: number;
+  approaches?: number;
   // Backward-compatible mirrors (CSV / Supabase schema)
   year?: number;
   month?: number;
@@ -121,6 +126,21 @@ export interface AircraftType {
   updatedAt?: string; // stamped on change (lib/merge) — drives sync conflict resolution
 }
 
+// A pilot-defined currency rule ("N <metric> in the last <windowDays> days",
+// optionally scoped to one aircraft type) evaluated by lib/currency.ts. The
+// Transport Canada rules are built-in; these are the user's extras (company
+// minima, personal minima). Per-user, merge-synced like everything else.
+export interface CurrencyRule {
+  id: string;
+  name: string;
+  metric: string; // a CurrencyMetric key from lib/currency.ts
+  threshold: number;
+  windowDays: number;
+  aircraftType?: string; // restrict to one type (normalized code) when set
+  createdAt: string;
+  updatedAt?: string; // stamped on change (lib/merge) — drives sync conflict resolution
+}
+
 // A remembered CSV import mapping, keyed by a hash of the file's (normalized)
 // header row. Re-importing a file with the same shape skips the mapping step.
 export interface ImportTemplate {
@@ -151,6 +171,8 @@ export interface AppData {
   // The pilot's custom aircraft types, added via the Fleet manager, shown in
   // pickers alongside the built-in catalog (lib/aircraft.ts).
   fleet: AircraftType[];
+  // User-defined currency rules (lib/currency.ts evaluates them + the TC built-ins).
+  currencyRules: CurrencyRule[];
 }
 
 export function emptyData(): AppData {
@@ -168,7 +190,8 @@ export function emptyData(): AppData {
     documents: [],
     importTemplates: [],
     fleet: [],
+    currencyRules: [],
   };
 }
 
-export const APP_VERSION = "0.11.0";
+export const APP_VERSION = "0.12.0";

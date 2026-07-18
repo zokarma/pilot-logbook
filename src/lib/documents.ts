@@ -50,6 +50,7 @@ export const DOC_TYPES: DocTypeDef[] = [
   { value: "Instructor Rating", category: "Certificate", expiry: "manual" },
   { value: "Type Rating", category: "Certificate", expiry: "manual" },
   { value: "Dangerous Goods Training", category: "Certificate", expiry: "auto", auto: { basis: "issue", months: 24 } },
+  { value: "Recurrent Training", category: "Certificate", expiry: "auto", auto: { basis: "issue", months: 24 } },
   { value: "CRM Training", category: "Certificate", expiry: "auto", auto: { basis: "issue", months: 12 } },
   { value: "Other", category: "Certificate", expiry: "manual" },
 ];

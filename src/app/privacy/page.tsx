@@ -45,13 +45,22 @@ export default function PrivacyPage() {
             <p>
               Pilot Logbook requests camera access for one purpose only: scanning your paper
               logbook pages and aviation documents so you can import them without retyping.
-              <b> All scanning is processed entirely on your device</b>—text recognition and AI
-              extraction run locally, and your scanned images are never uploaded to our servers or
+              <b> Camera scanning is processed entirely on your device</b>—text recognition and AI
+              extraction run locally, and camera captures are never uploaded to our servers or
               any third party. Only the entries you review and save become part of your logbook.
               The app does not request access to GPS Location Services, Contacts, or Microphone,
               and does not integrate any third-party behavioral tracking SDKs. If you add the home
               screen widget, your hour totals and next document expiry are stored on your device
               only.
+            </p>
+            <p className="mt-2">
+              <b>Optional cloud AI extraction.</b> When you choose to upload a photo or PDF and
+              enable AI-enhanced extraction (and always when scanning from the website, which has
+              no on-device scanner), that file is transmitted over an encrypted connection to our
+              processing service, which uses Anthropic&apos;s Claude API solely to extract the
+              logbook or document fields. The file is processed transiently, is not used to train
+              AI models, and is not retained by us after processing. This is opt-in on the app:
+              if you never enable it, your images never leave your device.
             </p>
           </section>
 

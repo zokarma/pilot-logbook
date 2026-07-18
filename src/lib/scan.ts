@@ -424,5 +424,66 @@ export function combineDocument(fm: FmDocument | undefined, heur: ScannedDocumen
   return doc.type || doc.number || doc.issueDate || doc.expiryDate ? doc : heur;
 }
 
+/* --------------------- cloud extraction sanitizers --------------------- */
+// The scan-extract Edge Function relays whatever the vision model produced.
+// These guards make that untrusted JSON safe to feed into combineFlights /
+// combineDocument: only known keys survive, strings are trimmed and bounded,
+// numbers are coerced and clamped, dates are normalized to YYYY-MM-DD.
+
+function sStr(v: unknown, max = 120): string | undefined {
+  if (typeof v === "number" && isFinite(v)) v = String(v);
+  if (typeof v !== "string") return undefined;
+  const t = v.trim().slice(0, max);
+  return t ? t : undefined;
+}
+
+function sNum(v: unknown, max = 999): number | undefined {
+  const n = typeof v === "number" ? v : typeof v === "string" ? parseFloat(v) : NaN;
+  if (!isFinite(n) || n < 0) return undefined;
+  return Math.min(n, max);
+}
+
+function sDate(v: unknown): string | undefined {
+  const t = sStr(v, 30);
+  return t ? parseDateStr(t) ?? undefined : undefined;
+}
+
+export function sanitizeFmFlight(raw: unknown): FmFlight | null {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+  const r = raw as Record<string, unknown>;
+  const f: FmFlight = {
+    date: sDate(r.date),
+    aircraftType: sStr(r.aircraftType, 20),
+    registration: sStr(r.registration, 12),
+    loggedRole: sStr(r.loggedRole, 20),
+    from: sStr(r.from, 8),
+    to: sStr(r.to, 8),
+    se: sNum(r.se, 24), me: sNum(r.me, 24), xc: sNum(r.xc, 24),
+    dayHours: sNum(r.dayHours, 24), nightHours: sNum(r.nightHours, 24),
+    ifrActual: sNum(r.ifrActual, 24), ifrSim: sNum(r.ifrSim, 24),
+    pic: sStr(r.pic, 60), sic: sStr(r.sic, 60), notes: sStr(r.notes, 200),
+  };
+  const hasAny = Object.values(f).some((v) => v !== undefined);
+  return hasAny ? f : null;
+}
+
+export function sanitizeFmFlights(raw: unknown): FmFlight[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.slice(0, 60).map(sanitizeFmFlight).filter((f): f is FmFlight => f !== null);
+}
+
+export function sanitizeFmDocument(raw: unknown): FmDocument | undefined {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return undefined;
+  const r = raw as Record<string, unknown>;
+  const d: FmDocument = {
+    type: sStr(r.type, 80),
+    number: sStr(r.number, 30),
+    issueDate: sDate(r.issueDate),
+    examDate: sDate(r.examDate),
+    expiryDate: sDate(r.expiryDate),
+  };
+  return Object.values(d).some((v) => v !== undefined) ? d : undefined;
+}
+
 // Confidence below this ⇒ the confirm UI highlights the field for review.
 export const LOW_CONFIDENCE = 0.7;

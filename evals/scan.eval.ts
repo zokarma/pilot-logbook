@@ -5,6 +5,7 @@
 
 import {
   parseFlightsFromOcr, parseDocumentFromOcr, combineFlights, combineDocument,
+  sanitizeFmFlights, sanitizeFmDocument,
   LOW_CONFIDENCE, ScannedFlight, FmFlight,
 } from "../src/lib/scan";
 import { Suite } from "./harness";
@@ -144,6 +145,30 @@ export function run(): Suite {
 
     const d = combineDocument({ type: "Private Pilot Licence (PPL)", number: "A-123456" }, null);
     s.check("FM-only document fields arrive at 0.75", d?.type?.confidence === 0.75 && d?.number?.value === "A-123456");
+  }
+
+  // ---- cloud-extraction sanitizers (untrusted model JSON → safe FmFlight) ----
+  {
+    const flights = sanitizeFmFlights([
+      { date: "17/07/2026", registration: "c-gabc ", se: "1.2", me: -5, xc: 99999, extraKey: "dropped", notes: "x".repeat(500) },
+      "not an object",
+      {},
+      null,
+    ]);
+    s.check("sanitizer: only meaningful objects survive", flights.length === 1);
+    const f = flights[0] as FmFlight & { extraKey?: string };
+    s.check("sanitizer: dates normalized to YYYY-MM-DD", f.date === "2026-07-17");
+    s.check("sanitizer: numeric strings coerced, negatives dropped, hours clamped", f.se === 1.2 && f.me === undefined && f.xc === 24);
+    s.check("sanitizer: unknown keys never pass through", f.extraKey === undefined);
+    s.check("sanitizer: long strings bounded", (f.notes ?? "").length <= 200);
+    s.check("sanitizer: non-arrays yield empty", sanitizeFmFlights({ flights: [] }).length === 0);
+
+    const big = sanitizeFmFlights(Array.from({ length: 200 }, () => ({ date: "2026-01-01" })));
+    s.check("sanitizer: row count capped at 60", big.length === 60);
+
+    const d = sanitizeFmDocument({ type: "Category 1 Medical", examDate: "02 Jul 2026", junk: 1 });
+    s.check("sanitizer: document dates normalized, junk dropped", d?.examDate === "2026-07-02" && (d as Record<string, unknown>).junk === undefined);
+    s.check("sanitizer: empty document → undefined", sanitizeFmDocument({ junk: true }) === undefined);
   }
 
   s.probe(

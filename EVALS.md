@@ -13,7 +13,7 @@ npx tsx evals/run.ts
 - **probe** = recorded behavior worth knowing (design limits, domain-accuracy
   gaps, guard-rail assumptions). Probes never fail the run.
 
-**Last run: 2026-07-17 — 190/190 checks passed, 16 probes. Both defects below are now FIXED (their checks are green and stay in the suite as regression tests).**
+**Last run: 2026-07-18 — 261/261 checks passed, 17 probes across 12 suites. Both defects below are FIXED (their checks stay in the suite as regression tests). Newer suites: #10 Fleet manager (18), #11 Currency math (24), #12 PDF export model (15); the scan suite gained cloud-extraction sanitizer checks (42 total).**
 
 | # | Feature | Suite | Result | Why it ranks here |
 |---|---------|-------|--------|-------------------|
