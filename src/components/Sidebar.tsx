@@ -25,6 +25,15 @@ export const NAV: { href: string; label: string; icon: React.ReactNode }[] = [
     ),
   },
   {
+    href: "/fleet",
+    label: "Fleet",
+    icon: (
+      <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M2 12h20M12 2l4 10H8l4-10z" /><path d="M6 12l-2 5h16l-2-5" /><path d="M10 17v3M14 17v3" />
+      </svg>
+    ),
+  },
+  {
     href: "/routemap",
     label: "Route Map",
     icon: (

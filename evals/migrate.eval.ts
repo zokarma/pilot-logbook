@@ -21,6 +21,13 @@ export function run(): Suite {
     s.check("null input yields a complete empty AppData", Array.isArray(d.flights) && Array.isArray(d.pilots) && typeof d.duty === "object");
     s.check("brand-new user keeps profile null (wizard must run)", d.profile === null);
     s.eq("flightColumns default to the canonical set", d.flightColumns, DEFAULT_FLIGHT_COLUMN_KEYS);
+    s.check("fleet initialized to an empty array", Array.isArray(d.fleet) && d.fleet.length === 0);
+  }
+
+  // -- fleet back-filled on legacy data that predates it --
+  {
+    const d = migrateData({ flights: [] } as Partial<AppData>);
+    s.check("legacy data without a fleet gets an empty fleet array", Array.isArray(d.fleet));
   }
 
   // -- legacy year/month/day and civilIdent upgrades --

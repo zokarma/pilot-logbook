@@ -134,6 +134,22 @@ export function run(): Suite {
     s.check("unknown top-level key from a newer client survives", out.futureFeature === "written by v0.11");
   }
 
+  // -- fleet (custom aircraft) merges like every other entity --
+  {
+    const ac = (id: string, code: string, name: string, ms: number) => ({ id, code, name, createdAt: stampAt(0), updatedAt: stampAt(ms) });
+    const base = mkData({ fleet: [] });
+    const local = mkData({ fleet: [ac("a1", "C210", "Cessna 210", 1000)] });
+    const remote = mkData({ fleet: [ac("a2", "SR22", "Cirrus SR22", 2000)] });
+    const out = mergeAppData(base, local, remote);
+    s.eq("fleet: offline adds on two devices union", out.fleet.map((a) => a.id).sort(), ["a1", "a2"]);
+
+    const b2 = mkData({ fleet: [ac("a1", "C210", "Cessna 210", 0)] });
+    const le = mkData({ fleet: [ac("a1", "C210", "Cessna 210 Centurion", 1000)] });
+    const re = mkData({ fleet: [ac("a1", "C210", "Cessna Two-Ten", 2000)] });
+    s.check("fleet: concurrent rename resolves to newer stamp", mergeAppData(b2, le, re).fleet[0].name === "Cessna Two-Ten");
+    s.eq("fleet: delete propagates via base", mergeAppData(b2, mkData({ fleet: [] }), b2).fleet, []);
+  }
+
   // -- pilots list merges on updatedAt --
   {
     const p = mkPilot("p1", "Ben", "Pearce", { updatedAt: stampAt(0) });

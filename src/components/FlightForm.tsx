@@ -2,10 +2,10 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useData } from "@/context/DataContext";
-import { AIRCRAFT_TYPES, CREW_ROLES } from "@/lib/aircraft";
+import { fleetTypes, normalizeAircraftCode, CREW_ROLES } from "@/lib/aircraft";
 import { uid } from "@/lib/id";
 import { num, pilotName } from "@/lib/logbook";
-import { DayNight, Flight } from "@/lib/types";
+import { AircraftType, DayNight, Flight } from "@/lib/types";
 import AirportDatalist from "./AirportDatalist";
 
 function todayStr(): string {
@@ -42,6 +42,13 @@ export default function FlightForm({
   const editing = editingId ? data.flights.find((f) => f.id === editingId) || null : null;
   const [form, setForm] = useState<FormState>(() => blankForm(data.lastLoggedRole || "Captain"));
   const [msg, setMsg] = useState("");
+  // Inline "add a new aircraft type" panel, shown when the picker's
+  // "+ Add new type…" option is chosen. Adds to the pilot's per-user fleet.
+  const [addingType, setAddingType] = useState(false);
+  const [newType, setNewType] = useState({ code: "", name: "" });
+  const [typeMsg, setTypeMsg] = useState("");
+
+  const aircraftOptions = useMemo(() => fleetTypes(data.fleet), [data.fleet]);
 
   useEffect(() => {
     if (editing) {
@@ -81,7 +88,33 @@ export default function FlightForm({
     <option key={p.id} value={p.id}>{pilotName(data, p.id) || "(unnamed)"}</option>
   ));
 
-  const aircraftKnown = AIRCRAFT_TYPES.some((t) => t.code === form.aircraftType);
+  const aircraftKnown = aircraftOptions.some((t) => t.code === form.aircraftType);
+
+  // Add a custom aircraft type to the pilot's fleet and select it on the form.
+  function addAircraftType() {
+    const code = normalizeAircraftCode(newType.code);
+    const name = newType.name.trim();
+    if (!code) { setTypeMsg("Enter an aircraft code, e.g. C210."); return; }
+    if (aircraftOptions.some((t) => normalizeAircraftCode(t.code) === code)) {
+      setTypeMsg(`"${code}" is already in your fleet.`);
+      return;
+    }
+    mutate((draft) => {
+      if (!Array.isArray(draft.fleet)) draft.fleet = [];
+      const entry: AircraftType = {
+        id: uid("ac"),
+        code,
+        name: name || code,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      draft.fleet.push(entry);
+    });
+    set("aircraftType", code);
+    setNewType({ code: "", name: "" });
+    setTypeMsg("");
+    setAddingType(false);
+  }
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -138,11 +171,47 @@ export default function FlightForm({
           <input type="date" required value={form.date} onChange={(e) => set("date", e.target.value)} className={inputCls} />
         </Field>
         <Field label="Aircraft Type">
-          <select required value={form.aircraftType} onChange={(e) => set("aircraftType", e.target.value)} className={inputCls}>
+          <select
+            required={!addingType}
+            value={addingType ? "__add__" : form.aircraftType}
+            onChange={(e) => {
+              if (e.target.value === "__add__") { setAddingType(true); setTypeMsg(""); }
+              else { setAddingType(false); set("aircraftType", e.target.value); }
+            }}
+            className={inputCls}
+          >
             <option value="">— select —</option>
-            {AIRCRAFT_TYPES.map((t) => <option key={t.code} value={t.code}>{t.code} — {t.name}</option>)}
+            {aircraftOptions.map((t) => <option key={t.code} value={t.code}>{t.code} — {t.name}</option>)}
             {form.aircraftType && !aircraftKnown && <option value={form.aircraftType}>{form.aircraftType} (custom)</option>}
+            <option value="__add__">+ Add new type…</option>
           </select>
+          {addingType && (
+            <div className="mt-2 p-2 rounded-lg border border-slate-700 bg-slate-800/40 space-y-2">
+              <input
+                autoFocus
+                placeholder="Code (e.g. C210)"
+                value={newType.code}
+                onChange={(e) => setNewType((t) => ({ ...t, code: e.target.value.toUpperCase() }))}
+                className={inputCls + " uppercase"}
+              />
+              <input
+                placeholder="Name (e.g. Cessna 210)"
+                value={newType.name}
+                onChange={(e) => setNewType((t) => ({ ...t, name: e.target.value }))}
+                className={inputCls}
+              />
+              {typeMsg && <p className="text-xs text-red-400">{typeMsg}</p>}
+              <div className="flex gap-2">
+                <button type="button" onClick={addAircraftType} className="text-sm bg-brand-600 hover:bg-brand-700 text-white px-3 py-1.5 rounded-lg transition">
+                  Add to fleet
+                </button>
+                <button type="button" onClick={() => { setAddingType(false); setTypeMsg(""); setNewType({ code: "", name: "" }); }} className="text-sm text-slate-400 hover:text-slate-200 px-2">
+                  Cancel
+                </button>
+              </div>
+              <p className="text-[11px] text-slate-500">Saved to your fleet — available in every flight and manageable on the Fleet page.</p>
+            </div>
+          )}
         </Field>
         <Field label="Registration">
           <input list="registrationsList" placeholder="e.g. C-GABC" value={form.registration} onChange={(e) => set("registration", e.target.value.toUpperCase())} className={inputCls + " uppercase"} />

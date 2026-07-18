@@ -109,6 +109,18 @@ export interface PilotDocument {
   updatedAt: string;
 }
 
+// A user-defined aircraft type in the pilot's personal fleet, on top of the
+// built-in catalog (lib/aircraft.ts). Per-user data like everything else —
+// stored in AppData, RLS-scoped, offline-mirrored, and merge-synced. `code`
+// (normalized, uppercased) is the natural key used to dedupe against built-ins.
+export interface AircraftType {
+  id: string;
+  code: string;
+  name: string;
+  createdAt: string;
+  updatedAt?: string; // stamped on change (lib/merge) — drives sync conflict resolution
+}
+
 // A remembered CSV import mapping, keyed by a hash of the file's (normalized)
 // header row. Re-importing a file with the same shape skips the mapping step.
 export interface ImportTemplate {
@@ -136,6 +148,9 @@ export interface AppData {
   documents: PilotDocument[];
   // Saved CSV column mappings from previous imports (lib/importMap).
   importTemplates: ImportTemplate[];
+  // The pilot's custom aircraft types, added via the Fleet manager, shown in
+  // pickers alongside the built-in catalog (lib/aircraft.ts).
+  fleet: AircraftType[];
 }
 
 export function emptyData(): AppData {
@@ -152,7 +167,8 @@ export function emptyData(): AppData {
     profile: null,
     documents: [],
     importTemplates: [],
+    fleet: [],
   };
 }
 
-export const APP_VERSION = "0.10.0";
+export const APP_VERSION = "0.11.0";

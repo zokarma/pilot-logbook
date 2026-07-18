@@ -1,4 +1,11 @@
 // Standardized aircraft-type dropdown list + crew roles.
+//
+// AIRCRAFT_TYPES is the built-in catalog. Pilots can extend it with their own
+// types via the Fleet manager (stored per-user in AppData.fleet); use
+// fleetTypes(data.fleet) to get the combined, de-duplicated, sorted list that
+// every picker should show.
+
+export interface FleetOption { code: string; name: string; builtIn: boolean }
 
 export const AIRCRAFT_TYPES: { code: string; name: string }[] = [
   { code: "C172", name: "Cessna 172" },
@@ -20,8 +27,38 @@ export const AIRCRAFT_TYPES: { code: string; name: string }[] = [
   { code: "A321", name: "Airbus A321" },
 ];
 
-export function aircraftName(code: string): string {
-  const t = AIRCRAFT_TYPES.find((x) => x.code === code);
+// Canonical form of a type code for de-duping ("c 172" / "C172" → "C172").
+export function normalizeAircraftCode(code: string): string {
+  return (code || "").trim().toUpperCase().replace(/\s+/g, "");
+}
+
+// Built-in catalog + the pilot's custom fleet, de-duplicated by normalized code
+// (built-ins win) and sorted by code. The list every aircraft picker renders.
+export function fleetTypes(custom?: { code: string; name: string }[] | null): FleetOption[] {
+  const out: FleetOption[] = [];
+  const seen = new Set<string>();
+  for (const t of AIRCRAFT_TYPES) {
+    const k = normalizeAircraftCode(t.code);
+    if (!k || seen.has(k)) continue;
+    seen.add(k);
+    out.push({ code: t.code, name: t.name, builtIn: true });
+  }
+  for (const t of custom ?? []) {
+    const k = normalizeAircraftCode(t.code);
+    if (!k || seen.has(k)) continue;
+    seen.add(k);
+    out.push({ code: t.code, name: t.name, builtIn: false });
+  }
+  return out.sort((a, b) => a.code.localeCompare(b.code));
+}
+
+// Friendly name for a type code, checking the pilot's custom fleet too. Falls
+// back to the code itself for anything unknown (e.g. a legacy free-text type).
+export function aircraftName(code: string, custom?: { code: string; name: string }[] | null): string {
+  const k = normalizeAircraftCode(code);
+  if (!k) return code || "";
+  const all: { code: string; name: string }[] = [...AIRCRAFT_TYPES, ...(custom ?? [])];
+  const t = all.find((x) => normalizeAircraftCode(x.code) === k);
   return t ? t.name : code || "";
 }
 

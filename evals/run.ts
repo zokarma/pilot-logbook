@@ -12,11 +12,12 @@ import * as pilots from "./pilots.eval";
 import * as core from "./core.eval";
 import * as dashboard from "./dashboard.eval";
 import * as airports from "./airports.eval";
+import * as fleet from "./fleet.eval";
 import { Suite } from "./harness";
 
 const suites: Suite[] = [
   merge.run(), migrate.run(), documents.run(), csv.run(), scan.run(),
-  pilots.run(), core.run(), dashboard.run(), airports.run(),
+  pilots.run(), core.run(), dashboard.run(), airports.run(), fleet.run(),
 ];
 
 let totalPass = 0, totalFail = 0, totalProbes = 0;
