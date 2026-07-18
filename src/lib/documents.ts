@@ -81,6 +81,15 @@ export function addMonths(dateStr: string, months: number): string {
   return `${target.getFullYear()}-${mm}-${dd}`;
 }
 
+// Push a "YYYY-MM-DD" date to the last day of its month (e.g. 2026-03-15 →
+// 2026-03-31). Used for Transport Canada medical expiries.
+export function endOfMonth(dateStr: string): string {
+  const [y, m] = dateStr.split("-").map((n) => parseInt(n, 10));
+  if (!y || !m) return "";
+  const last = new Date(y, m, 0).getDate(); // day 0 of next month = last of this
+  return `${dateStr.slice(0, 7)}-${String(last).padStart(2, "0")}`;
+}
+
 // Whole years between two "YYYY-MM-DD" dates (age of `dob` on `onDate`).
 export function ageOn(dob: string, onDate: string): number | null {
   const [by, bm, bd] = dob.split("-").map((n) => parseInt(n, 10));
@@ -116,7 +125,9 @@ export function computeAutoExpiry(doc: PilotDocument, profile: UserProfile | nul
     if (!exam || !dob) return "";
     const age = ageOn(dob, exam);
     if (age == null) return "";
-    return addMonths(exam, medicalValidityMonths(doc.type, age));
+    // Transport Canada medicals stay valid until the LAST DAY of the month in
+    // which the validity period ends — not the exact anniversary of the exam.
+    return endOfMonth(addMonths(exam, medicalValidityMonths(doc.type, age)));
   }
   const anchor = def.auto.basis === "exam" ? doc.examDate : doc.issueDate;
   if (!anchor || !def.auto.months) return "";

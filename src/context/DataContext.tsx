@@ -17,6 +17,7 @@ import { AppData, emptyData } from "@/lib/types";
 import { migrateData } from "@/lib/migrate";
 import { deepEqual, mergeAppData, sameStamp, stampChanges } from "@/lib/merge";
 import { getSupabaseClient, supabaseConfigured } from "@/lib/supabaseClient";
+import { isNativeApp } from "@/lib/native";
 import {
   loadCache, saveCache, loadBase, saveBase, SyncBase, mergeScreenshots, stripScreenshots,
   loadLastUser, saveLastUser, clearLastUser,
@@ -381,6 +382,59 @@ export function DataProvider({ children }: { children: ReactNode }) {
     setReady(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Pull remote changes when the app returns to the foreground. Without this an
+  // already-open session never re-reads the server, so edits made elsewhere (e.g.
+  // on the website) don't appear until the next login — even though the sync
+  // badge reads "Synced" (that only reflects our own last push). pushState()
+  // probes the server's updated_at and three-way-merges any newer server data
+  // into the UI, so it doubles as the pull path. Guarded to the native app so
+  // the website's behaviour is unchanged.
+  useEffect(() => {
+    if (!cloud || !isNativeApp()) return;
+    const refresh = () => {
+      if (uidRef.current) void pushState();
+    };
+    const onVisible = () => {
+      if (typeof document !== "undefined" && document.visibilityState === "visible") refresh();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    // The Capacitor App plugin's appStateChange is the reliable foreground signal
+    // on iOS (read via the injected bridge — no @capacitor import in the bundle).
+    const cap = (window as unknown as { Capacitor?: { Plugins?: Record<string, unknown> } }).Capacitor;
+    const app = cap?.Plugins?.App as
+      | { addListener: (e: string, fn: (s: { isActive: boolean }) => void) => { remove: () => void } }
+      | undefined;
+    const handle = app?.addListener?.("appStateChange", (s) => { if (s.isActive) refresh(); });
+    return () => {
+      document.removeEventListener("visibilitychange", onVisible);
+      handle?.remove();
+    };
+  }, [cloud, pushState]);
+
+  // Live pull: subscribe to this user's row via Supabase Realtime so edits made
+  // elsewhere (e.g. on the website) reach an open app immediately — even while it
+  // stays in the foreground, which the visibility/appState refresh above can't
+  // catch. On any change we trigger pushState() (which probes + three-way-merges
+  // the newer server data) rather than trusting the payload, so a large logbook
+  // isn't a problem, and the app's own writes just no-op. Guarded to the native
+  // app. NOTE: requires Realtime enabled for `plb_app_state` in Supabase
+  // (Database → Publications → supabase_realtime).
+  useEffect(() => {
+    if (!cloud || !isNativeApp() || !currentUser) return;
+    const uid = uidRef.current;
+    const sb = getSupabaseClient();
+    if (!uid || !sb) return;
+    const channel = sb
+      .channel(`plb_app_state:${uid}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "plb_app_state", filter: `user_id=eq.${uid}` },
+        () => { void pushState(); },
+      )
+      .subscribe();
+    return () => { void sb.removeChannel(channel); };
+  }, [cloud, currentUser, pushState]);
 
   const login = useCallback(async (identifier: string, password: string): Promise<AuthResult> => {
     if (cloud) {
