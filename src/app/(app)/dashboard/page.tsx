@@ -250,7 +250,7 @@ export default function DashboardPage() {
               <div className="space-y-3">
                 {!entries.length && <p className="text-slate-400 text-sm">No flights logged yet.</p>}
                 {entries.map(([t, h]) => {
-                  const friendly = aircraftName(t);
+                  const friendly = aircraftName(t, data.fleet);
                   return (
                     <div key={t}>
                       <div className="flex justify-between text-sm mb-1">

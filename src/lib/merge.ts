@@ -153,6 +153,7 @@ export function mergeAppData(base: AppData | null, local: AppData, remote: AppDa
     importTemplates: mergeById(
       base?.importTemplates, local.importTemplates ?? [], remote.importTemplates ?? [], (t) => t.id, "updatedAt",
     ),
+    fleet: mergeById(base?.fleet, local.fleet ?? [], remote.fleet ?? [], (a) => a.id, "updatedAt"),
     duty: mergeDuty(base?.duty, local.duty ?? {}, remote.duty ?? {}),
     pilotName: pickField(base, local, remote, "pilotName"),
     currentPilotId: pickField(base, local, remote, "currentPilotId"),
@@ -185,6 +186,7 @@ export function stampChanges(prev: AppData, next: AppData, now: string): void {
   stampList(prev.documents ?? [], next.documents ?? [], (d) => d.id, "updatedAt", now);
   stampList(prev.bugReports ?? [], next.bugReports ?? [], (b) => b.id, "updatedAt", now);
   stampList(prev.importTemplates ?? [], next.importTemplates ?? [], (t) => t.id, "updatedAt", now);
+  stampList(prev.fleet ?? [], next.fleet ?? [], (a) => a.id, "updatedAt", now);
   const prevDuty = prev.duty ?? {};
   const nextDuty = next.duty ?? {};
   for (const key of Object.keys(nextDuty)) {

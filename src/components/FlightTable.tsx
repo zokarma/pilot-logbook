@@ -2,7 +2,7 @@
 
 import { useMemo, useRef, useState } from "react";
 import { useData } from "@/context/DataContext";
-import { AIRCRAFT_TYPES, CREW_ROLES } from "@/lib/aircraft";
+import { fleetTypes, CREW_ROLES } from "@/lib/aircraft";
 import {
   flightsForCurrentPilot, flightDateStr, ifrHours, num, pilotName, syncFlightMirrors,
 } from "@/lib/logbook";
@@ -72,10 +72,11 @@ export default function FlightTable({ onFullEdit }: { onFullEdit: (id: string) =
   const hiddenCols = DEFAULT_FLIGHT_COLUMN_KEYS.filter((k) => !visibleCols.includes(k));
 
   const aircraftTypes = useMemo(() => {
-    const codes = new Set(AIRCRAFT_TYPES.map((t) => t.code));
+    const known = fleetTypes(data.fleet);
+    const codes = new Set(known.map((t) => t.code));
     const extra = Array.from(new Set(data.flights.map((f) => f.aircraftType).filter((c) => c && !codes.has(c))));
-    return { known: AIRCRAFT_TYPES, extra };
-  }, [data.flights]);
+    return { known, extra };
+  }, [data.flights, data.fleet]);
 
   const set = <K extends keyof InlineForm>(k: K, v: InlineForm[K]) =>
     setForm((f) => (f ? { ...f, [k]: v } : f));
