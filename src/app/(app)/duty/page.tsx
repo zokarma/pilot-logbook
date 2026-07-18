@@ -6,7 +6,9 @@ import { dstr, flightDateStr, num } from "@/lib/logbook";
 import { DutyEntry } from "@/lib/types";
 import { OPERATION_TYPES, DUTY_LIMITS, DEFAULT_OPERATION, operationLimits } from "@/lib/dutyLimits";
 
-type DutyType = "14" | "21" | "month";
+// Windows match the CARs rolling periods the limits are written against:
+// 7 days (work), 28 days (flight time + work), 90 days (flight time).
+type DutyType = "7" | "28" | "90";
 
 function calcDutyHours(start: string, end: string): number {
   if (!start || !end) return 0;
@@ -40,7 +42,7 @@ function limitRows(op: string): { value: string; label: string; tone: string }[]
 export default function DutyPage() {
   const { data, mutate } = useData();
   const carsOp = data.profile?.carsSubpart ?? DEFAULT_OPERATION;
-  const [dutyType, setDutyType] = useState<DutyType>("14");
+  const [dutyType, setDutyType] = useState<DutyType>("28");
   const [anchor, setAnchor] = useState<Date>(() => new Date());
   const [modalKey, setModalKey] = useState<string | null>(null);
 
@@ -51,22 +53,20 @@ export default function DutyPage() {
     );
   }, [data.flights, data.currentPilotId]);
 
+  // Trailing window ENDING on the anchor (today by default) — the CARs limits
+  // are "in any N consecutive days", so what matters is the look-back.
   const { cells, label } = useMemo(() => {
     const out: (Date | null)[] = [];
-    let lbl = "";
-    if (dutyType === "month") {
-      const y = anchor.getFullYear(), m = anchor.getMonth();
-      lbl = anchor.toLocaleDateString(undefined, { month: "long", year: "numeric" });
-      const startPad = new Date(y, m, 1).getDay();
-      const daysInMonth = new Date(y, m + 1, 0).getDate();
-      for (let i = 0; i < startPad; i++) out.push(null);
-      for (let d = 1; d <= daysInMonth; d++) out.push(new Date(y, m, d));
-    } else {
-      const n = parseInt(dutyType, 10);
-      const start = new Date(anchor.getFullYear(), anchor.getMonth(), anchor.getDate());
-      for (let i = 0; i < n; i++) out.push(new Date(start.getFullYear(), start.getMonth(), start.getDate() + i));
-      lbl = `${dstr(out[0]!)} → ${dstr(out[out.length - 1]!)} (${n} days)`;
+    const n = parseInt(dutyType, 10);
+    const end = new Date(anchor.getFullYear(), anchor.getMonth(), anchor.getDate());
+    const days: Date[] = [];
+    for (let i = n - 1; i >= 0; i--) {
+      days.push(new Date(end.getFullYear(), end.getMonth(), end.getDate() - i));
     }
+    // Pad so the Su–Sa column headers line up with the real weekdays.
+    for (let i = 0; i < days[0].getDay(); i++) out.push(null);
+    days.forEach((d) => out.push(d));
+    const lbl = `${dstr(days[0])} → ${dstr(days[days.length - 1])} (${n} days)`;
     return { cells: out, label: lbl };
   }, [dutyType, anchor]);
 
@@ -83,11 +83,8 @@ export default function DutyPage() {
   }, [cells, data.duty, flightDateSet]);
 
   function shift(dir: number) {
-    if (dutyType === "month") setAnchor(new Date(anchor.getFullYear(), anchor.getMonth() + dir, 1));
-    else {
-      const n = parseInt(dutyType, 10);
-      setAnchor(new Date(anchor.getFullYear(), anchor.getMonth(), anchor.getDate() + dir * n));
-    }
+    const n = parseInt(dutyType, 10);
+    setAnchor(new Date(anchor.getFullYear(), anchor.getMonth(), anchor.getDate() + dir * n));
   }
 
   const todayKey = dstr(new Date());
@@ -111,9 +108,9 @@ export default function DutyPage() {
             onChange={(e) => { setDutyType(e.target.value as DutyType); setAnchor(new Date()); }}
             className="px-3 py-2 border border-slate-700 rounded-lg text-sm"
           >
-            <option value="14">14-Day</option>
-            <option value="21">21-Day</option>
-            <option value="month">Monthly</option>
+            <option value="7">7-Day</option>
+            <option value="28">28-Day</option>
+            <option value="90">90-Day</option>
           </select>
         </div>
 
@@ -124,10 +121,9 @@ export default function DutyPage() {
         </div>
 
         <div className="grid grid-cols-7 gap-1.5">
-          {dutyType === "month" &&
-            ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"].map((d) => (
-              <div key={d} className="text-center text-xs font-medium text-slate-500 pb-1">{d}</div>
-            ))}
+          {["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"].map((d) => (
+            <div key={d} className="text-center text-xs font-medium text-slate-500 pb-1">{d}</div>
+          ))}
           {cells.map((d, i) => {
             if (!d) return <div key={"pad" + i} />;
             const key = dstr(d);
