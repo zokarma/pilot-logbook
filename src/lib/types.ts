@@ -93,6 +93,7 @@ export interface UserProfile {
   displayName?: string;
   role: string; // one of PILOT_ROLES
   dateOfBirth?: string; // "YYYY-MM-DD" — drives Transport Canada medical expiry math
+  carsSubpart?: string; // "703" | "704" | "705" — CARs operation, drives duty limits
   pilotId?: string; // the Pilot profile that represents this account holder
   onboarded: boolean; // has the setup wizard been completed / skipped
 }

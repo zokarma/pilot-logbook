@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { useData } from "@/context/DataContext";
 import { dstr, flightDateStr, num } from "@/lib/logbook";
 import { DutyEntry } from "@/lib/types";
+import { OPERATION_TYPES, DUTY_LIMITS, DEFAULT_OPERATION, operationLimits } from "@/lib/dutyLimits";
 
 type DutyType = "14" | "21" | "month";
 
@@ -17,18 +18,28 @@ function calcDutyHours(start: string, end: string): number {
   return Math.round((mins / 60) * 100) / 100;
 }
 
-const CARS_LIMITS: { value: string; label: string; tone: string }[] = [
-  { value: "18 hours", label: "Maximum flight duty period", tone: "amber" },
-  { value: "16 hours", label: "Maximum single flight time", tone: "amber" },
-  { value: "2,200 hours", label: "Maximum flight time per 365 days", tone: "sky" },
-  { value: "192 hours", label: "Maximum flight time per 28 days", tone: "sky" },
-  { value: "12 hours", label: "Minimum rest at home base", tone: "emerald" },
-  { value: "10 hours", label: "Minimum rest away from base", tone: "emerald" },
-  { value: "15 minutes", label: "Nutrition break every 6 hours of duty", tone: "violet" },
-];
+// Reference rows for the selected operation, built from the CARs limit tables
+// (lib/dutyLimits) so the numbers can never drift from what the gauges use.
+function limitRows(op: string): { value: string; label: string; tone: string }[] {
+  const l = operationLimits(op);
+  const hrs = (n: number) => `${n.toLocaleString()} hours`;
+  return [
+    { value: hrs(l.fdpDailyMax), label: "Max flight duty period (daily ceiling)", tone: "amber" },
+    ...(l.singlePilot24 ? [{ value: hrs(l.singlePilot24), label: "Max flight time, single-pilot (24h)", tone: "amber" }] : []),
+    { value: hrs(l.flightTime28), label: "Max flight time per 28 days", tone: "sky" },
+    { value: hrs(l.flightTime90), label: "Max flight time per 90 days", tone: "sky" },
+    { value: hrs(l.flightTime365), label: "Max flight time per 365 days", tone: "sky" },
+    { value: hrs(l.duty7Day), label: "Max hours of work per 7 days", tone: "violet" },
+    ...(l.duty28Day ? [{ value: hrs(l.duty28Day), label: "Max hours of work per 28 days", tone: "violet" }] : []),
+    { value: hrs(l.duty365), label: "Max hours of work per 365 days", tone: "violet" },
+    { value: hrs(l.minRestHome), label: "Minimum rest at home base", tone: "emerald" },
+    { value: hrs(l.minRestAway), label: "Minimum rest away from base", tone: "emerald" },
+  ];
+}
 
 export default function DutyPage() {
   const { data, mutate } = useData();
+  const carsOp = data.profile?.carsSubpart ?? DEFAULT_OPERATION;
   const [dutyType, setDutyType] = useState<DutyType>("14");
   const [anchor, setAnchor] = useState<Date>(() => new Date());
   const [modalKey, setModalKey] = useState<string | null>(null);
@@ -159,15 +170,32 @@ export default function DutyPage() {
 
       <div className="card p-5">
         <h3 className="font-semibold mb-1">CARs Part VII Limits</h3>
-        <p className="text-xs text-slate-400 mb-4">Canadian Aviation Regulations — flight &amp; duty time reference.</p>
+        <p className="text-xs text-slate-400 mb-3">Canadian Aviation Regulations — flight &amp; duty time reference.</p>
+        <label className="block text-xs font-medium text-slate-400 mb-1">Operation type</label>
+        <select
+          value={carsOp}
+          onChange={(e) => mutate((d) => { if (d.profile) d.profile.carsSubpart = e.target.value; })}
+          className="w-full px-3 py-2 border border-slate-700 rounded-lg text-sm mb-2"
+        >
+          {OPERATION_TYPES.map((t) => (
+            <option key={t} value={t}>{DUTY_LIMITS[t].label}</option>
+          ))}
+        </select>
+        <p className="text-xs text-slate-500 mb-4">
+          Sets the limits used by the Daily/Weekly Duty and Flight Time gauges on the dashboard.
+        </p>
         <div className="space-y-3 text-sm">
-          {CARS_LIMITS.map((l) => (
+          {limitRows(carsOp).map((l) => (
             <div key={l.label} className={"p-3 rounded-lg border " + toneCls[l.tone]}>
               <div className="font-semibold">{l.value}</div>
               <div className={toneSub[l.tone]}>{l.label}</div>
             </div>
           ))}
         </div>
+        <p className="text-xs text-slate-500 mt-3">
+          Max FDP is a sliding scale (about 9–13 h) set by report time and number of
+          flight segments — the figure above is the ceiling.
+        </p>
       </div>
 
       {modalKey && (

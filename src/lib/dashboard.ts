@@ -3,6 +3,7 @@
 
 import { AppData } from "./types";
 import { dstr, flightDate, totalHours } from "./logbook";
+import { operationLimits } from "./dutyLimits";
 
 export const DASH_METRICS: { section: string; items: [string, string][] }[] = [
   { section: "Flight Stats", items: [["totalTime", "Total Time"], ["currentMonth", "Current Month"], ["annualTotal", "Annual Total"], ["totalFlights", "Total Flights"]] },
@@ -10,7 +11,7 @@ export const DASH_METRICS: { section: string; items: [string, string][] }[] = [
   { section: "Active Duty", items: [["dailyDuty", "Daily Duty"], ["weeklyDuty", "Weekly Duty"]] },
   { section: "Documents", items: [["documentStatus", "Document Status"]] },
   { section: "Panels", items: [["aircraftHours", "Hours by Aircraft Type"], ["currentPilot", "Current Pilot"], ["recentLogs", "Recent Logs"]] },
-  { section: "CARs Compliance · Duty Tracker", items: [["carMonthly", "CAR 700.15 — Monthly"], ["carRest", "CAR 700.16 — Rest"]] },
+  { section: "CARs Compliance · Duty Tracker", items: [["carMonthly", "Flight Time (28-day)"], ["carRest", "Min Rest"]] },
 ];
 
 export function isHidden(data: AppData, key: string): boolean {
@@ -19,10 +20,11 @@ export function isHidden(data: AppData, key: string): boolean {
 
 // Active Duty — today + trailing 7 days of recorded duty hours.
 export function computeActiveDuty(data: AppData) {
+  const limits = operationLimits(data.profile?.carsSubpart);
   const todayKey = dstr(new Date());
   const todayEntry = data.duty[todayKey];
   const dailyHrs = todayEntry && todayEntry.hours ? +todayEntry.hours : 0;
-  const dailyCap = 14;
+  const dailyCap = limits.fdpDailyMax; // FDP ceiling for the selected operation
   const dailyPct = Math.min(100, (dailyHrs / dailyCap) * 100);
 
   const now = new Date();
@@ -35,15 +37,16 @@ export function computeActiveDuty(data: AppData) {
       if (e && e.hours) weeklyHrs += +e.hours;
     }
   });
-  const weeklyCap = 60;
+  const weeklyCap = limits.duty7Day;
   const weeklyPct = Math.min(100, (weeklyHrs / weeklyCap) * 100);
-  return { dailyHrs, dailyCap, dailyPct, weeklyHrs, weeklyCap, weeklyPct };
+  return { dailyHrs, dailyCap, dailyPct, weeklyHrs, weeklyCap, weeklyPct, operation: limits.label };
 }
 
 // CARs Part VII reference gauges.
 // Monthly: rolling 28-day flight time vs 192h. Rest: smallest recorded gap
 // between consecutive duty days (trailing 14 days) vs the 12h minimum.
 export function computeCars(data: AppData) {
+  const limits = operationLimits(data.profile?.carsSubpart);
   const pid = data.currentPilotId;
   const fl = data.flights.filter((x) => !pid || x.pilotId === pid);
   const now = new Date();
@@ -51,7 +54,7 @@ export function computeCars(data: AppData) {
   const hrs28 = fl
     .filter((x) => { const d = flightDate(x); return d >= cutoff28 && d <= now; })
     .reduce((s, x) => s + totalHours(x), 0);
-  const monthlyCap = 192;
+  const monthlyCap = limits.flightTime28; // 28-day flight-time limit for the operation
   const monthlyPct = Math.min(100, (hrs28 / monthlyCap) * 100);
 
   const keys = Object.keys(data.duty)
@@ -77,9 +80,9 @@ export function computeCars(data: AppData) {
       if (minGapHrs === null || gapHrs < minGapHrs) minGapHrs = gapHrs;
     }
   }
-  const restCap = 12;
+  const restCap = limits.minRestHome;
   const restPct = minGapHrs == null ? 100 : Math.min(100, (minGapHrs / restCap) * 100);
   const restLabel = minGapHrs == null ? "No duty pairs recorded yet" : `${minGapHrs.toFixed(1)}h / ${restCap}h min rest`;
 
-  return { hrs28, monthlyCap, monthlyPct, minGapHrs, restCap, restPct, restLabel };
+  return { hrs28, monthlyCap, monthlyPct, minGapHrs, restCap, restPct, restLabel, operation: limits.label };
 }
