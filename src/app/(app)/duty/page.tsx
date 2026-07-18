@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { useData } from "@/context/DataContext";
 import { dstr, flightDateStr, num } from "@/lib/logbook";
 import { DutyEntry } from "@/lib/types";
-import { OPERATION_TYPES, DUTY_LIMITS, DEFAULT_OPERATION, operationLimits } from "@/lib/dutyLimits";
+import { OPERATION_TYPES, DUTY_LIMITS, DEFAULT_OPERATION, operationLimits, effectiveLimits } from "@/lib/dutyLimits";
 
 // Windows match the CARs rolling periods the limits are written against:
 // 7 days (work), 28 days (flight time + work), 90 days (flight time).
@@ -22,8 +22,8 @@ function calcDutyHours(start: string, end: string): number {
 
 // Reference rows for the selected operation, built from the CARs limit tables
 // (lib/dutyLimits) so the numbers can never drift from what the gauges use.
-function limitRows(op: string): { value: string; label: string; tone: string }[] {
-  const l = operationLimits(op);
+function limitRows(profile: { carsSubpart?: string; duty7DayOption?: number } | null | undefined): { value: string; label: string; tone: string }[] {
+  const l = effectiveLimits(profile);
   const hrs = (n: number) => `${n.toLocaleString()} hours`;
   return [
     { value: hrs(l.fdpDailyMax), label: "Max flight duty period (daily ceiling)", tone: "amber" },
@@ -42,6 +42,9 @@ function limitRows(op: string): { value: string; label: string; tone: string }[]
 export default function DutyPage() {
   const { data, mutate } = useData();
   const carsOp = data.profile?.carsSubpart ?? DEFAULT_OPERATION;
+  // The 7-day work limit actually in force (60 or 70, per the operator's schedule).
+  const sevenDayOptions = operationLimits(carsOp).duty7DayOptions;
+  const sevenDay = effectiveLimits(data.profile).duty7Day;
   const [dutyType, setDutyType] = useState<DutyType>("28");
   const [anchor, setAnchor] = useState<Date>(() => new Date());
   const [modalKey, setModalKey] = useState<string | null>(null);
@@ -177,11 +180,23 @@ export default function DutyPage() {
             <option key={t} value={t}>{DUTY_LIMITS[t].label}</option>
           ))}
         </select>
+        <label className="block text-xs font-medium text-slate-400 mb-1">
+          7-day work limit (operator&apos;s approved schedule)
+        </label>
+        <select
+          value={String(sevenDay)}
+          onChange={(e) => mutate((d) => { if (d.profile) d.profile.duty7DayOption = Number(e.target.value); })}
+          className="w-full px-3 py-2 border border-slate-700 rounded-lg text-sm mb-2"
+        >
+          {sevenDayOptions.map((h) => (
+            <option key={h} value={h}>{h} hours / 7 days</option>
+          ))}
+        </select>
         <p className="text-xs text-slate-500 mb-4">
           Sets the limits used by the Daily/Weekly Duty and Flight Time gauges on the dashboard.
         </p>
         <div className="space-y-3 text-sm">
-          {limitRows(carsOp).map((l) => (
+          {limitRows(data.profile).map((l) => (
             <div key={l.label} className={"p-3 rounded-lg border " + toneCls[l.tone]}>
               <div className="font-semibold">{l.value}</div>
               <div className={toneSub[l.tone]}>{l.label}</div>

@@ -17,7 +17,8 @@ export interface DutyLimits {
   flightTime365: number;
   // Duty
   fdpDailyMax: number;   // ceiling of the FDP sliding scale
-  duty7Day: number;      // hours in any 7 consecutive days (705/704: 60–70 by schedule)
+  duty7Day: number;      // default hours in any 7 consecutive days (conservative)
+  duty7DayOptions: number[]; // 60 or 70, depending on the operator's approved schedule
   duty28Day?: number;    // hours in any 28 days (704 = 192; 705 uses the annual cap)
   duty365: number;       // hours in any 365 consecutive days
   singlePilot24?: number; // max flight time in 24h for single-pilot ops (703/704)
@@ -30,20 +31,20 @@ export const DUTY_LIMITS: Record<OperationType, DutyLimits> = {
   "705": {
     label: "705 — Airline",
     flightTime28: 112, flightTime90: 300, flightTime365: 1000,
-    fdpDailyMax: 13, duty7Day: 60, duty365: 2200,
+    fdpDailyMax: 13, duty7Day: 60, duty7DayOptions: [60, 70], duty365: 2200,
     minRestHome: 12, minRestAway: 10,
   },
   "704": {
     label: "704 — Commuter",
     flightTime28: 112, flightTime90: 300, flightTime365: 1000,
-    fdpDailyMax: 13, duty7Day: 60, duty28Day: 192, duty365: 2200,
+    fdpDailyMax: 13, duty7Day: 60, duty7DayOptions: [60, 70], duty28Day: 192, duty365: 2200,
     singlePilot24: 8,
     minRestHome: 12, minRestAway: 10,
   },
   "703": {
     label: "703 — Air Taxi",
     flightTime28: 112, flightTime90: 300, flightTime365: 1000,
-    fdpDailyMax: 13, duty7Day: 60, duty28Day: 192, duty365: 2200,
+    fdpDailyMax: 13, duty7Day: 60, duty7DayOptions: [60, 70], duty28Day: 192, duty365: 2200,
     singlePilot24: 8,
     minRestHome: 12, minRestAway: 10,
   },
@@ -57,4 +58,17 @@ export const DEFAULT_OPERATION: OperationType = "705";
 // Resolve a stored (possibly undefined/legacy) operation code to a limit set.
 export function operationLimits(op?: string): DutyLimits {
   return DUTY_LIMITS[op as OperationType] ?? DUTY_LIMITS[DEFAULT_OPERATION];
+}
+
+// The limit set actually in force for a pilot: their operation's table with the
+// 7-day work limit swapped to whichever schedule option their operator is
+// approved for (60 or 70 hours). Falls back to the conservative default.
+export function effectiveLimits(
+  profile?: { carsSubpart?: string; duty7DayOption?: number } | null,
+): DutyLimits {
+  const base = operationLimits(profile?.carsSubpart);
+  const choice = profile?.duty7DayOption;
+  return choice && base.duty7DayOptions.includes(choice)
+    ? { ...base, duty7Day: choice }
+    : base;
 }
