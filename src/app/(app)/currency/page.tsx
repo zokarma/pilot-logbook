@@ -74,6 +74,9 @@ export default function CurrencyPage() {
   const { data, mutate } = useData();
   const [form, setForm] = useState({ name: "", metric: "landings" as CurrencyMetric, threshold: "3", windowDays: "90", aircraftType: "" });
   const [msg, setMsg] = useState("");
+  // The add-rule form is collapsed behind the header button (same pattern as
+  // the logger's "Add a Flight") so it's discoverable without scrolling.
+  const [showAdd, setShowAdd] = useState(false);
 
   const builtins = useMemo(() => builtinCurrencyStatuses(data), [data]);
   const customs = useMemo(() => customCurrencyStatuses(data), [data]);
@@ -108,6 +111,7 @@ export default function CurrencyPage() {
     });
     setForm({ name: "", metric: "landings", threshold: "3", windowDays: "90", aircraftType: "" });
     setMsg("");
+    setShowAdd(false);
   }
 
   function deleteRule(id: string) {
@@ -121,13 +125,71 @@ export default function CurrencyPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-xl font-semibold">Currency</h1>
-        <p className="text-sm text-slate-400 mt-1">
-          Recency at a glance, computed from your logged flights (flights without a landing count are treated as one
-          takeoff and one landing). These gauges are a simplified reference — the CARs, and your company minima, govern.
-        </p>
+      <div className="flex items-start justify-between gap-3 flex-wrap">
+        <div className="min-w-0">
+          <h1 className="text-xl font-semibold">Currency</h1>
+          <p className="text-sm text-slate-400 mt-1">
+            Recency at a glance, computed from your logged flights (flights without a landing count are treated as one
+            takeoff and one landing). These gauges are a simplified reference — the CARs, and your company minima, govern.
+          </p>
+        </div>
+        {!showAdd && (
+          <button
+            onClick={() => setShowAdd(true)}
+            className="inline-flex items-center gap-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition shrink-0"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 5v14M5 12h14" />
+            </svg>
+            Add Rule
+          </button>
+        )}
       </div>
+
+      {showAdd && (
+        <div className="card p-5">
+          <div className="flex items-center justify-between mb-1">
+            <h2 className="text-lg font-semibold">Add a custom rule</h2>
+            <button onClick={() => { setShowAdd(false); setMsg(""); }} className="text-sm text-slate-400 hover:text-slate-200">Close</button>
+          </div>
+          <p className="text-xs text-slate-400 mb-3">
+            Company or personal minima, e.g. “3 landings in 90 days on C172”.
+          </p>
+          <form onSubmit={addRule} className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-6 gap-3 items-end">
+            <div className="col-span-2">
+              <label className="block text-xs font-medium text-slate-400 mb-1">Name (optional)</label>
+              <input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} placeholder="Company: 3 in 90 on type" className={inputCls} />
+            </div>
+            <div className="col-span-2 sm:col-span-1">
+              <label className="block text-xs font-medium text-slate-400 mb-1">Requirement</label>
+              <select value={form.metric} onChange={(e) => setForm((f) => ({ ...f, metric: e.target.value as CurrencyMetric }))} className={inputCls}>
+                {CURRENCY_METRICS.map((m) => <option key={m} value={m}>{METRIC_LABELS[m]}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-400 mb-1">At least</label>
+              <input inputMode="decimal" value={form.threshold} onChange={(e) => setForm((f) => ({ ...f, threshold: e.target.value }))} className={inputCls} />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-400 mb-1">In the last (days)</label>
+              <input inputMode="numeric" value={form.windowDays} onChange={(e) => setForm((f) => ({ ...f, windowDays: e.target.value }))} className={inputCls} />
+            </div>
+            <div className="col-span-2 sm:col-span-1">
+              <label className="block text-xs font-medium text-slate-400 mb-1">Aircraft type (optional)</label>
+              <select value={form.aircraftType} onChange={(e) => setForm((f) => ({ ...f, aircraftType: e.target.value }))} className={inputCls}>
+                <option value="">Any type</option>
+                {fleetTypes(data.fleet).map((t) => <option key={t.code} value={t.code}>{t.code}</option>)}
+              </select>
+            </div>
+            <div className="col-span-2 lg:col-span-6 flex items-center gap-3">
+              <button type="submit" className="bg-brand-600 hover:bg-brand-700 text-white font-medium px-5 py-2.5 rounded-lg transition">
+                Add rule
+              </button>
+              {msg && <p className="text-sm text-red-400">{msg}</p>}
+            </div>
+          </form>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
         {builtins.map((s) => <StatusCard key={s.key} s={s} />)}
@@ -158,46 +220,6 @@ export default function CurrencyPage() {
         </div>
 
         {customs.map((s) => <StatusCard key={s.key} s={s} onDelete={() => deleteRule(s.key)} />)}
-      </div>
-
-      <div className="card p-5">
-        <h2 className="text-lg font-semibold mb-1">Add a custom rule</h2>
-        <p className="text-xs text-slate-400 mb-3">
-          Company or personal minima, e.g. “3 landings in 90 days on C172”.
-        </p>
-        <form onSubmit={addRule} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 items-end">
-          <div className="lg:col-span-2">
-            <label className="block text-xs font-medium text-slate-400 mb-1">Name (optional)</label>
-            <input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} placeholder="Company: 3 in 90 on type" className={inputCls} />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-slate-400 mb-1">Requirement</label>
-            <select value={form.metric} onChange={(e) => setForm((f) => ({ ...f, metric: e.target.value as CurrencyMetric }))} className={inputCls}>
-              {CURRENCY_METRICS.map((m) => <option key={m} value={m}>{METRIC_LABELS[m]}</option>)}
-            </select>
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-slate-400 mb-1">At least</label>
-            <input inputMode="decimal" value={form.threshold} onChange={(e) => setForm((f) => ({ ...f, threshold: e.target.value }))} className={inputCls} />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-slate-400 mb-1">In the last (days)</label>
-            <input inputMode="numeric" value={form.windowDays} onChange={(e) => setForm((f) => ({ ...f, windowDays: e.target.value }))} className={inputCls} />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-slate-400 mb-1">Aircraft type (optional)</label>
-            <select value={form.aircraftType} onChange={(e) => setForm((f) => ({ ...f, aircraftType: e.target.value }))} className={inputCls}>
-              <option value="">Any type</option>
-              {fleetTypes(data.fleet).map((t) => <option key={t.code} value={t.code}>{t.code}</option>)}
-            </select>
-          </div>
-          <div className="sm:col-span-2 lg:col-span-6 flex items-center gap-3">
-            <button type="submit" className="bg-brand-600 hover:bg-brand-700 text-white font-medium px-5 py-2.5 rounded-lg transition">
-              Add rule
-            </button>
-            {msg && <p className="text-sm text-red-400">{msg}</p>}
-          </div>
-        </form>
       </div>
 
       <p className="text-[11px] text-slate-500">
