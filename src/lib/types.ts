@@ -5,7 +5,10 @@
 
 import { DEFAULT_FLIGHT_COLUMN_KEYS } from "./flightColumns";
 
-export type DayNight = "Day" | "Night";
+// Takeoff/landing classification. "None" = this pilot didn't perform it (pilot
+// monitoring on a two-crew leg) — those flights contribute zero takeoffs or
+// landings to currency (lib/currency).
+export type DayNight = "Day" | "Night" | "None";
 
 export interface Pilot {
   id: string;

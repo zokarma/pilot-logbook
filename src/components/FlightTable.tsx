@@ -267,12 +267,12 @@ export default function FlightTable({ onFullEdit }: { onFullEdit: (id: string) =
       );
       case "takeoff": return (
         <select value={form.takeoff} onChange={(e) => set("takeoff", e.target.value as DayNight)} className={cellIn}>
-          <option value="Day">Day</option><option value="Night">Night</option>
+          <option value="Day">Day</option><option value="Night">Night</option><option value="None">None</option>
         </select>
       );
       case "landing": return (
         <select value={form.landing} onChange={(e) => set("landing", e.target.value as DayNight)} className={cellIn}>
-          <option value="Day">Day</option><option value="Night">Night</option>
+          <option value="Day">Day</option><option value="Night">Night</option><option value="None">None</option>
         </select>
       );
       default: return null;
@@ -326,7 +326,7 @@ export default function FlightTable({ onFullEdit }: { onFullEdit: (id: string) =
                   )}
                   {f.kind === "daynight" && (
                     <select value={st.value || "Day"} onChange={(e) => setVal(e.target.value)} className={cellIn} disabled={!st.on}>
-                      <option value="Day">Day</option><option value="Night">Night</option>
+                      <option value="Day">Day</option><option value="Night">Night</option><option value="None">None</option>
                     </select>
                   )}
                   {f.kind === "text" && (

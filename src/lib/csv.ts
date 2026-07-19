@@ -3,10 +3,19 @@
 // "structured logbook" export. All import functions are pure — they take the
 // current AppData, mutate a working copy, run migrateData, and return the result.
 
-import { AppData, Flight } from "./types";
+import { AppData, DayNight, Flight } from "./types";
 import { migrateData } from "./migrate";
 import { num, pilotName } from "./logbook";
 import { uid } from "./id";
+
+// "None" = the pilot didn't perform the takeoff/landing (pilot monitoring);
+// anything unrecognised falls back to "Day" as before.
+function parseDayNight(s: string): DayNight {
+  const v = s.trim().toLowerCase();
+  if (v === "night") return "Night";
+  if (v === "none") return "None";
+  return "Day";
+}
 
 export const CSV_FIELDS = [
   "date", "year", "month", "day", "aircraftType", "civilIdent", "pic", "sic",
@@ -370,8 +379,8 @@ export function importCSV(data: AppData, text: string, ownerNames: string[]): Im
       registration: get("civilIdent").toUpperCase(),
       pic: get("pic"), sic: get("sic"), soc: get("soc"),
       from: get("from").toUpperCase(), to: get("to").toUpperCase(),
-      takeoff: get("takeoff").toLowerCase() === "night" ? "Night" : "Day",
-      landing: get("landing").toLowerCase() === "night" ? "Night" : "Day",
+      takeoff: parseDayNight(get("takeoff")),
+      landing: parseDayNight(get("landing")),
       se: num(get("se")), me: num(get("me")), xc: num(get("xc")),
       dayHours: num(get("dayHours")), nightHours: num(get("nightHours")),
       ifrActual: num(get("ifrActual")), ifrSim: num(get("ifrSim")),
