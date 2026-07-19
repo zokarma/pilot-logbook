@@ -109,7 +109,7 @@ export default function DashboardPage() {
   const primaryVisible = primary.filter((c) => !hidden(c[0]));
   const secondaryVisible = secondary.filter((c) => !hidden(c[0]));
   const dutyCards = [
-    !hidden("dailyDuty") && <GaugeCard key="d" title="Daily Duty" subLabel={`${duty.dailyHrs.toFixed(1)}h / ${duty.dailyCap}h max FDP`} pct={duty.dailyPct} color="#22d3ee" />,
+    !hidden("dailyDuty") && <GaugeCard key="d" title="Daily Duty" subLabel={`${duty.dailyHrs.toFixed(1)}h today · ${duty.dailyCap}h ceiling`} pct={duty.dailyPct} color="#22d3ee" />,
     !hidden("weeklyDuty") && <GaugeCard key="w" title="Weekly Duty" subLabel={`${duty.weeklyHrs.toFixed(1)}h / ${duty.weeklyCap}h (7 days)`} pct={duty.weeklyPct} color="#22d3ee" />,
   ].filter(Boolean);
   const carsCards = [
