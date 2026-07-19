@@ -13,7 +13,7 @@ npx tsx evals/run.ts
 - **probe** = recorded behavior worth knowing (design limits, domain-accuracy
   gaps, guard-rail assumptions). Probes never fail the run.
 
-**Last run: 2026-07-18 — 281/281 checks passed, 17 probes across 13 suites. Suites: #10 Fleet manager (18), #11 Currency math (24), #12 PDF export model (15), #13 CARs duty limits (14); the scan suite carries cloud-extraction sanitizer checks (42). The TC medical end-of-month rule (finding F4) shipped and its checks were updated to lock it in; the dashboard suite now covers operation-type (703/704/705) caps.**
+**Last run: 2026-07-19 — 331/331 checks passed, 19 probes across 14 suites. Suites: #10 Fleet manager (18), #11 Currency math (24), #12 PDF export model (15), #13 CARs duty limits (14), #14 CSV Import Wizard (50); the scan suite carries cloud-extraction sanitizer checks (42). The TC medical end-of-month rule (finding F4) shipped and its checks lock it in; the dashboard suite covers operation-type (703/704/705) caps. The new importMap suite surfaced that wizard imports don't promote non-owner crew to Pilot profiles (planImport pre-sets ids to "", so migrate's promotion is skipped — matches finding F3) — documented as a probe.**
 
 | # | Feature | Suite | Result | Why it ranks here |
 |---|---------|-------|--------|-------------------|

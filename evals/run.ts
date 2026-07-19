@@ -16,12 +16,13 @@ import * as fleet from "./fleet.eval";
 import * as currency from "./currency.eval";
 import * as pdf from "./pdf.eval";
 import * as dutyLimits from "./dutyLimits.eval";
+import * as importMap from "./importMap.eval";
 import { Suite } from "./harness";
 
 const suites: Suite[] = [
   merge.run(), migrate.run(), documents.run(), csv.run(), scan.run(),
   pilots.run(), core.run(), dashboard.run(), airports.run(), fleet.run(),
-  currency.run(), pdf.run(), dutyLimits.run(),
+  currency.run(), pdf.run(), dutyLimits.run(), importMap.run(),
 ];
 
 let totalPass = 0, totalFail = 0, totalProbes = 0;
