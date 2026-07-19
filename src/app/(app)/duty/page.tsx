@@ -4,8 +4,11 @@ import { useMemo, useState } from "react";
 import { useData } from "@/context/DataContext";
 import { dstr, flightDateStr, num } from "@/lib/logbook";
 import { DutyEntry } from "@/lib/types";
+import { OPERATION_TYPES, DUTY_LIMITS, DEFAULT_OPERATION, operationLimits, effectiveLimits } from "@/lib/dutyLimits";
 
-type DutyType = "14" | "21" | "month";
+// Windows match the CARs rolling periods the limits are written against:
+// 7 days (work), 28 days (flight time + work), 90 days (flight time).
+type DutyType = "7" | "28" | "90";
 
 function calcDutyHours(start: string, end: string): number {
   if (!start || !end) return 0;
@@ -17,19 +20,32 @@ function calcDutyHours(start: string, end: string): number {
   return Math.round((mins / 60) * 100) / 100;
 }
 
-const CARS_LIMITS: { value: string; label: string; tone: string }[] = [
-  { value: "18 hours", label: "Maximum flight duty period", tone: "amber" },
-  { value: "16 hours", label: "Maximum single flight time", tone: "amber" },
-  { value: "2,200 hours", label: "Maximum flight time per 365 days", tone: "sky" },
-  { value: "192 hours", label: "Maximum flight time per 28 days", tone: "sky" },
-  { value: "12 hours", label: "Minimum rest at home base", tone: "emerald" },
-  { value: "10 hours", label: "Minimum rest away from base", tone: "emerald" },
-  { value: "15 minutes", label: "Nutrition break every 6 hours of duty", tone: "violet" },
-];
+// Reference rows for the selected operation, built from the CARs limit tables
+// (lib/dutyLimits) so the numbers can never drift from what the gauges use.
+function limitRows(profile: { carsSubpart?: string; duty7DayOption?: number } | null | undefined): { value: string; label: string; tone: string }[] {
+  const l = effectiveLimits(profile);
+  const hrs = (n: number) => `${n.toLocaleString()} hours`;
+  return [
+    { value: hrs(l.fdpDailyMax), label: "Max flight duty period (daily ceiling)", tone: "amber" },
+    ...(l.singlePilot24 ? [{ value: hrs(l.singlePilot24), label: "Max flight time, single-pilot (24h)", tone: "amber" }] : []),
+    { value: hrs(l.flightTime28), label: "Max flight time per 28 days", tone: "sky" },
+    { value: hrs(l.flightTime90), label: "Max flight time per 90 days", tone: "sky" },
+    { value: hrs(l.flightTime365), label: "Max flight time per 365 days", tone: "sky" },
+    { value: hrs(l.duty7Day), label: "Max hours of work per 7 days", tone: "violet" },
+    ...(l.duty28Day ? [{ value: hrs(l.duty28Day), label: "Max hours of work per 28 days", tone: "violet" }] : []),
+    { value: hrs(l.duty365), label: "Max hours of work per 365 days", tone: "violet" },
+    { value: hrs(l.minRestHome), label: "Minimum rest at home base", tone: "emerald" },
+    { value: hrs(l.minRestAway), label: "Minimum rest away from base", tone: "emerald" },
+  ];
+}
 
 export default function DutyPage() {
   const { data, mutate } = useData();
-  const [dutyType, setDutyType] = useState<DutyType>("14");
+  const carsOp = data.profile?.carsSubpart ?? DEFAULT_OPERATION;
+  // The 7-day work limit actually in force (60 or 70, per the operator's schedule).
+  const sevenDayOptions = operationLimits(carsOp).duty7DayOptions;
+  const sevenDay = effectiveLimits(data.profile).duty7Day;
+  const [dutyType, setDutyType] = useState<DutyType>("28");
   const [anchor, setAnchor] = useState<Date>(() => new Date());
   const [modalKey, setModalKey] = useState<string | null>(null);
 
@@ -40,22 +56,20 @@ export default function DutyPage() {
     );
   }, [data.flights, data.currentPilotId]);
 
+  // Trailing window ENDING on the anchor (today by default) — the CARs limits
+  // are "in any N consecutive days", so what matters is the look-back.
   const { cells, label } = useMemo(() => {
     const out: (Date | null)[] = [];
-    let lbl = "";
-    if (dutyType === "month") {
-      const y = anchor.getFullYear(), m = anchor.getMonth();
-      lbl = anchor.toLocaleDateString(undefined, { month: "long", year: "numeric" });
-      const startPad = new Date(y, m, 1).getDay();
-      const daysInMonth = new Date(y, m + 1, 0).getDate();
-      for (let i = 0; i < startPad; i++) out.push(null);
-      for (let d = 1; d <= daysInMonth; d++) out.push(new Date(y, m, d));
-    } else {
-      const n = parseInt(dutyType, 10);
-      const start = new Date(anchor.getFullYear(), anchor.getMonth(), anchor.getDate());
-      for (let i = 0; i < n; i++) out.push(new Date(start.getFullYear(), start.getMonth(), start.getDate() + i));
-      lbl = `${dstr(out[0]!)} → ${dstr(out[out.length - 1]!)} (${n} days)`;
+    const n = parseInt(dutyType, 10);
+    const end = new Date(anchor.getFullYear(), anchor.getMonth(), anchor.getDate());
+    const days: Date[] = [];
+    for (let i = n - 1; i >= 0; i--) {
+      days.push(new Date(end.getFullYear(), end.getMonth(), end.getDate() - i));
     }
+    // Pad so the Su–Sa column headers line up with the real weekdays.
+    for (let i = 0; i < days[0].getDay(); i++) out.push(null);
+    days.forEach((d) => out.push(d));
+    const lbl = `${dstr(days[0])} → ${dstr(days[days.length - 1])} (${n} days)`;
     return { cells: out, label: lbl };
   }, [dutyType, anchor]);
 
@@ -72,11 +86,8 @@ export default function DutyPage() {
   }, [cells, data.duty, flightDateSet]);
 
   function shift(dir: number) {
-    if (dutyType === "month") setAnchor(new Date(anchor.getFullYear(), anchor.getMonth() + dir, 1));
-    else {
-      const n = parseInt(dutyType, 10);
-      setAnchor(new Date(anchor.getFullYear(), anchor.getMonth(), anchor.getDate() + dir * n));
-    }
+    const n = parseInt(dutyType, 10);
+    setAnchor(new Date(anchor.getFullYear(), anchor.getMonth(), anchor.getDate() + dir * n));
   }
 
   const todayKey = dstr(new Date());
@@ -100,9 +111,9 @@ export default function DutyPage() {
             onChange={(e) => { setDutyType(e.target.value as DutyType); setAnchor(new Date()); }}
             className="px-3 py-2 border border-slate-700 rounded-lg text-sm"
           >
-            <option value="14">14-Day</option>
-            <option value="21">21-Day</option>
-            <option value="month">Monthly</option>
+            <option value="7">7-Day</option>
+            <option value="28">28-Day</option>
+            <option value="90">90-Day</option>
           </select>
         </div>
 
@@ -113,10 +124,9 @@ export default function DutyPage() {
         </div>
 
         <div className="grid grid-cols-7 gap-1.5">
-          {dutyType === "month" &&
-            ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"].map((d) => (
-              <div key={d} className="text-center text-xs font-medium text-slate-500 pb-1">{d}</div>
-            ))}
+          {["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"].map((d) => (
+            <div key={d} className="text-center text-xs font-medium text-slate-500 pb-1">{d}</div>
+          ))}
           {cells.map((d, i) => {
             if (!d) return <div key={"pad" + i} />;
             const key = dstr(d);
@@ -159,15 +169,44 @@ export default function DutyPage() {
 
       <div className="card p-5">
         <h3 className="font-semibold mb-1">CARs Part VII Limits</h3>
-        <p className="text-xs text-slate-400 mb-4">Canadian Aviation Regulations — flight &amp; duty time reference.</p>
+        <p className="text-xs text-slate-400 mb-3">Canadian Aviation Regulations — flight &amp; duty time reference.</p>
+        <label className="block text-xs font-medium text-slate-400 mb-1">Operation type</label>
+        <select
+          value={carsOp}
+          onChange={(e) => mutate((d) => { if (d.profile) d.profile.carsSubpart = e.target.value; })}
+          className="w-full px-3 py-2 border border-slate-700 rounded-lg text-sm mb-2"
+        >
+          {OPERATION_TYPES.map((t) => (
+            <option key={t} value={t}>{DUTY_LIMITS[t].label}</option>
+          ))}
+        </select>
+        <label className="block text-xs font-medium text-slate-400 mb-1">
+          7-day work limit (operator&apos;s approved schedule)
+        </label>
+        <select
+          value={String(sevenDay)}
+          onChange={(e) => mutate((d) => { if (d.profile) d.profile.duty7DayOption = Number(e.target.value); })}
+          className="w-full px-3 py-2 border border-slate-700 rounded-lg text-sm mb-2"
+        >
+          {sevenDayOptions.map((h) => (
+            <option key={h} value={h}>{h} hours / 7 days</option>
+          ))}
+        </select>
+        <p className="text-xs text-slate-500 mb-4">
+          Sets the limits used by the Daily/Weekly Duty and Flight Time gauges on the dashboard.
+        </p>
         <div className="space-y-3 text-sm">
-          {CARS_LIMITS.map((l) => (
+          {limitRows(data.profile).map((l) => (
             <div key={l.label} className={"p-3 rounded-lg border " + toneCls[l.tone]}>
               <div className="font-semibold">{l.value}</div>
               <div className={toneSub[l.tone]}>{l.label}</div>
             </div>
           ))}
         </div>
+        <p className="text-xs text-slate-500 mt-3">
+          Max FDP is a sliding scale (about 9–13 h) set by report time and number of
+          flight segments — the figure above is the ceiling.
+        </p>
       </div>
 
       {modalKey && (

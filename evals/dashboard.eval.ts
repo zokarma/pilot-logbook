@@ -21,7 +21,9 @@ export function run(): Suite {
     const d = computeActiveDuty(data);
     s.check("daily hours read from today's entry", d.dailyHrs === 5);
     s.check("weekly window includes day -6, excludes day -7", d.weeklyHrs === 15);
-    s.check("daily % against the 14h cap", approx(d.dailyPct, (5 / 14) * 100));
+    // Default (no profile op) → 705 limits: FDP ceiling 13, 7-day 60.
+    s.check("daily % against the default 705 FDP cap (13h)", approx(d.dailyPct, (5 / 13) * 100) && d.dailyCap === 13);
+    s.check("weekly cap is the operation's 7-day limit (60h default)", d.weeklyCap === 60);
   }
   {
     const d = computeActiveDuty(mkData({ duty: { [localDateOffset(0)]: { on: true, hours: 20 } } }));
@@ -81,9 +83,24 @@ export function run(): Suite {
     s.check("no duty pairs → gauge full, honest label", c.restPct === 100 && /no duty pairs/i.test(c.restLabel));
   }
 
+  // -- gauges now follow the pilot's CARs operation type (dutyLimits.ts) --
+  {
+    const flights = [mkFlight("f", { date: localDateOffset(-1), se: 5, pilotId: "me" })];
+    const base = { firstName: "Z", lastName: "K", role: "Captain", onboarded: true } as const;
+    const c703 = computeCars(mkData({ currentPilotId: "me", flights, profile: { ...base, carsSubpart: "703" } }));
+    const c705 = computeCars(mkData({ currentPilotId: "me", flights, profile: { ...base, carsSubpart: "705" } }));
+    s.check("28-day flight-time cap follows operation (all currently 112h)", c703.monthlyCap === 112 && c705.monthlyCap === 112);
+    s.check("operation label surfaced for the gauge", /703/.test(c703.operation) && /705/.test(c705.operation));
+
+    const d70 = computeActiveDuty(mkData({ duty: { [localDateOffset(0)]: { on: true, hours: 5 } }, profile: { ...base, carsSubpart: "705", duty7DayOption: 70 } }));
+    s.check("selected 7-day option (70h) drives the weekly cap", d70.weeklyCap === 70);
+    const dBad = computeActiveDuty(mkData({ duty: {}, profile: { ...base, carsSubpart: "705", duty7DayOption: 99 } }));
+    s.check("an unapproved 7-day option falls back to the default (60h)", dBad.weeklyCap === 60);
+  }
+
   s.probe(
     "gauges are advisory only",
-    "CAR 700.15/700.16 gauges use fixed caps (192h/28d, 12h rest) with no operation-type nuance (703/704/705 differ); labels present them as reference values, which matches the intent.",
+    "Caps now come from the pilot's CARs operation (703/704/705) via dutyLimits.ts, defaulting to the conservative 705 set; FDP is capped at the sliding-scale ceiling (13h). Labels still present them as reference values.",
   );
 
   return s;

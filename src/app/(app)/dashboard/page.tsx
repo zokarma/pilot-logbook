@@ -109,12 +109,12 @@ export default function DashboardPage() {
   const primaryVisible = primary.filter((c) => !hidden(c[0]));
   const secondaryVisible = secondary.filter((c) => !hidden(c[0]));
   const dutyCards = [
-    !hidden("dailyDuty") && <GaugeCard key="d" title="Daily Duty" subLabel={`${duty.dailyHrs.toFixed(1)}h / ${duty.dailyCap}h today`} pct={duty.dailyPct} color="#22d3ee" />,
+    !hidden("dailyDuty") && <GaugeCard key="d" title="Daily Duty" subLabel={`${duty.dailyHrs.toFixed(1)}h / ${duty.dailyCap}h max FDP`} pct={duty.dailyPct} color="#22d3ee" />,
     !hidden("weeklyDuty") && <GaugeCard key="w" title="Weekly Duty" subLabel={`${duty.weeklyHrs.toFixed(1)}h / ${duty.weeklyCap}h (7 days)`} pct={duty.weeklyPct} color="#22d3ee" />,
   ].filter(Boolean);
   const carsCards = [
-    !hidden("carMonthly") && <GaugeCard key="m" title="CAR 700.15 — Monthly" subLabel={`${cars.hrs28.toFixed(1)} / ${cars.monthlyCap} hrs (28-day)`} pct={cars.monthlyPct} color={cars.monthlyPct > 90 ? "#f59e0b" : "#34d399"} />,
-    !hidden("carRest") && <GaugeCard key="r" title="CAR 700.16 — Rest" subLabel={cars.restLabel} pct={cars.restPct} color={cars.restPct < 100 ? "#f59e0b" : "#34d399"} />,
+    !hidden("carMonthly") && <GaugeCard key="m" title="Flight Time · 28-day" subLabel={`${cars.hrs28.toFixed(1)} / ${cars.monthlyCap} hrs · ${cars.operation}`} pct={cars.monthlyPct} color={cars.monthlyPct > 90 ? "#f59e0b" : "#34d399"} />,
+    !hidden("carRest") && <GaugeCard key="r" title="Min Rest" subLabel={cars.restLabel} pct={cars.restPct} color={cars.restPct < 100 ? "#f59e0b" : "#34d399"} />,
   ].filter(Boolean);
 
   const panelsVisible = !hidden("aircraftHours") || !hidden("currentPilot");
