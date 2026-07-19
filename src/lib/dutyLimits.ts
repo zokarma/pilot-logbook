@@ -19,7 +19,7 @@ export interface DutyLimits {
   fdpDailyMax: number;   // ceiling of the FDP sliding scale
   duty7Day: number;      // default hours in any 7 consecutive days (conservative)
   duty7DayOptions: number[]; // 60 or 70, depending on the operator's approved schedule
-  duty28Day?: number;    // hours in any 28 days (704 = 192; 705 uses the annual cap)
+  duty28Day: number;     // hours in any 28 consecutive days (192 across 703/704/705)
   duty365: number;       // hours in any 365 consecutive days
   singlePilot24?: number; // max flight time in 24h for single-pilot ops (703/704)
   // Minimum rest before a flight duty period
@@ -56,7 +56,7 @@ export const DUTY_LIMITS: Record<OperationType, DutyLimits> = {
   "705": {
     label: "705 — Airline",
     flightTime28: 112, flightTime90: 300, flightTime365: 1000,
-    fdpDailyMax: 13, duty7Day: 60, duty7DayOptions: [60, 70], duty365: 2200,
+    fdpDailyMax: 13, duty7Day: 60, duty7DayOptions: [60, 70], duty28Day: 192, duty365: 2200,
     minRestHome: 12, minRestAway: 10,
     notes: [
       "36 consecutive hours free from duty every 7 days.",

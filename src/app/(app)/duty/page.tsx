@@ -32,7 +32,7 @@ function limitRows(profile: { carsSubpart?: string; duty7DayOption?: number } | 
     { value: hrs(l.flightTime90), label: "Max flight time per 90 days", tone: "sky" },
     { value: hrs(l.flightTime365), label: "Max flight time per 365 days", tone: "sky" },
     { value: hrs(l.duty7Day), label: "Max hours of work per 7 days", tone: "violet" },
-    ...(l.duty28Day ? [{ value: hrs(l.duty28Day), label: "Max hours of work per 28 days", tone: "violet" }] : []),
+    { value: hrs(l.duty28Day), label: "Max hours of work per 28 days", tone: "violet" },
     { value: hrs(l.duty365), label: "Max hours of work per 365 days", tone: "violet" },
     { value: hrs(l.minRestHome), label: "Minimum rest at home base", tone: "emerald" },
     { value: hrs(l.minRestAway), label: "Minimum rest away from base", tone: "emerald" },
