@@ -252,12 +252,12 @@ export default function FlightForm({
         <AirportDatalist id="icaoList" />
         <Field label="Takeoff">
           <select value={form.takeoff} onChange={(e) => set("takeoff", e.target.value as DayNight)} className={inputCls}>
-            <option value="Day">Day</option><option value="Night">Night</option>
+            <option value="Day">Day</option><option value="Night">Night</option><option value="None">None</option>
           </select>
         </Field>
         <Field label="Landing">
           <select value={form.landing} onChange={(e) => set("landing", e.target.value as DayNight)} className={inputCls}>
-            <option value="Day">Day</option><option value="Night">Night</option>
+            <option value="Day">Day</option><option value="Night">Night</option><option value="None">None</option>
           </select>
         </Field>
         <NumField label="Single Engine (hrs)" value={form.se} onChange={(v) => set("se", v)} />

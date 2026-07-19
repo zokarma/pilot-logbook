@@ -42,6 +42,12 @@ export function flightLandings(fl: Flight): number {
   return isNaN(n) ? 1 : Math.max(0, n);
 }
 
+// Landings the pilot actually performed: zero when landing is "None" (pilot
+// monitoring on a two-crew leg), else the recorded count.
+export function performedLandings(fl: Flight): number {
+  return fl.landing === "None" ? 0 : flightLandings(fl);
+}
+
 export function flightApproaches(fl: Flight): number {
   const n = typeof fl.approaches === "number" && isFinite(fl.approaches) ? fl.approaches : NaN;
   return isNaN(n) ? 0 : Math.max(0, n);
@@ -50,8 +56,10 @@ export function flightApproaches(fl: Flight): number {
 // How much a single flight contributes to a metric.
 export function metricAmount(fl: Flight, metric: CurrencyMetric): number {
   switch (metric) {
-    case "takeoffs": return flightLandings(fl);
-    case "landings": return flightLandings(fl);
+    // takeoff/landing === "None" means this pilot didn't perform it (pilot
+    // monitoring on a two-crew leg) — no currency credit for that flight.
+    case "takeoffs": return fl.takeoff === "None" ? 0 : flightLandings(fl);
+    case "landings": return performedLandings(fl);
     case "nightTakeoffs": return fl.takeoff === "Night" ? flightLandings(fl) : 0;
     case "nightLandings": return fl.landing === "Night" ? flightLandings(fl) : 0;
     case "hours": return totalHours(fl);

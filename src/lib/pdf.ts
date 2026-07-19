@@ -6,7 +6,7 @@
 import { AppData, Flight } from "./types";
 import { flightDate, flightDateStr, ifrHours, pilotName } from "./logbook";
 import { aircraftName } from "./aircraft";
-import { flightLandings } from "./currency";
+import { performedLandings } from "./currency";
 import { builtinCurrencyStatuses, customCurrencyStatuses } from "./currency";
 import { documentStatus } from "./documents";
 
@@ -53,7 +53,7 @@ export const fmtTotal = (colIdx: number, n: number): string =>
 
 function numericValues(fl: Flight): number[] {
   // Aligned with PDF_NUMERIC_COLS: SE ME XC Day Night IFR Ldg
-  return [fl.se || 0, fl.me || 0, fl.xc || 0, fl.dayHours || 0, fl.nightHours || 0, ifrHours(fl), flightLandings(fl)];
+  return [fl.se || 0, fl.me || 0, fl.xc || 0, fl.dayHours || 0, fl.nightHours || 0, ifrHours(fl), performedLandings(fl)];
 }
 
 function rowCells(data: AppData, fl: Flight): string[] {
@@ -132,7 +132,7 @@ export function buildPdfModel(data: AppData, rowsPerPage = 16): PdfModel {
       day: sum((f) => f.dayHours || 0),
       night: sum((f) => f.nightHours || 0),
       ifr: sum((f) => ifrHours(f)),
-      landings: Math.round(flights.reduce((s, f) => s + flightLandings(f), 0)),
+      landings: Math.round(flights.reduce((s, f) => s + performedLandings(f), 0)),
       byType,
       currencies,
       documents,
