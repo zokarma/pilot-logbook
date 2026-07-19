@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useData } from "@/context/DataContext";
 import { pilotName } from "@/lib/logbook";
@@ -143,10 +144,13 @@ export default function BugReporter({ variant = "toolbar" }: { variant?: "toolba
           onClick={(e) => { if (e.target === e.currentTarget) setOpen(false); }}
         >
           <div className="modal-card w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center justify-between mb-1">
               <h3 className="text-lg font-semibold">Report a Bug</h3>
               <button onClick={() => setOpen(false)} className="text-slate-400 hover:text-slate-200 text-2xl leading-none">&times;</button>
             </div>
+            <Link href="/bugs" onClick={() => setOpen(false)} className="inline-block text-xs text-cyan-400 hover:text-cyan-300 mb-4">
+              View past reports →
+            </Link>
             <form onSubmit={submit} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium mb-1">Severity</label>
