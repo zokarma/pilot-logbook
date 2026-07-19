@@ -224,8 +224,8 @@ export default function DutyPage() {
                 </thead>
                 <tbody>
                   {FDP_TABLE.map((r) => (
-                    <tr key={r.start} className={"border-t border-slate-800 " + (r.wocl ? "text-amber-300" : "text-slate-300")}>
-                      <td className="py-1 pr-2 whitespace-nowrap">{r.start}{r.wocl ? " ·WOCL" : ""}</td>
+                    <tr key={r.start} className={"border-t border-slate-800 " + (r.mostRestrictive ? "text-amber-300" : "text-slate-300")}>
+                      <td className="py-1 pr-2 whitespace-nowrap">{r.start}</td>
                       <td className="py-1 px-2 text-right tabular-nums">{r.legs1to4.toFixed(1)}</td>
                       <td className="py-1 px-2 text-right tabular-nums">{r.legs5to6.toFixed(1)}</td>
                       <td className="py-1 pl-2 text-right tabular-nums">{r.legs7plus.toFixed(1)}</td>

@@ -38,7 +38,7 @@ export interface FdpRow {
   legs1to4: number;
   legs5to6: number;
   legs7plus: number;
-  wocl?: boolean;
+  mostRestrictive?: boolean; // highlight the lowest-FDP bracket
 }
 
 export const FDP_TABLE: FdpRow[] = [
@@ -46,10 +46,22 @@ export const FDP_TABLE: FdpRow[] = [
   { start: "13:00–16:59", legs1to4: 12.5, legs5to6: 11.5, legs7plus: 10.5 },
   { start: "17:00–21:59", legs1to4: 12, legs5to6: 11, legs7plus: 10 },
   { start: "22:00–22:59", legs1to4: 11, legs5to6: 10, legs7plus: 9 },
-  { start: "23:00–03:59", legs1to4: 9, legs5to6: 9, legs7plus: 9, wocl: true },
+  { start: "23:00–03:59", legs1to4: 9, legs5to6: 9, legs7plus: 9, mostRestrictive: true },
   { start: "04:00–04:59", legs1to4: 10, legs5to6: 9, legs7plus: 9 },
   { start: "05:00–05:59", legs1to4: 11, legs5to6: 10, legs7plus: 9 },
   { start: "06:00–06:59", legs1to4: 12, legs5to6: 11, legs7plus: 10 },
+];
+
+// The modern fatigue rules are ONE unified division (CARs 700.26–700.72) that
+// applies to 703, 704 and 705 alike, so the reference notes are shared. Each
+// item is verified against the regulation text (section cited).
+const UNIFIED_NOTES: string[] = [
+  "60h/7-day option requires 1 single day free from duty in any 7 days and 4 single days free in any 28 days. [700.29]",
+  "70h/7-day option requires 120 consecutive hours free from duty, including 5 consecutive local nights' rest, in any 21 days, plus added duty restrictions. [700.29]",
+  "Split duty: a break of at least 60 consecutive minutes in suitable accommodation (first 45 minutes don't count) extends the max FDP by 50% of the break — 100% if the break falls between 00:00 and 05:59. Extended FDPs are limited to 3 consecutive night duty periods. [700.50]",
+  "Unforeseen operational circumstances: the FDP may be extended by up to 1h single-pilot, 2h unaugmented crew, or 3h augmented on a single-flight FDP; the next rest period increases by at least the extension. [700.63]",
+  "Reserve availability period: 14 consecutive hours maximum. [700.70]",
+  "Minimum rest is 12h at home base (or 11h plus travel time to accommodation) and 10h in suitable accommodation away from base.",
 ];
 
 export const DUTY_LIMITS: Record<OperationType, DutyLimits> = {
@@ -58,10 +70,7 @@ export const DUTY_LIMITS: Record<OperationType, DutyLimits> = {
     flightTime28: 112, flightTime90: 300, flightTime365: 1000,
     fdpDailyMax: 13, duty7Day: 60, duty7DayOptions: [60, 70], duty28Day: 192, duty365: 2200,
     minRestHome: 12, minRestAway: 10,
-    notes: [
-      "36 consecutive hours free from duty every 7 days.",
-      "3 consecutive days free from duty within any 17 days.",
-    ],
+    notes: UNIFIED_NOTES,
   },
   "704": {
     label: "704 — Commuter",
@@ -69,13 +78,7 @@ export const DUTY_LIMITS: Record<OperationType, DutyLimits> = {
     fdpDailyMax: 13, duty7Day: 60, duty7DayOptions: [60, 70], duty28Day: 192, duty365: 2200,
     singlePilot24: 8,
     minRestHome: 12, minRestAway: 10,
-    notes: [
-      "Time off — Option A: 36 consecutive hours off every 7 days, plus 3 consecutive days off every 17 days.",
-      "Time off — Option B: 48 consecutive hours off every 8 days, plus 4 consecutive days off every 16 days.",
-      "Split duty: a break of at least 4 consecutive hours in suitable accommodation extends the FDP by 50% of the break. Total extended FDP caps at 15 hours.",
-      "Unforeseen circumstances: the captain may extend the FDP by up to 2 hours (3 hours with an augmented crew); the next rest period increases by the same amount.",
-      "Max 3 consecutive FDPs infringing the window of circadian low (02:00–05:59) without added rest provisions.",
-    ],
+    notes: UNIFIED_NOTES,
   },
   "703": {
     label: "703 — Air Taxi",
@@ -83,13 +86,7 @@ export const DUTY_LIMITS: Record<OperationType, DutyLimits> = {
     fdpDailyMax: 13, duty7Day: 60, duty7DayOptions: [60, 70], duty28Day: 192, duty365: 2200,
     singlePilot24: 8,
     minRestHome: 12, minRestAway: 10,
-    notes: [
-      "Time off — Option A: 36 consecutive hours off every 7 days, plus 3 consecutive days off every 17 days.",
-      "Time off — Option B: 48 consecutive hours off every 8 days, plus 4 consecutive days off every 16 days.",
-      "Split duty: a break of at least 4 consecutive hours in suitable accommodation extends the FDP by 50% of the break (full credit for a night break). Total duty caps at 17 hours.",
-      "Unforeseen circumstances: the captain may extend the FDP by up to 2 hours; the next rest period increases by the same amount.",
-      "Reserve availability period (RAP): 14 hours maximum, and crews must be advised in advance.",
-    ],
+    notes: UNIFIED_NOTES,
   },
 };
 
