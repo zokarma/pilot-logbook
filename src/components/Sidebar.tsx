@@ -77,16 +77,10 @@ export const NAV: { href: string; label: string; icon: React.ReactNode }[] = [
       </svg>
     ),
   },
-  {
-    href: "/bugs",
-    label: "Bug Reports",
-    icon: (
-      <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M12 8a4 4 0 0 1 4 4v3a4 4 0 1 1-8 0v-3a4 4 0 0 1 4-4z" /><path d="M8 12H3M21 12h-5M9 6l-2-2M15 6l2-2M9 18l-2 2M15 18l2 2M8 9l-2-1M16 9l2-1" />
-      </svg>
-    ),
-  },
 ];
+// The Bug Reports page is reached via the sidebar's "Report Bug" modal ("View
+// past reports"), not the main nav — filing and browsing would otherwise show
+// up as two near-identical menu entries.
 
 export default function Sidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
   const pathname = usePathname();

@@ -39,7 +39,9 @@ export default function TopBar({ navOpen, onToggleNav }: { navOpen: boolean; onT
   // Show the current page's name (from the same nav list the Sidebar uses).
   // Normalise the trailing slash added by the static export before matching.
   const currentPath = pathname.replace(/\/+$/, "") || "/";
-  const pageTitle = NAV.find((n) => n.href === currentPath)?.label ?? "Logbook";
+  // Pages reachable outside the sidebar NAV still need a heading.
+  const EXTRA_TITLES: Record<string, string> = { "/bugs": "Bug Reports" };
+  const pageTitle = NAV.find((n) => n.href === currentPath)?.label ?? EXTRA_TITLES[currentPath] ?? "Logbook";
 
   const profile = data.profile;
   const holderName =
@@ -88,9 +90,7 @@ export default function TopBar({ navOpen, onToggleNav }: { navOpen: boolean; onT
         </div>
         <div className="flex items-center gap-3 text-sm">
           {sync && <span className={"text-xs font-medium " + sync.cls}>{sync.text}</span>}
-          <span className="hidden sm:inline text-slate-400">
-            Hi, <span className="font-medium text-slate-100">{currentUser}</span>
-          </span>
+          <span className="hidden sm:inline font-medium text-slate-300 truncate max-w-[16rem]">{logbookTitle}</span>
           <button
             onClick={toggleTheme}
             aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
@@ -157,10 +157,6 @@ export default function TopBar({ navOpen, onToggleNav }: { navOpen: boolean; onT
       </div>
       {showProfile && <ProfileModal onClose={() => setShowProfile(false)} />}
       {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
-      <div className="px-4 lg:px-8 pb-3 flex items-center gap-2 text-sm flex-wrap">
-        <span className="font-semibold text-slate-200">{logbookTitle}</span>
-        {profile?.role && <span className="text-xs text-slate-500">· {profile.role}</span>}
-      </div>
     </header>
   );
 }
