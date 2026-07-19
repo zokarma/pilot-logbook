@@ -13,7 +13,7 @@ npx tsx evals/run.ts
 - **probe** = recorded behavior worth knowing (design limits, domain-accuracy
   gaps, guard-rail assumptions). Probes never fail the run.
 
-**Last run: 2026-07-18 — 261/261 checks passed, 17 probes across 12 suites. Both defects below are FIXED (their checks stay in the suite as regression tests). Newer suites: #10 Fleet manager (18), #11 Currency math (24), #12 PDF export model (15); the scan suite gained cloud-extraction sanitizer checks (42 total).**
+**Last run: 2026-07-18 — 281/281 checks passed, 17 probes across 13 suites. Suites: #10 Fleet manager (18), #11 Currency math (24), #12 PDF export model (15), #13 CARs duty limits (14); the scan suite carries cloud-extraction sanitizer checks (42). The TC medical end-of-month rule (finding F4) shipped and its checks were updated to lock it in; the dashboard suite now covers operation-type (703/704/705) caps.**
 
 | # | Feature | Suite | Result | Why it ranks here |
 |---|---------|-------|--------|-------------------|

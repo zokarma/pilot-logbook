@@ -43,25 +43,32 @@ export function run(): Suite {
   s.eq("Cat 4, age 45 → 24 months", medicalValidityMonths("Category 4 Medical", 45), 24);
 
   // -- end-to-end auto expiry --
+  // TC medicals stay valid to the LAST DAY of the month the validity period
+  // ends in (endOfMonth), so exam 2026-07-17 + 12 months → 2027-07-31.
   s.eq(
-    "Cat 1 medical, under 40 at exam → exam + 12",
+    "Cat 1 medical, under 40 at exam → exam + 12, end of month",
     computeAutoExpiry(doc({ type: "Category 1 Medical", expiryMode: "auto", examDate: "2026-07-17" }), profile("1990-01-01")),
-    "2027-07-17",
+    "2027-07-31",
   );
   s.eq(
-    "Cat 1 medical, 40+ at exam → exam + 6",
+    "Cat 1 medical, 40+ at exam → exam + 6, end of month",
     computeAutoExpiry(doc({ type: "Category 1 Medical", expiryMode: "auto", examDate: "2026-07-17" }), profile("1980-01-01")),
-    "2027-01-17",
+    "2027-01-31",
   );
   s.eq(
     "exam on the 40th birthday uses the 40+ row (boundary)",
     computeAutoExpiry(doc({ type: "Category 1 Medical", expiryMode: "auto", examDate: "2026-07-17" }), profile("1986-07-17")),
-    "2027-01-17",
+    "2027-01-31",
   );
   s.eq(
-    "Cat 3 medical, under 40 → exam + 60",
+    "Cat 3 medical, under 40 → exam + 60, end of month",
     computeAutoExpiry(doc({ type: "Category 3 Medical", expiryMode: "auto", examDate: "2026-07-17" }), profile("1995-01-01")),
-    "2031-07-17",
+    "2031-07-31",
+  );
+  s.eq(
+    "medical validity extends to month end even when exam is on the 1st",
+    computeAutoExpiry(doc({ type: "Category 1 Medical", expiryMode: "auto", examDate: "2026-02-01" }), profile("1990-01-01")),
+    "2027-02-28",
   );
   s.eq(
     "medical without a DOB can't compute (empty, not wrong)",
@@ -105,8 +112,8 @@ export function run(): Suite {
 
   // -- domain-accuracy probes (not failures; the current math is CONSERVATIVE) --
   s.probe(
-    "TC end-of-month rule not modeled",
-    "CARs medical validity runs to the first day of the month after the anniversary (e.g. Cat 1 under-40 exam 2026-07-17 is valid into 2027-08-01); the app computes 2027-07-17 — up to ~30 days SHORTER than the pilot is legally entitled to. Safe direction, but pilots will see earlier renewals than TC requires.",
+    "TC end-of-month rule",
+    "Medical validity now extends to the last day of the month the period ends in (endOfMonth in documents.ts), matching the CARs — the earlier ~30-day-short finding is FIXED and locked in by the checks above.",
   );
   s.probe(
     "Instrument Rating anchor",
