@@ -8,7 +8,9 @@ import { uid } from "@/lib/id";
 import { getRecentErrors } from "@/lib/recentErrors";
 import { APP_VERSION, BugReport } from "@/lib/types";
 
-export default function BugReporter() {
+// variant "toolbar" (default) renders the original compact button; "nav"
+// renders a Sidebar-style item so it can live where Settings used to be.
+export default function BugReporter({ variant = "toolbar" }: { variant?: "toolbar" | "nav" }) {
   const { data, cloud, currentUser, mutate } = useData();
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
@@ -114,13 +116,26 @@ export default function BugReporter() {
 
   return (
     <>
-      <button
-        onClick={openModal}
-        title="Report a bug"
-        className="bg-slate-800 hover:bg-slate-700 text-slate-200 text-sm font-medium px-3 py-1.5 rounded-lg transition"
-      >
-        Report Bug
-      </button>
+      {variant === "nav" ? (
+        <button
+          onClick={openModal}
+          title="Report a bug"
+          className="nav-item w-full flex items-center justify-start gap-3 px-3 py-2.5 rounded-lg text-sm font-medium border-l-2 text-slate-400 border-transparent hover:bg-slate-800/60 hover:text-slate-100"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M12 8a4 4 0 0 1 4 4v3a4 4 0 1 1-8 0v-3a4 4 0 0 1 4-4z" /><path d="M8 12H3M21 12h-5M9 6l-2-2M15 6l2-2M9 18l-2 2M15 18l2 2M8 9l-2-1M16 9l2-1" />
+          </svg>
+          <span>Report Bug</span>
+        </button>
+      ) : (
+        <button
+          onClick={openModal}
+          title="Report a bug"
+          className="bg-slate-800 hover:bg-slate-700 text-slate-200 text-sm font-medium px-3 py-1.5 rounded-lg transition"
+        >
+          Report Bug
+        </button>
+      )}
 
       {open && (
         <div

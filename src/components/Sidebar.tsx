@@ -1,9 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
-import { useState } from "react";
-import { useData } from "@/context/DataContext";
+import { usePathname } from "next/navigation";
+import BugReporter from "./BugReporter";
 
 export const NAV: { href: string; label: string; icon: React.ReactNode }[] = [
   {
@@ -91,28 +90,11 @@ export const NAV: { href: string; label: string; icon: React.ReactNode }[] = [
 
 export default function Sidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
   const pathname = usePathname();
-  const router = useRouter();
-  const { cloud, currentUser, deleteAccount } = useData();
-  const [settingsOpen, setSettingsOpen] = useState(false);
-  const [deleting, setDeleting] = useState(false);
-  const [deleteErr, setDeleteErr] = useState<string | null>(null);
 
   // On phones the sidebar is an overlay drawer — navigating should dismiss it.
   const onNavigate = () => {
     if (typeof window !== "undefined" && window.innerWidth < 1024) onClose();
   };
-
-  async function onDeleteAccount() {
-    if (!confirm("Permanently delete your account and ALL your logbook data? This cannot be undone.")) return;
-    if (!confirm("Are you absolutely sure? Deletion is immediate and permanent.")) return;
-    setDeleting(true);
-    setDeleteErr(null);
-    const res = await deleteAccount();
-    setDeleting(false);
-    if (res.error) { setDeleteErr(res.error); return; }
-    setSettingsOpen(false);
-    router.replace("/login");
-  }
 
   const itemCls = (active: boolean) =>
     "nav-item w-full flex items-center justify-start gap-3 px-3 py-2.5 rounded-lg text-sm font-medium border-l-2 " +
@@ -149,54 +131,8 @@ export default function Sidebar({ open, onClose }: { open: boolean; onClose: () 
       </nav>
 
       <div className="px-3 mt-4 border-t border-slate-800 pt-3">
-        <button onClick={() => setSettingsOpen(true)} title="Cloud sync status" className={itemCls(false)}>
-          <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="12" cy="12" r="3" />
-            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
-          </svg>
-          <span>Settings</span>
-        </button>
+        <BugReporter variant="nav" />
       </div>
-
-      {settingsOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={(e) => { if (e.target === e.currentTarget) setSettingsOpen(false); }}>
-          <div className="modal-card w-full max-w-md p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold">Settings</h3>
-              <button onClick={() => setSettingsOpen(false)} className="text-slate-400 hover:text-slate-200 text-2xl leading-none">&times;</button>
-            </div>
-            {cloud ? (
-              <p className="text-sm text-slate-300">
-                <span className="text-emerald-400 font-medium">Connected.</span> Your data syncs to Supabase (secured by
-                per-user Row Level Security) and is mirrored to this device for offline use.
-                {currentUser && <> Signed in as <span className="text-slate-100">{currentUser}</span>.</>}
-              </p>
-            ) : (
-              <p className="text-sm text-slate-300">
-                <span className="text-amber-300 font-medium">Local-only mode.</span> Supabase isn&apos;t configured, so your
-                data lives in this browser only. Set the Supabase environment variables to enable cloud sync — see the README.
-              </p>
-            )}
-
-            {cloud && (
-              <div className="mt-6 pt-5 border-t border-slate-800">
-                <h4 className="text-sm font-semibold text-red-300 mb-1">Danger zone</h4>
-                <p className="text-xs text-slate-400 mb-3">
-                  Permanently delete your account and all your logbook data. This cannot be undone.
-                </p>
-                {deleteErr && <p className="text-xs text-red-400 mb-2">{deleteErr}</p>}
-                <button
-                  onClick={onDeleteAccount}
-                  disabled={deleting}
-                  className="text-sm font-medium bg-red-600/90 hover:bg-red-600 disabled:opacity-60 text-white px-3 py-1.5 rounded-lg transition"
-                >
-                  {deleting ? "Deleting…" : "Delete account"}
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
       </aside>
     </>
   );

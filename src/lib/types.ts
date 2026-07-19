@@ -95,6 +95,7 @@ export interface UserProfile {
   dateOfBirth?: string; // "YYYY-MM-DD" — drives Transport Canada medical expiry math
   carsSubpart?: string; // "703" | "704" | "705" — CARs operation, drives duty limits
   duty7DayOption?: number; // 60 or 70 — the operator's approved 7-day work limit
+  avatar?: string; // small square profile picture as a data URL (resized client-side)
   pilotId?: string; // the Pilot profile that represents this account holder
   onboarded: boolean; // has the setup wizard been completed / skipped
 }
