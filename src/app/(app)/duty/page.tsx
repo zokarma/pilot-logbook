@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { useData } from "@/context/DataContext";
 import { dstr, flightDateStr, num } from "@/lib/logbook";
 import { DutyEntry } from "@/lib/types";
-import { OPERATION_TYPES, DUTY_LIMITS, DEFAULT_OPERATION, operationLimits, effectiveLimits } from "@/lib/dutyLimits";
+import { OPERATION_TYPES, DUTY_LIMITS, DEFAULT_OPERATION, operationLimits, effectiveLimits, FDP_TABLE } from "@/lib/dutyLimits";
 
 // Windows match the CARs rolling periods the limits are written against:
 // 7 days (work), 28 days (flight time + work), 90 days (flight time).
@@ -32,7 +32,7 @@ function limitRows(profile: { carsSubpart?: string; duty7DayOption?: number } | 
     { value: hrs(l.flightTime90), label: "Max flight time per 90 days", tone: "sky" },
     { value: hrs(l.flightTime365), label: "Max flight time per 365 days", tone: "sky" },
     { value: hrs(l.duty7Day), label: "Max hours of work per 7 days", tone: "violet" },
-    ...(l.duty28Day ? [{ value: hrs(l.duty28Day), label: "Max hours of work per 28 days", tone: "violet" }] : []),
+    { value: hrs(l.duty28Day), label: "Max hours of work per 28 days", tone: "violet" },
     { value: hrs(l.duty365), label: "Max hours of work per 365 days", tone: "violet" },
     { value: hrs(l.minRestHome), label: "Minimum rest at home base", tone: "emerald" },
     { value: hrs(l.minRestAway), label: "Minimum rest away from base", tone: "emerald" },
@@ -203,10 +203,51 @@ export default function DutyPage() {
             </div>
           ))}
         </div>
-        <p className="text-xs text-slate-500 mt-3">
-          Max FDP is a sliding scale (about 9–13 h) set by report time and number of
-          flight segments — the figure above is the ceiling.
-        </p>
+        <details className="mt-4 rounded-lg border border-slate-800 bg-slate-900/40">
+          <summary className="cursor-pointer px-3 py-2 text-sm font-medium text-slate-300 select-none">
+            Max FDP by report time &amp; segments
+          </summary>
+          <div className="px-3 pb-3">
+            <p className="text-xs text-slate-500 mb-2">
+              The daily maximum is a sliding scale, not a single number — the ceiling above
+              is the best case. Flights averaging 50 minutes or more.
+            </p>
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="text-slate-400">
+                    <th className="text-left font-medium py-1 pr-2">Report</th>
+                    <th className="text-right font-medium py-1 px-2">1–4</th>
+                    <th className="text-right font-medium py-1 px-2">5–6</th>
+                    <th className="text-right font-medium py-1 pl-2">7+</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {FDP_TABLE.map((r) => (
+                    <tr key={r.start} className={"border-t border-slate-800 " + (r.mostRestrictive ? "text-amber-300" : "text-slate-300")}>
+                      <td className="py-1 pr-2 whitespace-nowrap">{r.start}</td>
+                      <td className="py-1 px-2 text-right tabular-nums">{r.legs1to4.toFixed(1)}</td>
+                      <td className="py-1 px-2 text-right tabular-nums">{r.legs5to6.toFixed(1)}</td>
+                      <td className="py-1 pl-2 text-right tabular-nums">{r.legs7plus.toFixed(1)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <p className="text-xs text-slate-500 mt-2">Hours of flight duty period, by number of flight segments.</p>
+          </div>
+        </details>
+
+        <details className="mt-2 rounded-lg border border-slate-800 bg-slate-900/40">
+          <summary className="cursor-pointer px-3 py-2 text-sm font-medium text-slate-300 select-none">
+            Rest, time off &amp; extensions
+          </summary>
+          <ul className="px-3 pb-3 space-y-2 text-xs text-slate-400 list-disc pl-6">
+            {effectiveLimits(data.profile).notes.map((n) => (
+              <li key={n}>{n}</li>
+            ))}
+          </ul>
+        </details>
       </div>
 
       {modalKey && (
