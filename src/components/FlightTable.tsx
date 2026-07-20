@@ -285,6 +285,14 @@ export default function FlightTable({ onFullEdit }: { onFullEdit: (id: string) =
       {selected.size > 0 && (
         <div className="flex flex-wrap items-center gap-2 mb-3 p-2.5 rounded-lg bg-brand-600/10 border border-brand-500/30">
           <span className="text-sm font-medium text-brand-200">{selected.size} selected</span>
+          {selected.size === 1 && (
+            <button
+              onClick={() => { const id = [...selected][0]; clearSel(); onFullEdit(id); }}
+              className="text-sm font-medium bg-brand-600 hover:bg-brand-700 text-white px-3 py-1.5 rounded-lg transition"
+            >
+              Edit
+            </button>
+          )}
           <button onClick={() => setBulkOpen((v) => !v)} className="text-sm font-medium bg-brand-600 hover:bg-brand-700 text-white px-3 py-1.5 rounded-lg transition">
             Bulk edit
           </button>

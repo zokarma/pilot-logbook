@@ -8,6 +8,8 @@ import {
   currentPilot, flightDate, flightsForCurrentPilot, flightDateStr, ifrHours, num, pilotName, totalHours,
 } from "@/lib/logbook";
 import { DASH_METRICS, computeActiveDuty, computeCars, isHidden } from "@/lib/dashboard";
+import { OPERATION_TYPES, DUTY_LIMITS, DEFAULT_OPERATION } from "@/lib/dutyLimits";
+import { builtinCurrencyStatuses, customCurrencyStatuses } from "@/lib/currency";
 import { documentStatus, STATUS_META } from "@/lib/documents";
 
 /* ---------- presentational helpers ---------- */
@@ -44,6 +46,14 @@ function GaugeCard({ title, subLabel, pct, color }: { title: string; subLabel: s
       </div>
     </div>
   );
+}
+
+// Whole days from today until a "YYYY-MM-DD" date (negative = already past).
+function daysUntil(dateStr: string): number {
+  const [y, m, d] = dateStr.split("-").map((n) => parseInt(n, 10));
+  const n = new Date();
+  const today = new Date(n.getFullYear(), n.getMonth(), n.getDate()).getTime();
+  return Math.round((new Date(y, (m || 1) - 1, d || 1).getTime() - today) / 86400000);
 }
 
 const ICONS: Record<string, React.ReactNode> = {
@@ -104,6 +114,7 @@ export default function DashboardPage() {
   const cp = currentPilot(data);
   const duty = computeActiveDuty(data);
   const cars = computeCars(data);
+  const currencies = [...builtinCurrencyStatuses(data), ...customCurrencyStatuses(data)];
   const recent = flightsForCurrentPilot(data)[0];
 
   const primaryVisible = primary.filter((c) => !hidden(c[0]));
@@ -233,6 +244,38 @@ export default function DashboardPage() {
         </div>
       )}
 
+      {/* Currency */}
+      {!hidden("currency") && (
+        <div>
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400">Currency · Recency</h3>
+            <Link href="/currency" className="text-xs font-medium text-cyan-400 hover:text-cyan-300 flex items-center gap-1">
+              View Currency
+              <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
+            </Link>
+          </div>
+          <div className="card p-2 sm:p-3">
+            <ul className="divide-y divide-slate-800">
+              {currencies.map((s) => {
+                const days = s.lapsesOn ? daysUntil(s.lapsesOn) : null;
+                const tone = !s.ok ? "text-red-400" : days !== null && days <= 30 ? "text-amber-300" : "text-emerald-400";
+                const label = !s.ok ? "NOT CURRENT" : days !== null && days <= 30 ? `LAPSES IN ${days}d` : "CURRENT";
+                return (
+                  <li key={s.key} className="flex items-center justify-between gap-3 px-3 py-2.5">
+                    <span className="text-sm font-medium text-slate-100 truncate">{s.name}</span>
+                    <span className={"text-xs font-semibold whitespace-nowrap " + tone}>{label}</span>
+                  </li>
+                );
+              })}
+            </ul>
+            <div className="px-3 pt-2 pb-1 flex items-center justify-between">
+              <span className="text-[11px] text-slate-500">Reference only — the CARs and company minima govern.</span>
+              <Link href="/currency" className="text-xs text-cyan-400 hover:text-cyan-300 font-medium">Manage rules →</Link>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Active Duty */}
       {dutyCards.length > 0 && (
         <div>
@@ -310,14 +353,26 @@ export default function DashboardPage() {
       {/* CARs Compliance */}
       {carsCards.length > 0 && (
         <div>
-          <div className="flex items-center justify-between mb-3">
+          <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
             <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400">CARs Compliance · Duty Tracker</h3>
-            <Link href="/duty" className="text-xs font-medium text-cyan-400 hover:text-cyan-300 flex items-center gap-1">
-              View in Duty Tracker
-              <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
-            </Link>
+            <div className="flex items-center gap-3">
+              <label className="flex items-center gap-1.5 text-xs text-slate-400">
+                Operation
+                <select
+                  value={data.profile?.carsSubpart ?? DEFAULT_OPERATION}
+                  onChange={(e) => mutate((d) => { if (d.profile) d.profile.carsSubpart = e.target.value; })}
+                  className="bg-slate-800 border border-slate-700 rounded-lg text-xs px-2 py-1 text-slate-200"
+                >
+                  {OPERATION_TYPES.map((t) => <option key={t} value={t}>{DUTY_LIMITS[t].label}</option>)}
+                </select>
+              </label>
+              <Link href="/duty" className="text-xs font-medium text-cyan-400 hover:text-cyan-300 flex items-center gap-1">
+                View in Duty Tracker
+                <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
+              </Link>
+            </div>
           </div>
-          <p className="text-xs text-slate-500 mb-3">Live from your Duty Tracker — edit duty days there and these update automatically.</p>
+          <p className="text-xs text-slate-500 mb-3">Live from your Duty Tracker — pick your operation type above; edit duty days there and these update automatically.</p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">{carsCards}</div>
         </div>
       )}
