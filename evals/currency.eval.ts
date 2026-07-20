@@ -7,7 +7,7 @@ import {
   monthsAgo, daysAgo,
 } from "../src/lib/currency";
 import { dstr } from "../src/lib/logbook";
-import { CurrencyRule, Flight } from "../src/lib/types";
+import { CurrencyRule } from "../src/lib/types";
 import { Suite } from "./harness";
 import { mkData, mkFlight } from "./fixtures";
 
