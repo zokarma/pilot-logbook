@@ -1,18 +1,16 @@
 # Pilot Logbook (Next.js)
 
 A pilot logbook web app — flight logging, dashboard, route map, duty tracker,
-pilot profiles with de-duplication, CSV import/export, and bug reporting.
+currency/recency tracking, pilot profiles with de-duplication, a per-user fleet
+manager, aviation-document tracking, CSV import/export, PDF export, logbook
+scanning, and bug reporting.
 
-This is the **Next.js / TypeScript** rebuild of the original single-file
-`index.html` app. It uses the App Router (one route per tab) and **Supabase Auth
-+ Row Level Security** as the data layer. The browser talks to Supabase directly
-with the **public anon key** — there is **no service-role/secret key anywhere**,
-and RLS guarantees each user can only read/write their own row. A localStorage
-mirror provides offline resilience and holds bug-report screenshots (which are
-never sent to the cloud).
-
-> The legacy single-file version still lives in `index.html` for reference and
-> can be deleted once you're happy with the Next.js app.
+It's a **Next.js / TypeScript** app using the App Router (one route per tab) and
+**Supabase Auth + Row Level Security** as the data layer. The browser talks to
+Supabase directly with the **public anon key** — there is **no
+service-role/secret key anywhere**, and RLS guarantees each user can only
+read/write their own row. A localStorage mirror provides offline resilience and
+holds bug-report screenshots (which are never sent to the cloud).
 
 ## Getting started
 

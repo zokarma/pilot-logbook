@@ -5,6 +5,7 @@
 
 import { AppData, emptyData } from "./types";
 import { hashStr } from "./hash";
+import { migrateData } from "./migrate";
 
 const cacheKey = (u: string) => "plb_cache_" + u;
 const baseKey = (u: string) => "plb_base_" + u;
@@ -74,7 +75,13 @@ export interface SyncBase {
 export function loadBase(user: string): SyncBase | null {
   try {
     const raw = localStorage.getItem(baseKey(user));
-    return raw ? (JSON.parse(raw) as SyncBase) : null;
+    if (!raw) return null;
+    const base = JSON.parse(raw) as SyncBase;
+    // Normalize a base stored by an older app version: the sync merge compares
+    // fields against this ancestor, and a missing-vs-empty mismatch on a newly
+    // added field would make an untouched local look edited and win the merge.
+    base.data = migrateData(base.data);
+    return base;
   } catch {
     return null;
   }

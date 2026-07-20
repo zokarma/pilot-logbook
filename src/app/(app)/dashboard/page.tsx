@@ -2,12 +2,13 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useData } from "@/context/DataContext";
 import { aircraftName } from "@/lib/aircraft";
 import {
   currentPilot, flightDate, flightsForCurrentPilot, flightDateStr, ifrHours, num, pilotName, totalHours,
 } from "@/lib/logbook";
-import { DASH_METRICS, computeActiveDuty, computeCars, isHidden } from "@/lib/dashboard";
+import { DASH_METRICS, computeActiveDuty, computeCars, isHidden, roleAutoHidden } from "@/lib/dashboard";
 import { OPERATION_TYPES, DUTY_LIMITS, DEFAULT_OPERATION } from "@/lib/dutyLimits";
 import { builtinCurrencyStatuses, customCurrencyStatuses } from "@/lib/currency";
 import { documentStatus, STATUS_META } from "@/lib/documents";
@@ -65,7 +66,15 @@ const ICONS: Record<string, React.ReactNode> = {
 
 export default function DashboardPage() {
   const { data, mutate } = useData();
+  const router = useRouter();
   const [customizing, setCustomizing] = useState(false);
+
+  // Same intent mechanism the iOS widget deep link uses: park the flag, go to
+  // the logger, and its mount effect opens the flight form.
+  function addFlight() {
+    try { sessionStorage.setItem("plb_pending_new_flight", "1"); } catch { /* ignore */ }
+    router.push("/logger");
+  }
   const hidden = (k: string) => isHidden(data, k);
 
   const pid = data.currentPilotId;
@@ -114,8 +123,29 @@ export default function DashboardPage() {
   const cp = currentPilot(data);
   const duty = computeActiveDuty(data);
   const cars = computeCars(data);
-  const currencies = [...builtinCurrencyStatuses(data), ...customCurrencyStatuses(data)];
   const recent = flightsForCurrentPilot(data)[0];
+
+  // Currency widget rows: TC built-ins + custom rules + recurrent training
+  // (document-driven), minus any the pilot hid on the Currency page.
+  const currencyHiddenSet = new Set(data.currencyHidden ?? []);
+  const recurrentDoc = [...data.documents]
+    .filter((x) => x.type === "Recurrent Training")
+    .sort((a, b) => (b.expiryDate || "").localeCompare(a.expiryDate || ""))[0] || null;
+  const recurrentStatus = recurrentDoc ? documentStatus(recurrentDoc) : null;
+  const currencyRows = [
+    ...[...builtinCurrencyStatuses(data), ...customCurrencyStatuses(data)].map((s) => {
+      const days = s.lapsesOn ? daysUntil(s.lapsesOn) : null;
+      const tone = !s.ok ? "text-red-400" : days !== null && days <= 30 ? "text-amber-300" : "text-emerald-400";
+      const label = !s.ok ? "NOT CURRENT" : days !== null && days <= 30 ? `LAPSES IN ${days}d` : "CURRENT";
+      return { key: s.key, name: s.name, label, tone };
+    }),
+    {
+      key: "recurrent-training",
+      name: "Recurrent training — 24 months",
+      label: recurrentStatus ? STATUS_META[recurrentStatus.status].short.toUpperCase() : "NOT ON FILE",
+      tone: recurrentStatus ? STATUS_META[recurrentStatus.status].cls : "text-slate-400",
+    },
+  ].filter((r) => !currencyHiddenSet.has(r.key));
 
   const primaryVisible = primary.filter((c) => !hidden(c[0]));
   const secondaryVisible = secondary.filter((c) => !hidden(c[0]));
@@ -132,10 +162,21 @@ export default function DashboardPage() {
 
   function toggle(key: string) {
     mutate((d) => {
-      const set = new Set(d.dashboardHidden || []);
-      if (set.has(key)) set.delete(key);
-      else set.add(key);
-      d.dashboardHidden = Array.from(set);
+      const hiddenSet = new Set(d.dashboardHidden || []);
+      const shownSet = new Set(d.dashboardShown || []);
+      const autoHidden = roleAutoHidden(d).has(key);
+      if (isHidden(d, key)) {
+        // Currently hidden → show it. Clear any explicit hide, and if the role
+        // hides it by default, record an explicit "show" to override that.
+        hiddenSet.delete(key);
+        if (autoHidden) shownSet.add(key);
+      } else {
+        // Currently shown → hide it. Drop any role-override show.
+        hiddenSet.add(key);
+        shownSet.delete(key);
+      }
+      d.dashboardHidden = Array.from(hiddenSet);
+      d.dashboardShown = Array.from(shownSet);
     });
   }
 
@@ -143,8 +184,12 @@ export default function DashboardPage() {
 
   return (
     <section className="space-y-8">
-      {/* Customize toolbar */}
-      <div className="flex items-center justify-end -mb-4">
+      {/* Quick action + Customize toolbar */}
+      <div className="flex items-center justify-between -mb-4">
+        <button onClick={addFlight} className="flex items-center gap-2 text-sm font-medium bg-brand-600 hover:bg-brand-700 text-white px-4 py-2 rounded-lg transition">
+          <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14M5 12h14" /></svg>
+          Add a Flight
+        </button>
         <button onClick={() => setCustomizing((v) => !v)} className="flex items-center gap-2 text-sm font-medium text-slate-300 bg-slate-800 hover:bg-slate-700 px-3 py-1.5 rounded-lg transition">
           <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 6h16M4 12h16M4 18h16" /><circle cx="9" cy="6" r="2" fill="currentColor" stroke="none" /><circle cx="15" cy="12" r="2" fill="currentColor" stroke="none" /><circle cx="8" cy="18" r="2" fill="currentColor" stroke="none" /></svg>
           <span>Customize</span>
@@ -155,7 +200,7 @@ export default function DashboardPage() {
           <div className="flex items-center justify-between mb-3">
             <h3 className="font-semibold">Customize dashboard</h3>
             <div className="flex items-center gap-3">
-              <button onClick={() => mutate((d) => { d.dashboardHidden = []; })} className="text-xs text-slate-400 hover:text-slate-200">Show all</button>
+              <button onClick={() => mutate((d) => { d.dashboardHidden = []; d.dashboardShown = Array.from(roleAutoHidden(d)); })} className="text-xs text-slate-400 hover:text-slate-200">Show all</button>
               <button onClick={() => setCustomizing(false)} className="text-sm font-medium bg-brand-600 hover:bg-brand-500 text-white px-3 py-1.5 rounded-lg transition">Done</button>
             </div>
           </div>
@@ -255,22 +300,21 @@ export default function DashboardPage() {
             </Link>
           </div>
           <div className="card p-2 sm:p-3">
-            <ul className="divide-y divide-slate-800">
-              {currencies.map((s) => {
-                const days = s.lapsesOn ? daysUntil(s.lapsesOn) : null;
-                const tone = !s.ok ? "text-red-400" : days !== null && days <= 30 ? "text-amber-300" : "text-emerald-400";
-                const label = !s.ok ? "NOT CURRENT" : days !== null && days <= 30 ? `LAPSES IN ${days}d` : "CURRENT";
-                return (
-                  <li key={s.key} className="flex items-center justify-between gap-3 px-3 py-2.5">
-                    <span className="text-sm font-medium text-slate-100 truncate">{s.name}</span>
-                    <span className={"text-xs font-semibold whitespace-nowrap " + tone}>{label}</span>
+            {currencyRows.length === 0 ? (
+              <p className="px-3 py-4 text-sm text-slate-400">All currencies are hidden. Show some on the <Link href="/currency" className="text-cyan-400 hover:text-cyan-300">Currency page</Link>.</p>
+            ) : (
+              <ul className="divide-y divide-slate-800">
+                {currencyRows.map((r) => (
+                  <li key={r.key} className="flex items-center justify-between gap-3 px-3 py-2.5">
+                    <span className="text-sm font-medium text-slate-100 truncate">{r.name}</span>
+                    <span className={"text-xs font-semibold whitespace-nowrap " + r.tone}>{r.label}</span>
                   </li>
-                );
-              })}
-            </ul>
+                ))}
+              </ul>
+            )}
             <div className="px-3 pt-2 pb-1 flex items-center justify-between">
               <span className="text-[11px] text-slate-500">Reference only — the CARs and company minima govern.</span>
-              <Link href="/currency" className="text-xs text-cyan-400 hover:text-cyan-300 font-medium">Manage rules →</Link>
+              <Link href="/currency" className="text-xs text-cyan-400 hover:text-cyan-300 font-medium">Manage &amp; hide →</Link>
             </div>
           </div>
         </div>

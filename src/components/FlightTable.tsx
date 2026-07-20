@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useData } from "@/context/DataContext";
 import { fleetTypes, CREW_ROLES } from "@/lib/aircraft";
 import {
@@ -10,6 +10,7 @@ import {
   DEFAULT_FLIGHT_COLUMN_KEYS, FLIGHT_COLUMN_LABEL, normalizeFlightColumns,
 } from "@/lib/flightColumns";
 import { DayNight, Flight } from "@/lib/types";
+import { useUi } from "./UiProvider";
 
 type InlineForm = {
   date: string; aircraftType: string; registration: string; from: string; to: string;
@@ -55,12 +56,48 @@ function emptyBulk(): Record<BulkField, { on: boolean; value: string }> {
 
 const cellIn = "w-full bg-slate-900/70 border border-slate-700 rounded px-1.5 py-1 text-sm";
 const numIn = "w-14 bg-slate-900/70 border border-slate-700 rounded px-1 py-1 text-sm";
+// Row action buttons: comfortable tap targets on touch screens, compact on sm+.
+const actBtn = "font-medium inline-block px-2 py-2.5 -my-2 sm:px-1 sm:py-1 sm:my-0 rounded-lg";
+// Row checkboxes: slightly larger on touch screens.
+const rowCheck = "accent-cyan-500 w-5 h-5 sm:w-4 sm:h-4";
 
 export default function FlightTable({ onFullEdit }: { onFullEdit: (id: string) => void }) {
   const { data, mutate } = useData();
-  const flights = flightsForCurrentPilot(data);
+  const { confirmDialog, toast } = useUi();
+  const allFlights = flightsForCurrentPilot(data);
+
+  // Search + date-range filter. The rest of the component (selection, quick
+  // edit, bulk edit) operates on the FILTERED list, which is what's on screen.
+  const [query, setQuery] = useState("");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+  const filtering = !!(query.trim() || dateFrom || dateTo);
+  const flights = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!filtering) return allFlights;
+    return allFlights.filter((fl) => {
+      const ds = fl.date || "";
+      if (dateFrom && ds < dateFrom) return false;
+      if (dateTo && ds > dateTo) return false;
+      if (!q) return true;
+      const hay = [
+        fl.registration || fl.civilIdent, fl.from, fl.to, fl.aircraftType,
+        pilotName(data, fl.picId) || fl.pic, pilotName(data, fl.sicId) || fl.sic,
+        pilotName(data, fl.socId) || fl.soc, fl.notes,
+      ].filter(Boolean).join(" ").toLowerCase();
+      return hay.includes(q);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allFlights, query, dateFrom, dateTo, filtering, data.pilots]);
 
   const [selected, setSelected] = useState<Set<string>>(new Set());
+
+  // Changing the filter clears the selection so off-screen rows can't stay
+  // silently selected (a later bulk delete would hit rows the pilot can't see).
+  useEffect(() => {
+    setSelected(new Set());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [query, dateFrom, dateTo]);
   const anchor = useRef<number | null>(null);
   const [inlineId, setInlineId] = useState<string | null>(null);
   const [form, setForm] = useState<InlineForm | null>(null);
@@ -163,15 +200,33 @@ export default function FlightTable({ onFullEdit }: { onFullEdit: (id: string) =
     setBulkOpen(false);
     clearSel();
   }
-  function deleteSelected() {
-    if (!confirm(`Delete ${selected.size} selected flight${selected.size === 1 ? "" : "s"}? This cannot be undone.`)) return;
-    mutate((d) => { d.flights = d.flights.filter((f) => !selected.has(f.id)); });
+  // Deleted flights are restorable from the toast's Undo (the list re-sorts by
+  // date on read, so re-pushing the saved objects puts them straight back).
+  function restoreFlights(removed: Flight[]) {
+    mutate((d) => { d.flights.push(...structuredClone(removed)); });
+  }
+  async function deleteSelected() {
+    const ids = new Set(selected);
+    const removed = data.flights.filter((f) => ids.has(f.id));
+    if (!removed.length) return;
+    const n = removed.length;
+    const ok = await confirmDialog({
+      title: `Delete ${n} flight${n === 1 ? "" : "s"}?`,
+      message: `The selected flight${n === 1 ? "" : "s"} will be removed from your logbook.`,
+      confirmLabel: "Delete",
+      danger: true,
+    });
+    if (!ok) return;
+    mutate((d) => { d.flights = d.flights.filter((f) => !ids.has(f.id)); });
     clearSel();
+    toast(`${n} flight${n === 1 ? "" : "s"} deleted`, { actionLabel: "Undo", onAction: () => restoreFlights(removed) });
   }
   function delOne(id: string) {
-    if (!confirm("Delete this flight? This cannot be undone.")) return;
+    const removed = data.flights.find((x) => x.id === id);
+    if (!removed) return;
     mutate((d) => { d.flights = d.flights.filter((x) => x.id !== id); });
     if (inlineId === id) cancelInline();
+    toast("Flight deleted", { actionLabel: "Undo", onAction: () => restoreFlights([removed]) });
   }
 
   /* ----- columns ----- */
@@ -382,7 +437,7 @@ export default function FlightTable({ onFullEdit }: { onFullEdit: (id: string) =
         </div>
       )}
 
-      {flights.length > 0 && (
+      {allFlights.length > 0 && (
         <div className="flex items-start justify-between gap-3 mb-2">
           <p className="text-xs text-slate-500">
             Tip: double-click a row to quick-edit · click checkboxes (Shift-click for a range) to select, then Bulk edit.
@@ -397,12 +452,38 @@ export default function FlightTable({ onFullEdit }: { onFullEdit: (id: string) =
         </div>
       )}
 
+      {/* Search + date filter */}
+      {allFlights.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2 mb-3">
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search reg, route, type, pilot…"
+            className="px-3 py-2 border border-slate-700 rounded-lg text-sm w-60 max-w-full"
+          />
+          <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="px-2 py-1.5 border border-slate-700 rounded-lg text-sm" aria-label="From date" />
+          <span className="text-slate-500 text-sm">–</span>
+          <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="px-2 py-1.5 border border-slate-700 rounded-lg text-sm" aria-label="To date" />
+          {filtering && (
+            <>
+              <span className="text-xs text-slate-400">{flights.length} of {allFlights.length} flights</span>
+              <button
+                onClick={() => { setQuery(""); setDateFrom(""); setDateTo(""); }}
+                className="text-xs font-medium text-cyan-400 hover:text-cyan-300"
+              >
+                Clear
+              </button>
+            </>
+          )}
+        </div>
+      )}
+
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
             <tr className="text-left text-slate-400 border-b border-slate-800">
               <th className="py-2 pr-2 w-8">
-                <input type="checkbox" checked={allSelected} onChange={toggleAll} className="accent-cyan-500 w-4 h-4" aria-label="Select all" />
+                <input type="checkbox" checked={allSelected} onChange={toggleAll} className={rowCheck} aria-label="Select all" />
               </th>
               {visibleCols.map((key) => (
                 <th key={key} className="py-2 pr-3 font-medium">{FLIGHT_COLUMN_LABEL[key]}</th>
@@ -411,6 +492,13 @@ export default function FlightTable({ onFullEdit }: { onFullEdit: (id: string) =
             </tr>
           </thead>
           <tbody>
+            {filtering && !flights.length && (
+              <tr>
+                <td colSpan={visibleCols.length + 2} className="py-6 text-center text-slate-400 text-sm">
+                  No flights match the current filter.
+                </td>
+              </tr>
+            )}
             {flights.map((fl, idx) => {
               const isSel = selected.has(fl.id);
               const isEditing = inlineId === fl.id && form;
@@ -418,14 +506,14 @@ export default function FlightTable({ onFullEdit }: { onFullEdit: (id: string) =
                 return (
                   <tr key={fl.id} className="border-b border-brand-500/40 bg-slate-800/70" onKeyDown={onInlineKey}>
                     <td className="py-1.5 pr-2 align-top pt-2">
-                      <input type="checkbox" checked={isSel} readOnly onClick={(e) => onRowCheck(idx, fl.id, e.shiftKey)} className="accent-cyan-500 w-4 h-4" />
+                      <input type="checkbox" checked={isSel} readOnly onClick={(e) => onRowCheck(idx, fl.id, e.shiftKey)} className={rowCheck} />
                     </td>
                     {visibleCols.map((key, ci) => (
                       <td key={key} className="py-1.5 pr-2">{editCell(key, ci === 0)}</td>
                     ))}
                     <td className="py-1.5 pr-3 text-right whitespace-nowrap align-middle">
-                      <button onClick={saveInline} className="text-emerald-400 hover:text-emerald-300 font-medium mr-3">Save</button>
-                      <button onClick={cancelInline} className="text-slate-400 hover:text-slate-200 font-medium">Cancel</button>
+                      <button onClick={saveInline} className={actBtn + " text-emerald-400 hover:text-emerald-300 mr-1 sm:mr-2"}>Save</button>
+                      <button onClick={cancelInline} className={actBtn + " text-slate-400 hover:text-slate-200"}>Cancel</button>
                     </td>
                   </tr>
                 );
@@ -437,15 +525,15 @@ export default function FlightTable({ onFullEdit }: { onFullEdit: (id: string) =
                   className={"border-b border-slate-800/60 cursor-default " + (isSel ? "bg-brand-600/10" : "hover:bg-slate-800/60")}
                 >
                   <td className="py-2 pr-2" onDoubleClick={(e) => e.stopPropagation()}>
-                    <input type="checkbox" checked={isSel} readOnly onClick={(e) => onRowCheck(idx, fl.id, e.shiftKey)} className="accent-cyan-500 w-4 h-4" />
+                    <input type="checkbox" checked={isSel} readOnly onClick={(e) => onRowCheck(idx, fl.id, e.shiftKey)} className={rowCheck} />
                   </td>
                   {visibleCols.map((key) => (
                     <td key={key} className="py-2 pr-3">{displayCell(key, fl)}</td>
                   ))}
                   <td className="py-2 pr-3 text-right whitespace-nowrap" onDoubleClick={(e) => e.stopPropagation()}>
-                    <button onClick={() => startInline(fl)} className="text-cyan-400 hover:text-cyan-300 font-medium mr-3">Quick</button>
-                    <button onClick={() => onFullEdit(fl.id)} className="text-slate-300 hover:text-white font-medium mr-3">Edit</button>
-                    <button onClick={() => delOne(fl.id)} className="text-red-500 hover:text-red-400 font-medium">Delete</button>
+                    <button onClick={() => startInline(fl)} className={actBtn + " text-cyan-400 hover:text-cyan-300 mr-1 sm:mr-2"}>Quick</button>
+                    <button onClick={() => onFullEdit(fl.id)} className={actBtn + " text-slate-300 hover:text-white mr-1 sm:mr-2"}>Edit</button>
+                    <button onClick={() => delOne(fl.id)} className={actBtn + " text-red-500 hover:text-red-400"}>Delete</button>
                   </td>
                 </tr>
               );

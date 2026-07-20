@@ -15,8 +15,23 @@ export const DASH_METRICS: { section: string; items: [string, string][] }[] = [
   { section: "CARs Compliance · Duty Tracker", items: [["carMonthly", "Flight Time (28-day)"], ["carRest", "Min Rest"]] },
 ];
 
+// The Active-Duty + CARs-compliance widgets encode CARs Part VII commercial
+// duty limits (703/704/705). Roles that don't operate under those rules get
+// them hidden by default — the pilot can still switch them back on in Customize.
+const DUTY_WIDGET_KEYS = ["dailyDuty", "weeklyDuty", "carMonthly", "carRest"];
+const NON_COMMERCIAL_ROLES = new Set(["Student Pilot", "Private Pilot", "Flight Instructor"]);
+
+// Keys hidden by default for the pilot's role (empty for commercial roles).
+export function roleAutoHidden(data: AppData): Set<string> {
+  const role = data.profile?.role;
+  return role && NON_COMMERCIAL_ROLES.has(role) ? new Set(DUTY_WIDGET_KEYS) : new Set();
+}
+
+// A metric is hidden when the pilot explicitly hid it, or when their role hides
+// it by default AND they haven't explicitly opted to show it (dashboardShown).
 export function isHidden(data: AppData, key: string): boolean {
-  return (data.dashboardHidden || []).includes(key);
+  if ((data.dashboardHidden || []).includes(key)) return true;
+  return roleAutoHidden(data).has(key) && !(data.dashboardShown || []).includes(key);
 }
 
 // Active Duty — today + trailing 7 days of recorded duty hours.

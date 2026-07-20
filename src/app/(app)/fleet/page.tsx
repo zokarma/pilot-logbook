@@ -5,9 +5,11 @@ import { useData } from "@/context/DataContext";
 import { uid } from "@/lib/id";
 import { fleetTypes, normalizeAircraftCode } from "@/lib/aircraft";
 import { AircraftType } from "@/lib/types";
+import { useUi } from "@/components/UiProvider";
 
 export default function FleetPage() {
   const { data, mutate } = useData();
+  const { toast } = useUi();
   const [form, setForm] = useState({ code: "", name: "" });
   const [msg, setMsg] = useState("");
   const [query, setQuery] = useState("");
@@ -74,13 +76,19 @@ export default function FleetPage() {
   }
 
   function remove(id: string, code: string) {
+    const removed = (data.fleet || []).find((a) => a.id === id);
+    if (!removed) return;
     const used = usage.get(normalizeAircraftCode(code)) || 0;
-    const warn = used > 0
-      ? `Remove "${code}" from your fleet? ${used} logged flight${used === 1 ? "" : "s"} use it — those flights keep the code, but it won't appear in the picker anymore.`
-      : `Remove "${code}" from your fleet?`;
-    if (!confirm(warn)) return;
     mutate((draft) => {
       draft.fleet = (draft.fleet || []).filter((a) => a.id !== id);
+    });
+    // Logged flights keep the code either way — removal only affects pickers.
+    toast(`"${code}" removed from your fleet${used ? ` — ${used} logged flight${used === 1 ? "" : "s"} keep the code` : ""}`, {
+      actionLabel: "Undo",
+      onAction: () => mutate((draft) => {
+        if (!Array.isArray(draft.fleet)) draft.fleet = [];
+        draft.fleet.push(structuredClone(removed));
+      }),
     });
   }
 

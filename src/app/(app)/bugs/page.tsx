@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useData } from "@/context/DataContext";
+import { useUi } from "@/components/UiProvider";
 
 const SEV_COLOR: Record<string, string> = {
   "data-loss": "bg-red-500/15 text-red-300",
@@ -11,6 +12,7 @@ const SEV_COLOR: Record<string, string> = {
 
 export default function BugsPage() {
   const { data, mutate } = useData();
+  const { toast } = useUi();
   const [filter, setFilter] = useState<"all" | "open" | "resolved">("all");
 
   const reports = (data.bugReports || [])
@@ -31,8 +33,13 @@ export default function BugsPage() {
   }
 
   function del(id: string) {
-    if (!confirm("Delete this bug report? This cannot be undone.")) return;
+    const removed = (data.bugReports || []).find((r) => r.id === id);
+    if (!removed) return;
     mutate((d) => { d.bugReports = d.bugReports.filter((r) => r.id !== id); });
+    toast("Bug report deleted", {
+      actionLabel: "Undo",
+      onAction: () => mutate((d) => { d.bugReports.push(structuredClone(removed)); }),
+    });
   }
 
   return (

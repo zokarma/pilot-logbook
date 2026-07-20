@@ -10,6 +10,7 @@ import {
 import { documentStatus, STATUS_META } from "@/lib/documents";
 import { fleetTypes, normalizeAircraftCode } from "@/lib/aircraft";
 import { CurrencyRule } from "@/lib/types";
+import { useUi } from "@/components/UiProvider";
 
 // A currency that lapses within this many days shows amber.
 const WARN_DAYS = 30;
@@ -21,7 +22,7 @@ function daysUntil(dateStr: string): number {
   return Math.round((new Date(y, (m || 1) - 1, d || 1).getTime() - today) / 86400000);
 }
 
-function StatusCard({ s, onDelete }: { s: CurrencyStatus; onDelete?: () => void }) {
+function StatusCard({ s, onDelete, hidden, onToggleHide }: { s: CurrencyStatus; onDelete?: () => void; hidden?: boolean; onToggleHide?: () => void }) {
   const days = s.lapsesOn ? daysUntil(s.lapsesOn) : null;
   const tone = !s.ok ? "red" : days !== null && days <= WARN_DAYS ? "amber" : "green";
   const toneCls = tone === "red" ? "border-red-500/40" : tone === "amber" ? "border-amber-400/40" : "border-emerald-500/30";
@@ -32,14 +33,17 @@ function StatusCard({ s, onDelete }: { s: CurrencyStatus; onDelete?: () => void 
       : <span className="text-xs font-semibold text-emerald-400">CURRENT</span>;
 
   return (
-    <div className={`card p-4 border ${toneCls}`}>
+    <div className={`card p-4 border ${toneCls}` + (hidden ? " opacity-50" : "")}>
       <div className="flex items-start justify-between gap-2 mb-2">
         <div>
-          <h3 className="font-semibold text-sm">{s.name}</h3>
+          <h3 className="font-semibold text-sm">{s.name}{hidden && <span className="text-slate-500 font-normal"> · hidden</span>}</h3>
           {s.regRef && <p className="text-[11px] text-slate-500">{s.regRef} · reference only</p>}
         </div>
         <span className="flex items-center gap-3">
           {badge}
+          {onToggleHide && (
+            <button onClick={onToggleHide} className="text-xs text-slate-400 hover:text-slate-200">{hidden ? "Show" : "Hide"}</button>
+          )}
           {onDelete && (
             <button onClick={onDelete} className="text-xs text-red-400 hover:text-red-300">Remove</button>
           )}
@@ -72,6 +76,7 @@ function StatusCard({ s, onDelete }: { s: CurrencyStatus; onDelete?: () => void 
 
 export default function CurrencyPage() {
   const { data, mutate } = useData();
+  const { toast } = useUi();
   const [form, setForm] = useState({ name: "", metric: "landings" as CurrencyMetric, threshold: "3", windowDays: "90", aircraftType: "" });
   const [msg, setMsg] = useState("");
   // The add-rule form is collapsed behind the header button (same pattern as
@@ -80,6 +85,16 @@ export default function CurrencyPage() {
 
   const builtins = useMemo(() => builtinCurrencyStatuses(data), [data]);
   const customs = useMemo(() => customCurrencyStatuses(data), [data]);
+
+  const hiddenSet = useMemo(() => new Set(data.currencyHidden ?? []), [data.currencyHidden]);
+  function toggleHidden(key: string) {
+    mutate((draft) => {
+      if (!Array.isArray(draft.currencyHidden)) draft.currencyHidden = [];
+      draft.currencyHidden = draft.currencyHidden.includes(key)
+        ? draft.currencyHidden.filter((k) => k !== key)
+        : [...draft.currencyHidden, key];
+    });
+  }
 
   // 24-month recurrent training rides on the Documents system.
   const recurrentDoc = useMemo(() => {
@@ -115,9 +130,17 @@ export default function CurrencyPage() {
   }
 
   function deleteRule(id: string) {
-    if (!confirm("Remove this currency rule?")) return;
+    const removed = (data.currencyRules || []).find((r) => r.id === id);
+    if (!removed) return;
     mutate((draft) => {
       draft.currencyRules = (draft.currencyRules || []).filter((r) => r.id !== id);
+    });
+    toast("Currency rule removed", {
+      actionLabel: "Undo",
+      onAction: () => mutate((draft) => {
+        if (!Array.isArray(draft.currencyRules)) draft.currencyRules = [];
+        draft.currencyRules.push(structuredClone(removed));
+      }),
     });
   }
 
@@ -130,7 +153,8 @@ export default function CurrencyPage() {
           <h1 className="text-xl font-semibold">Currency</h1>
           <p className="text-sm text-slate-400 mt-1">
             Recency at a glance, computed from your logged flights (flights without a landing count are treated as one
-            takeoff and one landing). These gauges are a simplified reference — the CARs, and your company minima, govern.
+            takeoff and one landing). Use <span className="text-slate-200">Hide</span> on any card to drop it here and
+            from the dashboard widget. These gauges are a simplified reference — the CARs, and your company minima, govern.
           </p>
         </div>
         {!showAdd && (
@@ -192,22 +216,29 @@ export default function CurrencyPage() {
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-        {builtins.map((s) => <StatusCard key={s.key} s={s} />)}
+        {builtins.map((s) => (
+          <StatusCard key={s.key} s={s} hidden={hiddenSet.has(s.key)} onToggleHide={() => toggleHidden(s.key)} />
+        ))}
 
         {/* Recurrent training — document-driven */}
-        <div className={`card p-4 border ${!recurrentStatus ? "border-slate-700" : recurrentStatus.status === "expired" ? "border-red-500/40" : recurrentStatus.status === "expiring" ? "border-amber-400/40" : "border-emerald-500/30"}`}>
+        <div className={`card p-4 border ${!recurrentStatus ? "border-slate-700" : recurrentStatus.status === "expired" ? "border-red-500/40" : recurrentStatus.status === "expiring" ? "border-amber-400/40" : "border-emerald-500/30"}` + (hiddenSet.has("recurrent-training") ? " opacity-50" : "")}>
           <div className="flex items-start justify-between gap-2 mb-2">
             <div>
-              <h3 className="font-semibold text-sm">Recurrent training — 24 months</h3>
+              <h3 className="font-semibold text-sm">Recurrent training — 24 months{hiddenSet.has("recurrent-training") && <span className="text-slate-500 font-normal"> · hidden</span>}</h3>
               <p className="text-[11px] text-slate-500">CAR 401.05(2) · reference only</p>
             </div>
-            {recurrentStatus ? (
-              <span className={`text-xs font-semibold ${STATUS_META[recurrentStatus.status].cls}`}>
-                {STATUS_META[recurrentStatus.status].short.toUpperCase()}
-              </span>
-            ) : (
-              <span className="text-xs font-semibold text-slate-400">NOT ON FILE</span>
-            )}
+            <span className="flex items-center gap-3">
+              {recurrentStatus ? (
+                <span className={`text-xs font-semibold ${STATUS_META[recurrentStatus.status].cls}`}>
+                  {STATUS_META[recurrentStatus.status].short.toUpperCase()}
+                </span>
+              ) : (
+                <span className="text-xs font-semibold text-slate-400">NOT ON FILE</span>
+              )}
+              <button onClick={() => toggleHidden("recurrent-training")} className="text-xs text-slate-400 hover:text-slate-200">
+                {hiddenSet.has("recurrent-training") ? "Show" : "Hide"}
+              </button>
+            </span>
           </div>
           {recurrentStatus ? (
             <p className="text-sm text-slate-300">{recurrentStatus.label}</p>
@@ -219,7 +250,9 @@ export default function CurrencyPage() {
           )}
         </div>
 
-        {customs.map((s) => <StatusCard key={s.key} s={s} onDelete={() => deleteRule(s.key)} />)}
+        {customs.map((s) => (
+          <StatusCard key={s.key} s={s} hidden={hiddenSet.has(s.key)} onToggleHide={() => toggleHidden(s.key)} onDelete={() => deleteRule(s.key)} />
+        ))}
       </div>
 
       <p className="text-[11px] text-slate-500">

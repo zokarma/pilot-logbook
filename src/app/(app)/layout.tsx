@@ -7,6 +7,7 @@ import { installErrorCapture } from "@/lib/recentErrors";
 import Sidebar from "@/components/Sidebar";
 import TopBar from "@/components/TopBar";
 import Onboarding from "@/components/Onboarding";
+import UiProvider from "@/components/UiProvider";
 
 const NAV_OPEN_KEY = "plb_nav_open";
 
@@ -81,12 +82,14 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   if (!data.profile?.onboarded) return <Onboarding />;
 
   return (
-    <div className="min-h-screen flex bg-slate-950">
-      <Sidebar open={navOpen} onClose={() => setNav(false)} />
-      <div className="flex-1 flex flex-col min-w-0">
-        <TopBar navOpen={navOpen} onToggleNav={() => setNav(!navOpen)} />
-        <main className="flex-1 w-full px-4 lg:px-8 pt-6 pb-24 fade-in safe-right">{children}</main>
+    <UiProvider>
+      <div className="min-h-screen flex bg-slate-950">
+        <Sidebar open={navOpen} onClose={() => setNav(false)} />
+        <div className="flex-1 flex flex-col min-w-0">
+          <TopBar navOpen={navOpen} onToggleNav={() => setNav(!navOpen)} />
+          <main className="flex-1 w-full px-4 lg:px-8 pt-6 pb-24 fade-in safe-right">{children}</main>
+        </div>
       </div>
-    </div>
+    </UiProvider>
   );
 }

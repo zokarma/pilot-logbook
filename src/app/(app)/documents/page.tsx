@@ -8,9 +8,11 @@ import {
 } from "@/lib/documents";
 import DocumentForm from "@/components/DocumentForm";
 import ScanImport from "@/components/ScanImport";
+import { useUi } from "@/components/UiProvider";
 
 export default function DocumentsPage() {
   const { data, mutate } = useData();
+  const { toast } = useUi();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
 
@@ -30,9 +32,14 @@ export default function DocumentsPage() {
   }
 
   function del(id: string) {
-    if (!confirm("Delete this document?")) return;
+    const removed = data.documents.find((x) => x.id === id);
+    if (!removed) return;
     mutate((d) => { d.documents = d.documents.filter((x) => x.id !== id); });
     if (editingId === id) setEditingId(null);
+    toast("Document deleted", {
+      actionLabel: "Undo",
+      onAction: () => mutate((d) => { d.documents.push(structuredClone(removed)); }),
+    });
   }
 
   function recalcAll() {
