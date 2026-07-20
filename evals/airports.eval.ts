@@ -1,32 +1,35 @@
 // Eval #9 — airport reference data (src/lib/airports.ts).
-// Map support: known Canadian fields resolve to real coordinates; unknown codes
-// fall back deterministically instead of jumping around between renders.
+// Map support: known Canadian fields resolve to real coordinates; unknown
+// codes resolve to NULL (never a made-up position — the Route Map lists them
+// for the pilot to place); the pilot's own placed airports extend and can
+// correct the built-in DB.
 
 import { AIRPORTS_DB, airportCoord, airportLabel, sortedAirportCodes } from "../src/lib/airports";
+import type { CustomAirport } from "../src/lib/types";
 import { Suite } from "./harness";
 
 export function run(): Suite {
   const s = new Suite(9, "Airport DB (airports.ts)", "Route-map support data; wrong coords are cosmetic but visible.");
 
-  const [lat, lon] = airportCoord("CYVR");
-  s.check("CYVR resolves to Vancouver's real coordinates", Math.abs(lat - 49.1939) < 0.01 && Math.abs(lon + 123.1844) < 0.01);
+  const cyvr = airportCoord("CYVR")!;
+  s.check("CYVR resolves to Vancouver's real coordinates", !!cyvr && Math.abs(cyvr[0] - 49.1939) < 0.01 && Math.abs(cyvr[1] + 123.1844) < 0.01);
   s.check("CYVR label names the airport", /vancouver/i.test(airportLabel("CYVR")));
-  s.check("lookup is case-insensitive or exact (documented behavior)", airportCoord("CYYZ")[0] !== airportCoord("CYVR")[0]);
+  s.check("lookup normalizes case and whitespace", airportCoord(" cyvr ")![0] === cyvr[0]);
 
   {
-    const a = airportCoord("ZZZZ");
-    const b = airportCoord("ZZZZ");
-    s.check("unknown code falls back deterministically (same coords every call)", a[0] === b[0] && a[1] === b[1]);
-    s.check("fallback coords are on the planet", a[0] >= -90 && a[0] <= 90 && a[1] >= -180 && a[1] <= 180);
-    const c = airportCoord("QQQQ");
-    s.check("different unknown codes get different fallback spots", !(a[0] === c[0] && a[1] === c[1]));
-  }
-
-  {
-    const codes = sortedAirportCodes();
-    s.check("autocomplete source covers the DB", codes.length === Object.keys(AIRPORTS_DB).length && codes.includes("CYVR"));
-    const sorted = [...codes].sort();
-    s.check("codes come pre-sorted", codes.every((c, i) => c === sorted[i]));
+    s.check("unknown code resolves to null — never a fabricated position", airportCoord("ZZZZ") === null);
+    const custom: CustomAirport[] = [
+      { id: "ap1", code: "cabc", lat: 50.5, lon: -120.25, name: "Test Strip" },
+      { id: "ap2", code: "CYVR", lat: 1, lon: 2 }, // pilot correction shadows a built-in
+      { id: "ap3", code: "CBAD", lat: NaN, lon: 3 }, // junk coords are ignored
+    ];
+    const placed = airportCoord("CABC", custom);
+    s.check("custom airport resolves (code normalized)", !!placed && placed[0] === 50.5 && placed[1] === -120.25);
+    s.check("custom placement wins over the built-in DB", airportCoord("CYVR", custom)![0] === 1);
+    s.check("custom entry with junk coords is ignored", airportCoord("CBAD", custom) === null);
+    s.check("custom label uses the pilot's name", /test strip/i.test(airportLabel("CABC", custom)));
+    const codes = sortedAirportCodes(custom);
+    s.check("autocomplete includes custom codes alongside the DB", codes.includes("CABC") && codes.includes("CYVR") && codes.length === Object.keys(AIRPORTS_DB).length + 1);
   }
 
   const db = Object.entries(AIRPORTS_DB);

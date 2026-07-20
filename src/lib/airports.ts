@@ -1,8 +1,12 @@
-// Airport database — Canadian airports + select international hubs.
+// Airport database — Canadian airports + select international hubs, extended
+// at runtime by the pilot's own placed airports (AppData.customAirports).
 // Format: CODE: [lat, lon, "Name"]. Used both for the Route Map projection
 // AND as the autocomplete source for the ICAO From/To fields.
+//
+// Unknown codes deliberately resolve to NULL, never a made-up position — the
+// Route Map lists them for the pilot to place instead of plotting garbage.
 
-import { hashStr } from "./hash";
+import { CustomAirport } from "./types";
 
 export const AIRPORTS_DB: Record<string, [number, number, string]> = {
   // ===== CANADA — British Columbia =====
@@ -228,24 +232,45 @@ export const AIRPORTS: Record<string, [number, number]> = Object.fromEntries(
   Object.entries(AIRPORTS_DB).map(([k, v]) => [k, [v[0], v[1]]]),
 );
 
-export function airportLabel(code: string): string {
-  const a = AIRPORTS_DB[code];
-  return a ? `${code} — ${a[2]}` : code;
+export function normalizeAirportCode(code: string): string {
+  return code.trim().toUpperCase();
 }
 
-// Deterministic fallback coords for unknown ICAO codes.
-export function airportCoord(code: string): [number, number] {
-  if (AIRPORTS[code]) return AIRPORTS[code];
-  const h = parseInt(hashStr(code));
-  const lat = ((h % 12000) / 100) - 60; // -60 .. 60
-  const lon = (((h >> 7) % 34000) / 100) - 170; // -170 .. 170
-  return [lat, lon];
+// The pilot's placed airports as a lookup map (normalized codes; a custom
+// entry may shadow a built-in, letting the pilot correct a position).
+function customMap(custom?: CustomAirport[]): Map<string, CustomAirport> {
+  const m = new Map<string, CustomAirport>();
+  (custom ?? []).forEach((a) => {
+    const k = normalizeAirportCode(a.code);
+    if (k && isFinite(a.lat) && isFinite(a.lon)) m.set(k, a);
+  });
+  return m;
+}
+
+export function airportLabel(code: string, custom?: CustomAirport[]): string {
+  const k = normalizeAirportCode(code);
+  const c = customMap(custom).get(k);
+  if (c) return c.name ? `${k} — ${c.name}` : k;
+  const a = AIRPORTS_DB[k];
+  return a ? `${k} — ${a[2]}` : code;
+}
+
+// Real coordinates for a code, or null when nobody knows where it is. The
+// pilot's own placement wins over the built-in DB.
+export function airportCoord(code: string, custom?: CustomAirport[]): [number, number] | null {
+  const k = normalizeAirportCode(code);
+  const c = customMap(custom).get(k);
+  if (c) return [c.lat, c.lon];
+  return AIRPORTS[k] ?? null;
 }
 
 // Canadian ICAO codes sorted first, then everything else alphabetically —
-// used to order the autocomplete datalist.
-export function sortedAirportCodes(): string[] {
-  const codes = Object.keys(AIRPORTS_DB);
+// used to order the autocomplete datalist. Custom airports are included.
+export function sortedAirportCodes(custom?: CustomAirport[]): string[] {
+  const codes = Array.from(new Set([
+    ...Object.keys(AIRPORTS_DB),
+    ...Array.from(customMap(custom).keys()),
+  ]));
   const isCa = (c: string) =>
     c.startsWith("CY") || c.startsWith("CZ") || c.startsWith("CN") || c.startsWith("CA");
   return codes.sort((a, b) => {

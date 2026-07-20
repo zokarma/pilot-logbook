@@ -157,6 +157,9 @@ export function mergeAppData(base: AppData | null, local: AppData, remote: AppDa
     currencyRules: mergeById(
       base?.currencyRules, local.currencyRules ?? [], remote.currencyRules ?? [], (r) => r.id, "updatedAt",
     ),
+    customAirports: mergeById(
+      base?.customAirports, local.customAirports ?? [], remote.customAirports ?? [], (a) => a.id, "updatedAt",
+    ),
     duty: mergeDuty(base?.duty, local.duty ?? {}, remote.duty ?? {}),
     pilotName: pickField(base, local, remote, "pilotName"),
     currentPilotId: pickField(base, local, remote, "currentPilotId"),
