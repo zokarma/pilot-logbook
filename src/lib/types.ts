@@ -167,6 +167,9 @@ export interface AppData {
   bugReports: BugReport[];
   // Per-user dashboard metric keys the user has hidden (local UI preference).
   dashboardHidden: string[];
+  // Metric keys the user has explicitly chosen to SHOW despite their role
+  // hiding them by default (see roleAutoHidden in lib/dashboard). Empty normally.
+  dashboardShown: string[];
   // Ordered list of visible Logged Flights columns (keys from lib/flightColumns).
   flightColumns: string[];
   // First-time setup profile (null until the wizard runs) + aviation documents.
@@ -183,6 +186,10 @@ export interface AppData {
   fleetHidden: string[];
   // User-defined currency rules (lib/currency.ts evaluates them + the TC built-ins).
   currencyRules: CurrencyRule[];
+  // Currency statuses the pilot has hidden (by status key: TC built-in keys like
+  // "tc-day-pax", "recurrent-training", or a custom rule id). Hidden ones drop
+  // off the dashboard widget and are dimmed on the Currency page. Empty = show all.
+  currencyHidden: string[];
 }
 
 export function emptyData(): AppData {
@@ -195,6 +202,7 @@ export function emptyData(): AppData {
     lastLoggedRole: "Captain",
     bugReports: [],
     dashboardHidden: [],
+    dashboardShown: [],
     flightColumns: [...DEFAULT_FLIGHT_COLUMN_KEYS],
     profile: null,
     documents: [],
@@ -202,7 +210,8 @@ export function emptyData(): AppData {
     fleet: [],
     fleetHidden: [],
     currencyRules: [],
+    currencyHidden: [],
   };
 }
 
-export const APP_VERSION = "0.13.0";
+export const APP_VERSION = "0.14.0";

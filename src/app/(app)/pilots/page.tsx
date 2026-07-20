@@ -6,9 +6,11 @@ import { uid } from "@/lib/id";
 import { pilotName } from "@/lib/logbook";
 import { applyDeletePilot, applyMerge, findDuplicateClusters, flightRefCount } from "@/lib/pilots";
 import { Pilot } from "@/lib/types";
+import { useUi } from "@/components/UiProvider";
 
 export default function PilotsPage() {
   const { data, mutate } = useData();
+  const { confirmDialog } = useUi();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [dupesDismissed, setDupesDismissed] = useState(false);
   const [form, setForm] = useState({ firstName: "", lastName: "", employeeNumber: "", licenseNumber: "" });
@@ -47,23 +49,31 @@ export default function PilotsPage() {
     setForm({ firstName: "", lastName: "", employeeNumber: "", licenseNumber: "" });
   }
 
-  function del(id: string) {
+  async function del(id: string) {
     const count = data.flights.filter((f) => f.pilotId === id || f.picId === id || f.sicId === id || f.socId === id).length;
-    const warn = count
-      ? `Delete this pilot profile? ${count} flight${count === 1 ? "" : "s"} reference this pilot — those references will be cleared but the flights stay.`
-      : "Delete this pilot profile?";
-    if (!confirm(warn)) return;
+    const ok = await confirmDialog({
+      title: "Delete pilot profile?",
+      message: count
+        ? `${count} flight${count === 1 ? "" : "s"} reference this pilot — those references will be cleared but the flights stay.`
+        : `"${pilotName(data, id)}" will be removed from your pilot profiles.`,
+      confirmLabel: "Delete",
+      danger: true,
+    });
+    if (!ok) return;
     mutate((d) => applyDeletePilot(d, id));
     if (editingId === id) setEditingId(null);
   }
 
-  function mergeInto(sourceId: string, targetId: string) {
+  async function mergeInto(sourceId: string, targetId: string) {
     if (!targetId || sourceId === targetId) return;
     const refs = flightRefCount(data, [sourceId]);
-    if (!confirm(
-      `Merge "${pilotName(data, sourceId)}" into "${pilotName(data, targetId)}"?\n\n` +
-        `${refs} flight reference${refs === 1 ? "" : "s"} will be reassigned, then "${pilotName(data, sourceId)}" will be deleted.\n\nThis cannot be undone.`,
-    )) return;
+    const ok = await confirmDialog({
+      title: `Merge "${pilotName(data, sourceId)}" into "${pilotName(data, targetId)}"?`,
+      message: `${refs} flight reference${refs === 1 ? "" : "s"} will be reassigned, then "${pilotName(data, sourceId)}" will be deleted.\n\nThis cannot be undone.`,
+      confirmLabel: "Merge",
+      danger: true,
+    });
+    if (!ok) return;
     mutate((d) => applyMerge(d, targetId, [sourceId]));
   }
 
@@ -178,15 +188,19 @@ function DuplicateGroup({
     .sort((a, b) => b.n - a.n);
   const [target, setTarget] = useState(counted[0].p.id);
 
-  function doMerge() {
+  const { confirmDialog } = useUi();
+  async function doMerge() {
     const sources = counted.map((c) => c.p.id).filter((id) => id !== target);
     if (!sources.length) return;
     const refs = flightRefCount(data, sources);
     const names = sources.map((id) => `"${pilotName(data, id)}"`).join(", ");
-    if (!confirm(
-      `Merge ${names} into "${pilotName(data, target)}"?\n\n` +
-        `${refs} flight reference${refs === 1 ? "" : "s"} will be reassigned, then ${sources.length} duplicate profile${sources.length === 1 ? "" : "s"} will be deleted.\n\nThis cannot be undone.`,
-    )) return;
+    const ok = await confirmDialog({
+      title: `Merge into "${pilotName(data, target)}"?`,
+      message: `${names} will be merged in: ${refs} flight reference${refs === 1 ? "" : "s"} reassigned, then ${sources.length} duplicate profile${sources.length === 1 ? "" : "s"} deleted.\n\nThis cannot be undone.`,
+      confirmLabel: "Merge",
+      danger: true,
+    });
+    if (!ok) return;
     onMerge(target, sources);
   }
 

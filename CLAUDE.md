@@ -10,8 +10,6 @@ It is a **Next.js 15 (App Router) + TypeScript** app that builds to a **static e
 
 The data layer is **Supabase Auth + Row Level Security**: the browser talks to Supabase directly with the **public anon key**, and RLS scopes every row to its owner. A localStorage mirror provides offline resilience and holds bug-report screenshots. When Supabase env vars are absent the app runs **local-only** (auth + data entirely in the browser).
 
-> `index.html` is the original single-file version, kept for reference. It's superseded by the Next.js app and can be deleted.
-
 ## Commands
 
 ```
@@ -69,6 +67,6 @@ There is no unit-test tooling. Verify with `npm run build` (type errors surface 
 - Route Map uses Leaflet via dynamic `import("leaflet")` inside `useEffect` (needs `window`), with `import "leaflet/dist/leaflet.css"`. User-supplied airport codes are HTML-escaped before going into Leaflet popups.
 
 ## Conventions
-- `APP_VERSION` (`src/lib/types.ts`, currently `0.13.0`) is user-visible and attached to bug reports — bump it with meaningful releases. (`package.json` version is separate and not kept in lockstep.)
+- `APP_VERSION` (`src/lib/types.ts`, currently `0.14.0`) is user-visible and attached to bug reports — bump it with meaningful releases. (`package.json` version is separate and not kept in lockstep.)
 - Reference data and dedupe/CSV/migrate/documents logic must stay pure and framework-free in `src/lib`.
 - `*.csv` and `.claude/` are gitignored — CSV files are personal flight data and must never be committed.

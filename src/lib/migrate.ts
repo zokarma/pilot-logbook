@@ -24,6 +24,7 @@ export function migrateData(input: Partial<AppData> | null | undefined): AppData
   if (typeof d.pilotName !== "string") d.pilotName = "";
   if (!Array.isArray(d.bugReports)) d.bugReports = [];
   if (!Array.isArray(d.dashboardHidden)) d.dashboardHidden = [];
+  if (!Array.isArray(d.dashboardShown)) d.dashboardShown = [];
   d.flightColumns = normalizeFlightColumns(d.flightColumns);
   if (!Array.isArray(d.documents)) d.documents = [];
   if (typeof d.profile === "undefined") d.profile = null;
@@ -31,6 +32,7 @@ export function migrateData(input: Partial<AppData> | null | undefined): AppData
   if (!Array.isArray(d.fleet)) d.fleet = [];
   if (!Array.isArray(d.fleetHidden)) d.fleetHidden = [];
   if (!Array.isArray(d.currencyRules)) d.currencyRules = [];
+  if (!Array.isArray(d.currencyHidden)) d.currencyHidden = [];
 
   // Build a quick name -> pilotId map; create profiles for any free-text PIC/SIC/SOC.
   const nameToId: Record<string, string> = {};

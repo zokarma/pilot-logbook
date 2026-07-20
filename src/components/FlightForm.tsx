@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useData } from "@/context/DataContext";
 import { fleetTypes, normalizeAircraftCode, CREW_ROLES } from "@/lib/aircraft";
 import { uid } from "@/lib/id";
-import { num, pilotName } from "@/lib/logbook";
+import { flightDate, flightsForCurrentPilot, num, pilotName } from "@/lib/logbook";
 import { AircraftType, DayNight, Flight } from "@/lib/types";
 import AirportDatalist from "./AirportDatalist";
 
@@ -20,7 +20,7 @@ type FormState = {
   picId: string; sicId: string; socId: string; from: string; to: string;
   takeoff: DayNight; landing: DayNight;
   se: string; me: string; xc: string; dayHours: string; nightHours: string;
-  ifrActual: string; ifrSim: string; approaches: string; notes: string;
+  ifrActual: string; ifrSim: string; landings: string; approaches: string; notes: string;
 };
 
 function blankForm(role: string): FormState {
@@ -28,7 +28,7 @@ function blankForm(role: string): FormState {
     date: todayStr(), aircraftType: "", registration: "", loggedRole: role,
     picId: "", sicId: "", socId: "", from: "", to: "", takeoff: "Day", landing: "Day",
     se: "0", me: "0", xc: "0", dayHours: "0", nightHours: "0", ifrActual: "0", ifrSim: "0",
-    approaches: "0", notes: "",
+    landings: "1", approaches: "0", notes: "",
   };
 }
 
@@ -41,8 +41,13 @@ export default function FlightForm({
 }) {
   const { data, mutate } = useData();
   const editing = editingId ? data.flights.find((f) => f.id === editingId) || null : null;
-  const [form, setForm] = useState<FormState>(() => blankForm(data.lastLoggedRole || "Captain"));
+  // Smart default: a new flight usually departs from where the last one landed.
+  const lastTo = flightsForCurrentPilot(data)[0]?.to || "";
+  const [form, setForm] = useState<FormState>(() => ({ ...blankForm(data.lastLoggedRole || "Captain"), from: lastTo }));
   const [msg, setMsg] = useState("");
+  // True while the Registration field holds only auto-filled text — typing a
+  // registration by hand stops the type picker from overwriting it.
+  const regAuto = useRef(true);
   // Inline "add a new aircraft type" panel, shown when the picker's
   // "+ Add new type…" option is chosen. Adds to the pilot's per-user fleet.
   const [addingType, setAddingType] = useState(false);
@@ -50,6 +55,19 @@ export default function FlightForm({
   const [typeMsg, setTypeMsg] = useState("");
 
   const aircraftOptions = useMemo(() => fleetTypes(data.fleet, data.fleetHidden), [data.fleet, data.fleetHidden]);
+
+  // Most recent registration flown per aircraft type — prefills Registration
+  // when a type is picked (until the pilot types a registration themselves).
+  const lastRegByType = useMemo(() => {
+    const m = new Map<string, string>();
+    [...data.flights]
+      .sort((a, b) => flightDate(b).getTime() - flightDate(a).getTime())
+      .forEach((f) => {
+        const reg = (f.registration || f.civilIdent || "").trim().toUpperCase();
+        if (f.aircraftType && reg && !m.has(f.aircraftType)) m.set(f.aircraftType, reg);
+      });
+    return m;
+  }, [data.flights]);
 
   useEffect(() => {
     if (editing) {
@@ -65,11 +83,13 @@ export default function FlightForm({
         se: String(editing.se ?? 0), me: String(editing.me ?? 0), xc: String(editing.xc ?? 0),
         dayHours: String(editing.dayHours ?? 0), nightHours: String(editing.nightHours ?? 0),
         ifrActual: String(editing.ifrActual ?? 0), ifrSim: String(editing.ifrSim ?? 0),
-        approaches: String(editing.approaches ?? 0),
+        landings: String(editing.landings || 1), approaches: String(editing.approaches ?? 0),
         notes: editing.notes || "",
       });
+      regAuto.current = false;
     } else {
-      setForm(blankForm(data.lastLoggedRole || "Captain"));
+      setForm({ ...blankForm(data.lastLoggedRole || "Captain"), from: lastTo });
+      regAuto.current = true;
     }
     setMsg("");
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -146,9 +166,10 @@ export default function FlightForm({
         se: num(form.se), me: num(form.me), xc: num(form.xc),
         dayHours: num(form.dayHours), nightHours: num(form.nightHours),
         ifrActual: num(form.ifrActual), ifrSim: num(form.ifrSim),
-        // Landing count is derived from the Day/Night/None dropdown: "None"
-        // (pilot monitoring) is 0, otherwise the leg counts as one landing.
-        landings: form.landing === "None" ? 0 : 1, approaches: num(form.approaches),
+        // "None" (pilot monitoring) is 0 landings; otherwise the ×N count next
+        // to the dropdown (min 1) — circuits/touch-and-goes go there.
+        landings: form.landing === "None" ? 0 : Math.max(1, Math.floor(num(form.landings)) || 1),
+        approaches: num(form.approaches),
         notes: form.notes.trim(),
         year: y, month: m, day: d, civilIdent: reg,
         pic: pilotName(draft, form.picId), sic: pilotName(draft, form.sicId), soc: pilotName(draft, form.socId),
@@ -159,7 +180,9 @@ export default function FlightForm({
       else draft.flights.push(flight);
     });
 
-    setForm(blankForm(form.loggedRole || "Captain"));
+    // Next leg usually departs from where this one landed.
+    setForm({ ...blankForm(form.loggedRole || "Captain"), from: form.to.trim().toUpperCase() });
+    regAuto.current = true;
     onDone();
   }
 
@@ -183,7 +206,16 @@ export default function FlightForm({
             value={addingType ? "__add__" : form.aircraftType}
             onChange={(e) => {
               if (e.target.value === "__add__") { setAddingType(true); setTypeMsg(""); }
-              else { setAddingType(false); set("aircraftType", e.target.value); }
+              else {
+                setAddingType(false);
+                const v = e.target.value;
+                setForm((f) => {
+                  // Prefill the last registration flown on this type unless the
+                  // pilot has already typed one by hand.
+                  const reg = !editing && (regAuto.current || !f.registration) ? lastRegByType.get(v) : undefined;
+                  return { ...f, aircraftType: v, ...(reg ? { registration: reg } : {}) };
+                });
+              }
             }}
             className={inputCls}
           >
@@ -221,7 +253,16 @@ export default function FlightForm({
           )}
         </Field>
         <Field label="Registration">
-          <input list="registrationsList" placeholder="e.g. C-GABC" value={form.registration} onChange={(e) => set("registration", e.target.value.toUpperCase())} className={inputCls + " uppercase"} />
+          <input
+            list="registrationsList"
+            placeholder="e.g. C-GABC"
+            value={form.registration}
+            onChange={(e) => {
+              regAuto.current = e.target.value === "";
+              set("registration", e.target.value.toUpperCase());
+            }}
+            className={inputCls + " uppercase"}
+          />
           <datalist id="registrationsList">
             {regList.map((r) => <option key={r} value={r} />)}
           </datalist>
@@ -260,9 +301,26 @@ export default function FlightForm({
           </select>
         </Field>
         <Field label="Landing">
-          <select value={form.landing} onChange={(e) => set("landing", e.target.value as DayNight)} className={inputCls}>
-            <option value="Day">Day</option><option value="Night">Night</option><option value="None">None</option>
-          </select>
+          <div className="flex items-center gap-2">
+            <select value={form.landing} onChange={(e) => set("landing", e.target.value as DayNight)} className={inputCls}>
+              <option value="Day">Day</option><option value="Night">Night</option><option value="None">None</option>
+            </select>
+            {form.landing !== "None" && (
+              <>
+                <span className="text-slate-500 text-sm shrink-0">×</span>
+                <input
+                  type="number"
+                  step="1"
+                  min="1"
+                  inputMode="numeric"
+                  title="Number of landings (circuits count here)"
+                  value={form.landings}
+                  onChange={(e) => set("landings", e.target.value.replace(/[^0-9]/g, ""))}
+                  className="w-16 px-2 py-2 border border-slate-700 rounded-lg shrink-0"
+                />
+              </>
+            )}
+          </div>
         </Field>
         <NumField label="Single Engine (hrs)" value={form.se} onChange={(v) => set("se", v)} />
         <NumField label="Multi Engine (hrs)" value={form.me} onChange={(v) => set("me", v)} />

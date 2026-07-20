@@ -6,16 +6,29 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useData } from "@/context/DataContext";
+import { useUi } from "./UiProvider";
 
 export default function SettingsModal({ onClose }: { onClose: () => void }) {
   const router = useRouter();
   const { cloud, currentUser, deleteAccount } = useData();
+  const { confirmDialog } = useUi();
   const [deleting, setDeleting] = useState(false);
   const [deleteErr, setDeleteErr] = useState<string | null>(null);
 
   async function onDeleteAccount() {
-    if (!confirm("Permanently delete your account and ALL your logbook data? This cannot be undone.")) return;
-    if (!confirm("Are you absolutely sure? Deletion is immediate and permanent.")) return;
+    // Deliberately two-step: account deletion is the one action with no undo.
+    if (!(await confirmDialog({
+      title: "Delete your account?",
+      message: "Your account and ALL your logbook data will be permanently deleted. This cannot be undone.",
+      confirmLabel: "Continue",
+      danger: true,
+    }))) return;
+    if (!(await confirmDialog({
+      title: "Are you absolutely sure?",
+      message: "Deletion is immediate and permanent — your flights, documents, and profile will be gone.",
+      confirmLabel: "Permanently delete",
+      danger: true,
+    }))) return;
     setDeleting(true);
     setDeleteErr(null);
     const res = await deleteAccount();
