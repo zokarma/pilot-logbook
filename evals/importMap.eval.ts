@@ -9,7 +9,7 @@ import {
   planImport, mappingHasDate, applyMappedImport, ColumnMapping, MatchSource,
 } from "../src/lib/importMap";
 import { normalizeName } from "../src/lib/csv";
-import { AppData, ImportTemplate } from "../src/lib/types";
+import { ImportTemplate } from "../src/lib/types";
 import { Suite } from "./harness";
 import { mkData, mkPilot, clone } from "./fixtures";
 

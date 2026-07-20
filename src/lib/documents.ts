@@ -199,8 +199,3 @@ export const STATUS_META: Record<DocStatus, { icon: string; cls: string; short: 
   expired: { icon: "❌", cls: "text-red-400", short: "Expired" },
   none: { icon: "✅", cls: "text-slate-300", short: "No Expiry" },
 };
-
-// A friendly short name for a document type (drops the parenthetical for chips).
-export function docShortName(type: string): string {
-  return type.replace(/\s*\([^)]*\)\s*$/, "").trim() || type;
-}

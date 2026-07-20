@@ -15,7 +15,7 @@ import { migrateData } from "@/lib/migrate";
 import { normalizeName } from "@/lib/csv";
 import {
   ColumnMapping, TARGET_FIELDS, applyMappedImport, applyTemplate, collectCrewNames,
-  findTemplate, mappingHasDate, planImport, proposeMapping, targetField,
+  findTemplate, mappingHasDate, planImport, proposeMapping,
 } from "@/lib/importMap";
 
 export interface WizardInput {

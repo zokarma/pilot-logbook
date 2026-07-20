@@ -22,6 +22,8 @@ export default function FleetPage() {
     return m;
   }, [data.flights]);
 
+  // The manager lists EVERYTHING, including hidden built-ins (so they can be
+  // shown again) — only the pickers elsewhere filter by fleetHidden.
   const rows = useMemo(() => {
     const q = query.trim().toLowerCase();
     return fleetTypes(data.fleet).filter(
@@ -29,7 +31,23 @@ export default function FleetPage() {
     );
   }, [data.fleet, query]);
 
+  const hiddenSet = useMemo(
+    () => new Set((data.fleetHidden ?? []).map(normalizeAircraftCode)),
+    [data.fleetHidden],
+  );
   const customCount = data.fleet?.length ?? 0;
+
+  // Hide/show a built-in from the aircraft pickers (custom types are removed
+  // outright instead). Hiding never touches logged flights.
+  function toggleHidden(code: string) {
+    const k = normalizeAircraftCode(code);
+    mutate((draft) => {
+      if (!Array.isArray(draft.fleetHidden)) draft.fleetHidden = [];
+      draft.fleetHidden = draft.fleetHidden.includes(k)
+        ? draft.fleetHidden.filter((c) => c !== k)
+        : [...draft.fleetHidden, k];
+    });
+  }
 
   function add(e: React.FormEvent) {
     e.preventDefault();
@@ -74,7 +92,8 @@ export default function FleetPage() {
         <h1 className="text-xl font-semibold">Fleet</h1>
         <p className="text-sm text-slate-400 mt-1">
           Aircraft types available when logging flights. The built-in catalog is shared by everyone; anything you add
-          here is saved to your own logbook and syncs across your devices.
+          here is saved to your own logbook and syncs across your devices. Hide built-ins you never fly to declutter
+          the pickers — your own types can be removed outright.
         </p>
       </div>
 
@@ -99,7 +118,7 @@ export default function FleetPage() {
       <div className="card p-5">
         <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
           <h2 className="text-lg font-semibold">
-            All types <span className="text-slate-400 font-normal text-sm">({rows.length} shown · {customCount} custom)</span>
+            All types <span className="text-slate-400 font-normal text-sm">({rows.length} shown · {customCount} custom{hiddenSet.size ? ` · ${hiddenSet.size} hidden` : ""})</span>
           </h2>
           <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search code or name…" className="px-3 py-2 border border-slate-700 rounded-lg text-sm w-56 max-w-full" />
         </div>
@@ -118,18 +137,23 @@ export default function FleetPage() {
               {rows.map((t) => {
                 const used = usage.get(normalizeAircraftCode(t.code)) || 0;
                 const custom = data.fleet?.find((a) => normalizeAircraftCode(a.code) === normalizeAircraftCode(t.code) && !t.builtIn);
+                const isHidden = t.builtIn && hiddenSet.has(normalizeAircraftCode(t.code));
                 return (
-                  <tr key={t.code} className="border-b border-slate-800/60">
+                  <tr key={t.code} className={"border-b border-slate-800/60" + (isHidden ? " opacity-50" : "")}>
                     <td className="py-2 pr-4 font-medium">{t.code}</td>
                     <td className="py-2 pr-4 text-slate-300">{t.name}</td>
                     <td className="py-2 pr-4">
                       {t.builtIn
-                        ? <span className="text-slate-400">Built-in</span>
+                        ? <span className="text-slate-400">Built-in{isHidden ? " · hidden" : ""}</span>
                         : <span className="text-brand-400">Custom</span>}
                     </td>
                     <td className="py-2 pr-4 text-slate-400">{used || "—"}</td>
                     <td className="py-2 text-right">
-                      {!t.builtIn && custom && (
+                      {t.builtIn ? (
+                        <button onClick={() => toggleHidden(t.code)} className="text-xs text-slate-400 hover:text-slate-200">
+                          {isHidden ? "Show" : "Hide"}
+                        </button>
+                      ) : custom && (
                         <button onClick={() => remove(custom.id, t.code)} className="text-xs text-red-400 hover:text-red-300">
                           Remove
                         </button>

@@ -178,7 +178,7 @@ export default function CurrencyPage() {
               <label className="block text-xs font-medium text-slate-400 mb-1">Aircraft type (optional)</label>
               <select value={form.aircraftType} onChange={(e) => setForm((f) => ({ ...f, aircraftType: e.target.value }))} className={inputCls}>
                 <option value="">Any type</option>
-                {fleetTypes(data.fleet).map((t) => <option key={t.code} value={t.code}>{t.code}</option>)}
+                {fleetTypes(data.fleet, data.fleetHidden).map((t) => <option key={t.code} value={t.code}>{t.code}</option>)}
               </select>
             </div>
             <div className="col-span-2 lg:col-span-6 flex items-center gap-3">
