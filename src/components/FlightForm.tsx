@@ -49,7 +49,7 @@ export default function FlightForm({
   const [newType, setNewType] = useState({ code: "", name: "" });
   const [typeMsg, setTypeMsg] = useState("");
 
-  const aircraftOptions = useMemo(() => fleetTypes(data.fleet), [data.fleet]);
+  const aircraftOptions = useMemo(() => fleetTypes(data.fleet, data.fleetHidden), [data.fleet, data.fleetHidden]);
 
   useEffect(() => {
     if (editing) {
@@ -97,8 +97,10 @@ export default function FlightForm({
     const code = normalizeAircraftCode(newType.code);
     const name = newType.name.trim();
     if (!code) { setTypeMsg("Enter an aircraft code, e.g. C210."); return; }
-    if (aircraftOptions.some((t) => normalizeAircraftCode(t.code) === code)) {
-      setTypeMsg(`"${code}" is already in your fleet.`);
+    // Check the UNFILTERED catalog: a hidden built-in still owns its code (a
+    // custom duplicate would be shadowed) — unhide it on the Fleet page instead.
+    if (fleetTypes(data.fleet).some((t) => normalizeAircraftCode(t.code) === code)) {
+      setTypeMsg(`"${code}" already exists — it may be a hidden built-in (see the Fleet page).`);
       return;
     }
     mutate((draft) => {

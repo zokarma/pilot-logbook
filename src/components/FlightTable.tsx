@@ -72,7 +72,7 @@ export default function FlightTable({ onFullEdit }: { onFullEdit: (id: string) =
   const hiddenCols = DEFAULT_FLIGHT_COLUMN_KEYS.filter((k) => !visibleCols.includes(k));
 
   const aircraftTypes = useMemo(() => {
-    const known = fleetTypes(data.fleet);
+    const known = fleetTypes(data.fleet, data.fleetHidden);
     const codes = new Set(known.map((t) => t.code));
     const extra = Array.from(new Set(data.flights.map((f) => f.aircraftType).filter((c) => c && !codes.has(c))));
     return { known, extra };

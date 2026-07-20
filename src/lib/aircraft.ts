@@ -34,13 +34,20 @@ export function normalizeAircraftCode(code: string): string {
 
 // Built-in catalog + the pilot's custom fleet, de-duplicated by normalized code
 // (built-ins win) and sorted by code. The list every aircraft picker renders.
-export function fleetTypes(custom?: { code: string; name: string }[] | null): FleetOption[] {
+export function fleetTypes(
+  custom?: { code: string; name: string }[] | null,
+  // Normalized built-in codes the pilot hid on the Fleet page (AppData.fleetHidden).
+  // Only built-ins can be hidden; custom types are removed outright instead.
+  hidden?: string[] | null,
+): FleetOption[] {
   const out: FleetOption[] = [];
   const seen = new Set<string>();
+  const hide = new Set((hidden ?? []).map(normalizeAircraftCode));
   for (const t of AIRCRAFT_TYPES) {
     const k = normalizeAircraftCode(t.code);
     if (!k || seen.has(k)) continue;
-    seen.add(k);
+    seen.add(k); // hidden built-ins still claim their code so a custom can't shadow them
+    if (hide.has(k)) continue;
     out.push({ code: t.code, name: t.name, builtIn: true });
   }
   for (const t of custom ?? []) {

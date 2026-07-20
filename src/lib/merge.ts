@@ -162,6 +162,7 @@ export function mergeAppData(base: AppData | null, local: AppData, remote: AppDa
     currentPilotId: pickField(base, local, remote, "currentPilotId"),
     lastLoggedRole: pickField(base, local, remote, "lastLoggedRole"),
     dashboardHidden: pickField(base, local, remote, "dashboardHidden"),
+    fleetHidden: pickField(base, local, remote, "fleetHidden"),
     flightColumns: pickField(base, local, remote, "flightColumns"),
     profile: pickField(base, local, remote, "profile"),
   };

@@ -177,6 +177,10 @@ export interface AppData {
   // The pilot's custom aircraft types, added via the Fleet manager, shown in
   // pickers alongside the built-in catalog (lib/aircraft.ts).
   fleet: AircraftType[];
+  // Built-in catalog codes (normalized) the pilot has hidden from pickers on
+  // the Fleet page. Built-ins can only be hidden — never deleted — while the
+  // pilot's own custom types are removable instead.
+  fleetHidden: string[];
   // User-defined currency rules (lib/currency.ts evaluates them + the TC built-ins).
   currencyRules: CurrencyRule[];
 }
@@ -196,6 +200,7 @@ export function emptyData(): AppData {
     documents: [],
     importTemplates: [],
     fleet: [],
+    fleetHidden: [],
     currencyRules: [],
   };
 }
