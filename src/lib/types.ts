@@ -190,6 +190,21 @@ export interface AppData {
   // "tc-day-pax", "recurrent-training", or a custom rule id). Hidden ones drop
   // off the dashboard widget and are dimmed on the Currency page. Empty = show all.
   currencyHidden: string[];
+  // Airports the pilot has placed themselves (small strips missing from the
+  // built-in DB). Used by the Route Map and the From/To autocomplete;
+  // merge-synced by id like fleet. Unknown codes are NEVER given made-up
+  // coordinates — they stay off the map until placed here.
+  customAirports: CustomAirport[];
+}
+
+export interface CustomAirport {
+  id: string;
+  code: string; // ICAO/identifier, stored uppercase
+  lat: number;
+  lon: number;
+  name?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export function emptyData(): AppData {
@@ -211,6 +226,7 @@ export function emptyData(): AppData {
     fleetHidden: [],
     currencyRules: [],
     currencyHidden: [],
+    customAirports: [],
   };
 }
 

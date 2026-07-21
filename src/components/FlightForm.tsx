@@ -48,6 +48,9 @@ export default function FlightForm({
   // True while the Registration field holds only auto-filled text — typing a
   // registration by hand stops the type picker from overwriting it.
   const regAuto = useRef(true);
+  // Same idea for Aircraft Type: only auto-set from a registration lookup
+  // while the pilot hasn't picked a type themselves.
+  const typeAuto = useRef(true);
   // Inline "add a new aircraft type" panel, shown when the picker's
   // "+ Add new type…" option is chosen. Adds to the pilot's per-user fleet.
   const [addingType, setAddingType] = useState(false);
@@ -69,6 +72,33 @@ export default function FlightForm({
     return m;
   }, [data.flights]);
 
+  // The reverse lookup: known registration → its most recent aircraft type.
+  // Keyed by the reg with separators stripped ("C-FRZR" → "CFRZR") so typing
+  // the colloquial short form still matches.
+  const regTypeInfo = useMemo(() => {
+    const m = new Map<string, { reg: string; type: string }>();
+    [...data.flights]
+      .sort((a, b) => flightDate(b).getTime() - flightDate(a).getTime())
+      .forEach((f) => {
+        const reg = (f.registration || f.civilIdent || "").trim().toUpperCase();
+        const norm = reg.replace(/[^A-Z0-9]/g, "");
+        if (reg && norm && f.aircraftType && !m.has(norm)) m.set(norm, { reg, type: f.aircraftType });
+      });
+    return m;
+  }, [data.flights]);
+
+  // Match typed text against known registrations: exact after normalization,
+  // or a UNIQUE tail-end match of 4+ characters ("FRZR" → C-FRZR). Ambiguous
+  // or short input matches nothing — no guessing.
+  function lookupReg(input: string): { reg: string; type: string } | null {
+    const q = input.trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
+    if (q.length < 4) return null;
+    const exact = regTypeInfo.get(q);
+    if (exact) return exact;
+    const suffix = Array.from(regTypeInfo.entries()).filter(([k]) => k.endsWith(q));
+    return suffix.length === 1 ? suffix[0][1] : null;
+  }
+
   useEffect(() => {
     if (editing) {
       setForm({
@@ -87,9 +117,11 @@ export default function FlightForm({
         notes: editing.notes || "",
       });
       regAuto.current = false;
+      typeAuto.current = false;
     } else {
       setForm({ ...blankForm(data.lastLoggedRole || "Captain"), from: lastTo });
       regAuto.current = true;
+      typeAuto.current = true;
     }
     setMsg("");
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -135,6 +167,7 @@ export default function FlightForm({
       draft.fleet.push(entry);
     });
     set("aircraftType", code);
+    typeAuto.current = false; // freshly added type is an explicit choice
     setNewType({ code: "", name: "" });
     setTypeMsg("");
     setAddingType(false);
@@ -183,6 +216,7 @@ export default function FlightForm({
     // Next leg usually departs from where this one landed.
     setForm({ ...blankForm(form.loggedRole || "Captain"), from: form.to.trim().toUpperCase() });
     regAuto.current = true;
+    typeAuto.current = true;
     onDone();
   }
 
@@ -209,6 +243,7 @@ export default function FlightForm({
               else {
                 setAddingType(false);
                 const v = e.target.value;
+                typeAuto.current = v === ""; // hand-picked type wins over reg lookups
                 setForm((f) => {
                   // Prefill the last registration flown on this type unless the
                   // pilot has already typed one by hand.
@@ -258,8 +293,24 @@ export default function FlightForm({
             placeholder="e.g. C-GABC"
             value={form.registration}
             onChange={(e) => {
-              regAuto.current = e.target.value === "";
-              set("registration", e.target.value.toUpperCase());
+              const v = e.target.value.toUpperCase();
+              regAuto.current = v === "";
+              // Known tail → fill in its aircraft type (unless the pilot
+              // already picked a different type themselves).
+              const match = !editing ? lookupReg(v) : null;
+              setForm((f) => ({
+                ...f,
+                registration: v,
+                ...(match && (typeAuto.current || !f.aircraftType) ? { aircraftType: match.type } : {}),
+              }));
+            }}
+            onBlur={() => {
+              // "FRZR" → the full stored registration ("C-FRZR").
+              if (editing) return;
+              const match = lookupReg(form.registration);
+              if (match && match.reg !== form.registration.trim().toUpperCase()) {
+                set("registration", match.reg);
+              }
             }}
             className={inputCls + " uppercase"}
           />

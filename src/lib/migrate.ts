@@ -33,6 +33,7 @@ export function migrateData(input: Partial<AppData> | null | undefined): AppData
   if (!Array.isArray(d.fleetHidden)) d.fleetHidden = [];
   if (!Array.isArray(d.currencyRules)) d.currencyRules = [];
   if (!Array.isArray(d.currencyHidden)) d.currencyHidden = [];
+  if (!Array.isArray(d.customAirports)) d.customAirports = [];
 
   // Build a quick name -> pilotId map; create profiles for any free-text PIC/SIC/SOC.
   const nameToId: Record<string, string> = {};
