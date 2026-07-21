@@ -9,8 +9,10 @@ import {
 } from "@/lib/currency";
 import { documentStatus, STATUS_META } from "@/lib/documents";
 import { fleetTypes, normalizeAircraftCode } from "@/lib/aircraft";
+import { flightsForCurrentPilot } from "@/lib/logbook";
 import { CurrencyRule } from "@/lib/types";
 import { useUi } from "@/components/UiProvider";
+import Link from "next/link";
 
 // A currency that lapses within this many days shows amber.
 const WARN_DAYS = 30;
@@ -83,6 +85,7 @@ export default function CurrencyPage() {
   // the logger's "Add a Flight") so it's discoverable without scrolling.
   const [showAdd, setShowAdd] = useState(false);
 
+  const hasFlights = flightsForCurrentPilot(data).length > 0;
   const builtins = useMemo(() => builtinCurrencyStatuses(data), [data]);
   const customs = useMemo(() => customCurrencyStatuses(data), [data]);
 
@@ -212,6 +215,19 @@ export default function CurrencyPage() {
               {msg && <p className="text-sm text-red-400">{msg}</p>}
             </div>
           </form>
+        </div>
+      )}
+
+      {!hasFlights && (
+        <div className="card p-4 border border-brand-500/30 bg-brand-500/5 flex items-start gap-3">
+          <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-brand-300 shrink-0 mt-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="9" /><path d="M12 8h.01M11 12h1v4h1" />
+          </svg>
+          <p className="text-sm text-slate-300">
+            These gauges show <span className="text-slate-100">Not current</span> because you haven&apos;t logged any flights
+            yet — that&apos;s expected, not a problem. <Link href="/logger" className="text-brand-300 hover:text-brand-200 font-medium">Log a flight</Link> and
+            they&apos;ll update automatically.
+          </p>
         </div>
       )}
 

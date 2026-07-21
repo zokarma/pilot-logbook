@@ -186,7 +186,7 @@ export default function DashboardPage() {
     <section className="space-y-8">
       {/* Quick action + Customize toolbar */}
       <div className="flex items-center justify-between -mb-4">
-        <button onClick={addFlight} className="flex items-center gap-2 text-sm font-medium bg-brand-600 hover:bg-brand-700 text-white px-4 py-2 rounded-lg transition">
+        <button onClick={addFlight} data-tour="add-flight" className="flex items-center gap-2 text-sm font-medium bg-brand-600 hover:bg-brand-700 text-white px-4 py-2 rounded-lg transition">
           <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14M5 12h14" /></svg>
           Add a Flight
         </button>

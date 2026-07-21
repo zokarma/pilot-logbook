@@ -93,9 +93,12 @@ export default function DocumentsPage() {
 
       {!docs.length && !showForm ? (
         <div className="card p-10 text-center">
-          <p className="text-slate-400">No documents have been added yet.</p>
+          <p className="text-slate-400">No documents yet.</p>
+          <p className="text-slate-500 text-sm mt-1 max-w-md mx-auto">
+            Add your licence and medical and their expiry dates are worked out for you, so nothing lapses unnoticed.
+          </p>
           <button onClick={() => setAdding(true)} className="mt-4 bg-brand-600 hover:bg-brand-700 text-white font-medium px-5 py-2.5 rounded-lg transition">
-            Add Documents
+            Add your first document
           </button>
         </div>
       ) : (

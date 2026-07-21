@@ -4,7 +4,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useData } from "@/context/DataContext";
 import { fleetTypes, CREW_ROLES } from "@/lib/aircraft";
 import {
-  flightsForCurrentPilot, flightDateStr, ifrHours, num, pilotName, syncFlightMirrors,
+  buildRegTypeIndex, flightsForCurrentPilot, flightDateStr, ifrHours, lookupRegistration,
+  num, pilotName, syncFlightMirrors,
 } from "@/lib/logbook";
 import {
   DEFAULT_FLIGHT_COLUMN_KEYS, FLIGHT_COLUMN_LABEL, normalizeFlightColumns,
@@ -117,6 +118,15 @@ export default function FlightTable({ onFullEdit }: { onFullEdit: (id: string) =
 
   const set = <K extends keyof InlineForm>(k: K, v: InlineForm[K]) =>
     setForm((f) => (f ? { ...f, [k]: v } : f));
+
+  // Reg → aircraft-type lookup, same as the full flight form. A registration
+  // identifies the aircraft, so setting a known tail also fills its type.
+  const regTypeIndex = useMemo(() => buildRegTypeIndex(data.flights), [data.flights]);
+  function setInlineReg(v: string) {
+    const up = v.toUpperCase();
+    const match = lookupRegistration(regTypeIndex, up);
+    setForm((f) => (f ? { ...f, registration: up, ...(match ? { aircraftType: match.type } : {}) } : f));
+  }
 
   /* ----- selection ----- */
   function onRowCheck(idx: number, id: string, shift: boolean) {
@@ -294,7 +304,7 @@ export default function FlightTable({ onFullEdit }: { onFullEdit: (id: string) =
     switch (key) {
       case "date": return <input type="date" value={form.date} onChange={(e) => set("date", e.target.value)} className={cellIn} autoFocus={first} />;
       case "aircraft": return <AircraftSelect value={form.aircraftType} onChange={(v) => set("aircraftType", v)} cls={cellIn} />;
-      case "reg": return <input value={form.registration} onChange={(e) => set("registration", e.target.value.toUpperCase())} className={cellIn + " uppercase w-20"} autoFocus={first} />;
+      case "reg": return <input value={form.registration} onChange={(e) => setInlineReg(e.target.value)} className={cellIn + " uppercase w-20"} autoFocus={first} />;
       case "route": return (
         <div className="flex items-center gap-1">
           <input value={form.from} onChange={(e) => set("from", e.target.value.toUpperCase())} className={cellIn + " uppercase w-16"} placeholder="From" autoFocus={first} />

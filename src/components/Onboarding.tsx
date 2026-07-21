@@ -73,6 +73,7 @@ export default function Onboarding() {
         dateOfBirth: dob || undefined,
         pilotId,
         onboarded: true,
+        tourSeen: false, // trigger the first-run guided tour
       };
       d.profile = finalProfile;
       d.documents = docs.map((doc) => recalcDocument(doc, finalProfile));
