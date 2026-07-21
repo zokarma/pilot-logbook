@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useData } from "@/context/DataContext";
 import { fleetTypes, normalizeAircraftCode, CREW_ROLES } from "@/lib/aircraft";
 import { uid } from "@/lib/id";
-import { flightDate, flightsForCurrentPilot, num, pilotName } from "@/lib/logbook";
+import { buildRegTypeIndex, flightDate, flightsForCurrentPilot, lookupRegistration, num, pilotName } from "@/lib/logbook";
 import { AircraftType, DayNight, Flight } from "@/lib/types";
 import AirportDatalist from "./AirportDatalist";
 
@@ -73,31 +73,8 @@ export default function FlightForm({
   }, [data.flights]);
 
   // The reverse lookup: known registration → its most recent aircraft type.
-  // Keyed by the reg with separators stripped ("C-FRZR" → "CFRZR") so typing
-  // the colloquial short form still matches.
-  const regTypeInfo = useMemo(() => {
-    const m = new Map<string, { reg: string; type: string }>();
-    [...data.flights]
-      .sort((a, b) => flightDate(b).getTime() - flightDate(a).getTime())
-      .forEach((f) => {
-        const reg = (f.registration || f.civilIdent || "").trim().toUpperCase();
-        const norm = reg.replace(/[^A-Z0-9]/g, "");
-        if (reg && norm && f.aircraftType && !m.has(norm)) m.set(norm, { reg, type: f.aircraftType });
-      });
-    return m;
-  }, [data.flights]);
-
-  // Match typed text against known registrations: exact after normalization,
-  // or a UNIQUE tail-end match of 4+ characters ("FRZR" → C-FRZR). Ambiguous
-  // or short input matches nothing — no guessing.
-  function lookupReg(input: string): { reg: string; type: string } | null {
-    const q = input.trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
-    if (q.length < 4) return null;
-    const exact = regTypeInfo.get(q);
-    if (exact) return exact;
-    const suffix = Array.from(regTypeInfo.entries()).filter(([k]) => k.endsWith(q));
-    return suffix.length === 1 ? suffix[0][1] : null;
-  }
+  const regTypeIndex = useMemo(() => buildRegTypeIndex(data.flights), [data.flights]);
+  const lookupReg = (input: string) => lookupRegistration(regTypeIndex, input);
 
   useEffect(() => {
     if (editing) {

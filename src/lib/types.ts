@@ -101,6 +101,10 @@ export interface UserProfile {
   avatar?: string; // small square profile picture as a data URL (resized client-side)
   pilotId?: string; // the Pilot profile that represents this account holder
   onboarded: boolean; // has the setup wizard been completed / skipped
+  // Has the first-run guided tour (coach marks) run? Undefined on profiles that
+  // predate the feature — migrate marks those seen so only genuinely new users
+  // (who finish onboarding) get the tour. See components/Tour.tsx.
+  tourSeen?: boolean;
 }
 
 // How a document's expiry date was determined.

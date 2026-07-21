@@ -27,6 +27,20 @@ export function run(): Suite {
     s.check("summary career totals match", approx(m.summary.totalHours, 20) && m.summary.flights === 20);
   }
 
+  // -- circuits: a multi-landing flight contributes its full count everywhere --
+  {
+    const ldgIdx = PDF_NUMERIC_COLS.indexOf(13);
+    const m = buildPdfModel(mkData({ flights: [
+      mkFlight("solo", { date: "2026-03-01", se: 1.0 }),                       // default 1 landing
+      mkFlight("circuits", { date: "2026-03-02", se: 1.5, landings: 6 }),      // 6 circuits
+      mkFlight("pm", { date: "2026-03-03", se: 1.0, landing: "None", landings: 4 }), // monitoring → 0
+    ] }), 50);
+    s.check("circuits flight shows 6 in its Ldg cell", m.pages[0].rows[1][13] === "6");
+    s.check("pilot-monitoring leg shows blank Ldg (0)", m.pages[0].rows[2][13] === "");
+    s.check("Ldg grand total sums circuits (1 + 6 + 0 = 7)", m.grandTotals[ldgIdx] === 7);
+    s.check("summary landings total also counts circuits", m.summary.landings === 7);
+  }
+
   // -- float-safe totals --
   {
     const flights = Array.from({ length: 10 }, (_, i) => mkFlight(`f${i}`, { date: `2026-02-0${(i % 9) + 1}`, se: 0.1 }));

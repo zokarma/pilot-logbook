@@ -8,12 +8,36 @@ import Sidebar from "@/components/Sidebar";
 import TopBar from "@/components/TopBar";
 import Onboarding from "@/components/Onboarding";
 import UiProvider from "@/components/UiProvider";
+import Tour from "@/components/Tour";
+import WhatsNewBanner, { WHATSNEW_KEY, WHATSNEW_VERSION } from "@/components/WhatsNewBanner";
 
 const NAV_OPEN_KEY = "plb_nav_open";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
-  const { ready, currentUser, data } = useData();
+  const { ready, currentUser, data, mutate } = useData();
   const router = useRouter();
+
+  // First-run guided tour. Auto-starts once for a genuinely new user (Onboarding
+  // sets tourSeen:false; migrate marks existing profiles seen). Also replayable
+  // via a 'plb-start-tour' window event (fired from Settings).
+  const [tourOpen, setTourOpen] = useState(false);
+  const tourSeen = data.profile?.tourSeen;
+  const onboarded = data.profile?.onboarded;
+  useEffect(() => {
+    if (ready && currentUser && onboarded && tourSeen === false) setTourOpen(true);
+  }, [ready, currentUser, onboarded, tourSeen]);
+  useEffect(() => {
+    const h = () => setTourOpen(true);
+    window.addEventListener("plb-start-tour", h);
+    return () => window.removeEventListener("plb-start-tour", h);
+  }, []);
+  const finishTour = useCallback(() => {
+    setTourOpen(false);
+    mutate((d) => { if (d.profile) d.profile.tourSeen = true; });
+    // A new user who just took the tour has already seen everything — suppress
+    // the "what's new" banner for them (only existing upgraders should get it).
+    try { localStorage.setItem(WHATSNEW_KEY, WHATSNEW_VERSION); } catch { /* ignore */ }
+  }, [mutate]);
 
   // Sidebar visibility — per-device preference, defaulting open on desktop
   // and hidden on phones (full-screen content). Read after mount so the
@@ -87,8 +111,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         <Sidebar open={navOpen} onClose={() => setNav(false)} />
         <div className="flex-1 flex flex-col min-w-0">
           <TopBar navOpen={navOpen} onToggleNav={() => setNav(!navOpen)} />
-          <main className="flex-1 w-full px-4 lg:px-8 pt-6 pb-24 fade-in safe-right">{children}</main>
+          <main className="flex-1 w-full px-4 lg:px-8 pt-6 pb-24 fade-in safe-right">
+            <WhatsNewBanner active={!!onboarded && tourSeen === true} />
+            {children}
+          </main>
         </div>
+        {tourOpen && <Tour onFinish={finishTour} />}
       </div>
     </UiProvider>
   );

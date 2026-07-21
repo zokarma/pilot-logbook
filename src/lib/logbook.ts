@@ -77,3 +77,33 @@ export function dstr(d: Date): string {
   const day = String(d.getDate()).padStart(2, "0");
   return `${d.getFullYear()}-${m}-${day}`;
 }
+
+// --- Registration → aircraft-type lookup (shared by FlightForm + FlightTable) --
+// Index of each known registration → its MOST RECENT aircraft type, keyed by the
+// reg with separators stripped ("C-FRZR" → "CFRZR") so the colloquial short form
+// still matches. Build once from the flight list, then call lookupRegistration.
+export type RegTypeIndex = Map<string, { reg: string; type: string }>;
+
+export function buildRegTypeIndex(flights: Flight[]): RegTypeIndex {
+  const m: RegTypeIndex = new Map();
+  [...flights]
+    .sort((a, b) => flightDate(b).getTime() - flightDate(a).getTime())
+    .forEach((f) => {
+      const reg = (f.registration || f.civilIdent || "").trim().toUpperCase();
+      const norm = reg.replace(/[^A-Z0-9]/g, "");
+      if (reg && norm && f.aircraftType && !m.has(norm)) m.set(norm, { reg, type: f.aircraftType });
+    });
+  return m;
+}
+
+// Match typed text against known registrations: exact after normalization, or a
+// UNIQUE tail-end match of 4+ characters ("FRZR" → C-FRZR). Ambiguous or short
+// input matches nothing — no guessing.
+export function lookupRegistration(index: RegTypeIndex, input: string): { reg: string; type: string } | null {
+  const q = input.trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
+  if (q.length < 4) return null;
+  const exact = index.get(q);
+  if (exact) return exact;
+  const suffix = Array.from(index.entries()).filter(([k]) => k.endsWith(q));
+  return suffix.length === 1 ? suffix[0][1] : null;
+}

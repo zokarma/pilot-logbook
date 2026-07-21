@@ -117,7 +117,7 @@ export default function Sidebar({ open, onClose }: { open: boolean; onClose: () 
 
       <nav className="flex-1 flex flex-col gap-1 px-3">
         {NAV.map((n) => (
-          <Link key={n.href} href={n.href} title={n.label} onClick={onNavigate} className={itemCls(pathname === n.href)}>
+          <Link key={n.href} href={n.href} title={n.label} onClick={onNavigate} data-tour={"nav" + n.href} className={itemCls(pathname === n.href)}>
             {n.icon}
             <span>{n.label}</span>
           </Link>

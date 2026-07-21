@@ -58,6 +58,19 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
           </p>
         )}
 
+        <div className="mt-6 pt-5 border-t border-slate-800">
+          <h4 className="text-sm font-semibold text-slate-200 mb-1">Guided tour</h4>
+          <p className="text-xs text-slate-400 mb-3">
+            Replay the quick walkthrough of where everything lives.
+          </p>
+          <button
+            onClick={() => { onClose(); window.dispatchEvent(new Event("plb-start-tour")); }}
+            className="text-sm font-medium text-slate-200 bg-slate-800 hover:bg-slate-700 px-3 py-1.5 rounded-lg transition"
+          >
+            Take the tour
+          </button>
+        </div>
+
         {cloud && (
           <div className="mt-6 pt-5 border-t border-slate-800">
             <h4 className="text-sm font-semibold text-red-300 mb-1">Danger zone</h4>

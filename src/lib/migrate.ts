@@ -111,6 +111,9 @@ export function migrateData(input: Partial<AppData> | null | undefined): AppData
   if (d.profile && !d.profile.pilotId && d.currentPilotId) {
     d.profile.pilotId = d.currentPilotId;
   }
+  // Existing profiles predate the guided tour — mark them seen so only new
+  // users (whose Onboarding sets tourSeen:false) get it. (Undefined only here.)
+  if (d.profile && d.profile.tourSeen === undefined) d.profile.tourSeen = true;
 
   return d;
 }
