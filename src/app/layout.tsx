@@ -24,11 +24,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" suppressHydrationWarning>
       <body>
         {/* Apply the stored theme before anything paints (no light/dark flash).
-            Runs synchronously as the first thing in <body>. */}
+            Also flag the native (Capacitor) shell so the root marketing page
+            (landing.css hides `.lp` under [data-native]) never flashes before
+            it redirects into the logbook. Runs synchronously as the first thing
+            in <body>. */}
         <script
           dangerouslySetInnerHTML={{
             __html:
-              'try{if(localStorage.getItem("plb_theme")==="light")document.documentElement.setAttribute("data-theme","light")}catch(e){}',
+              'try{if(localStorage.getItem("plb_theme")==="light")document.documentElement.setAttribute("data-theme","light");var c=window.Capacitor;if(c&&c.isNativePlatform&&c.isNativePlatform())document.documentElement.setAttribute("data-native","1")}catch(e){}',
           }}
         />
         <DataProvider>{children}</DataProvider>
