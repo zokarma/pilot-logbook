@@ -2,8 +2,9 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 export const metadata: Metadata = {
-  title: "Privacy Policy · Pilot Logbook",
+  title: "Privacy Policy",
   description: "How Pilot Logbook collects, stores, and handles your data.",
+  alternates: { canonical: "/privacy" },
 };
 
 export default function PrivacyPage() {

@@ -1,0 +1,31 @@
+# Pilot Logbook
+
+> Pilot Logbook (pilotlogbook.ca) is a digital pilot logbook app that lets pilots photograph their paper logbook and have AI fill in every flight, then automatically tracks flight hours, currency/recency, duty limits, and aviation-document expiries. It runs on the web and as native iPhone and iPad apps, works offline, and syncs across devices. Built around Canadian aviation regulations (CARs / Transport Canada), with reference-only currency and duty gauges.
+
+## What it does
+
+- AI logbook scanning: photograph a paper logbook page and AI extracts dates, aircraft type, registration, routes, hours, and crew into reviewable flight rows (nothing is auto-saved — the pilot confirms).
+- Currency & recency tracking: day/night passenger recency, IFR (6 approaches / 6 months), and custom rules, over calendar-month windows.
+- Duty & rest tracking: 703 / 704 / 705 flight-time, flight-duty-period, and rest limits.
+- Aviation document tracking: medicals, ratings, and recurrent training with Transport Canada expiry math and reminders.
+- Import/export: CSV import and export, plus Transport Canada-style PDF logbook and summary export.
+- Offline-first with cloud sync; data is encrypted and scoped to each account.
+
+## Pricing
+
+- Free — $0 forever. Unlimited manual logging, flight totals & reports, basic currency tracking, aircraft database, route map, basic PDF export.
+- Pro — $7/month (or $5.83/month billed annually). Adds AI logbook scanning, document OCR, unlimited multi-device cloud sync, advanced currency & expiry alerts, professional PDF export, backup & restore, and native iPhone/iPad/Mac apps.
+- Professional — $10/month (or $8.33/month billed annually). Adds unlimited AI scanning, airline roster import, company reports, advanced analytics, duty & rest analysis, and priority support.
+- 14-day free trial on Pro and Professional; scan your first 10 pages free; no credit card required to start; cancel anytime. Prices in USD.
+
+## Key pages
+
+- Home: https://pilotlogbook.ca/
+- Pricing: https://pilotlogbook.ca/pricing
+- Privacy: https://pilotlogbook.ca/privacy
+- Log in / sign up: https://pilotlogbook.ca/login
+
+## Notes
+
+- Audience: student, private, commercial, and airline pilots — with a focus on Canada (CARs / Transport Canada).
+- Currency and duty figures are a reference aid; the CARs and a pilot's company minima always govern.
