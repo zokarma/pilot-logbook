@@ -5,13 +5,28 @@
 -- each user can only read/write their own row. No service-role/secret key is
 -- used anywhere.
 --
--- Run once in Supabase → SQL Editor → New query → Run.
--- NOTE: this drops the earlier service-role tables (they hold no real data).
--- Safe to re-run.
+-- ============================================================================
+-- ⚠️  STOP — READ THIS BEFORE RUNNING THE WHOLE FILE  ⚠️
+-- ============================================================================
+-- This file is idempotent and SAFE to run in full on an existing database:
+-- `plb_app_state` (every pilot's entire logbook) is created with
+-- `create table if not exists`, so re-running LEAVES EXISTING DATA UNTOUCHED.
+--
+-- The destructive `drop table … plb_app_state` that used to live here has been
+-- REMOVED. Do NOT re-add it: on a live database it would delete every user's
+-- logbook — a legal flight record — with no recovery. If you ever need a true
+-- from-scratch reset (empty project only), do it deliberately and manually.
+--
+-- The two legacy service-role tables below never held real data, so dropping
+-- them is harmless; they're kept only to clean up old projects.
+--
+-- Run once in Supabase → SQL Editor → New query → Run. Safe to re-run.
+-- ============================================================================
 
+-- Legacy cleanup only — these never held real user data. (plb_app_state is
+-- intentionally NOT dropped here; see the warning above.)
 drop table if exists plb_users cascade;
 drop table if exists plb_bug_reports cascade;
-drop table if exists plb_app_state cascade;
 
 -- One row per user: the whole logbook (flights, duty, pilots, bug reports, …)
 -- as JSON, owned by the Supabase Auth user.
@@ -42,7 +57,9 @@ drop table if exists plb_app_state cascade;
 --
 -- Each document belongs to exactly one user by virtue of living in that user's
 -- row (enforced by the RLS policies below).
-create table plb_app_state (
+-- `if not exists`: on a live database this is a no-op that preserves every
+-- existing logbook. See the warning at the top of this file.
+create table if not exists plb_app_state (
   user_id uuid primary key references auth.users (id) on delete cascade,
   data jsonb not null default '{}'::jsonb,
   updated_at timestamptz default now()
