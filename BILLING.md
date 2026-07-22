@@ -1,6 +1,61 @@
-# Billing & Subscriptions — setup plan (future work)
+# Billing & Subscriptions
 
-Not built yet. v1.0 ships free. This is the blueprint for when we add premium.
+**Status: web backend built (Stripe). Not yet enforced — no feature is gated
+until you wrap it in `<PremiumGate>`, so the app still behaves free.** What
+exists now, and the operator steps to switch it on, are at the top; the
+original plan (incl. RevenueCat / native IAP for later) follows.
+
+## What's implemented
+
+- **`plb_entitlements` table** (`supabase/schema.sql`) — server-authoritative
+  premium state, **read-your-own only, no client write policy**. Only the
+  webhook (service-role) writes it.
+- **`supabase/functions/stripe-webhook`** — verifies the Stripe signature, maps
+  the subscription's price → tier via `STRIPE_PRICE_MAP`, and upserts the row.
+- **`src/lib/entitlement.ts`** (pure, eval-covered) — `effectiveTier` (with a
+  `GRACE_DAYS` window so a paying pilot is never locked out offline / on a
+  retriable payment), `hasFeature`, and `entitlementFromRow` (a malformed row
+  can never read as premium).
+- **`src/hooks/useEntitlement.ts`** — offline-first read of the row (cached in
+  localStorage), interpreted by the pure helpers.
+- **`src/components/PremiumGate.tsx`** — `<PremiumGate feature="…">` wrapper;
+  enforcement is opt-in per feature.
+- **`src/lib/checkout.ts`** + the `/pricing` plan buttons — start a Stripe
+  Payment Link checkout with `client_reference_id = supabase user id`.
+
+## Operator setup (to go live)
+
+1. **DB:** run `supabase/schema.sql` (adds `plb_entitlements`; safe to re-run).
+2. **Stripe:** create the Pro & Professional products + monthly/yearly prices;
+   make a **Payment Link** per price with a 14-day trial and "collect
+   client reference id" on.
+3. **Function:**
+   ```
+   supabase functions deploy stripe-webhook --no-verify-jwt
+   supabase secrets set STRIPE_SECRET_KEY=… STRIPE_WEBHOOK_SECRET=… \
+     STRIPE_PRICE_MAP='{"price_pro_m":"pro","price_pro_y":"pro","price_prof_m":"professional","price_prof_y":"professional"}'
+   ```
+   Add the function URL as a Stripe webhook endpoint subscribing to
+   `checkout.session.completed`, `customer.subscription.updated`,
+   `customer.subscription.deleted`.
+4. **App env** (Vercel, public): `NEXT_PUBLIC_STRIPE_LINK_PRO_MONTHLY`,
+   `_PRO_YEARLY`, `_PROFESSIONAL_MONTHLY`, `_PROFESSIONAL_YEARLY` = the payment
+   link URLs. Until set, the plan buttons fall back to signup.
+5. **Turn on enforcement** feature-by-feature by wrapping surfaces in
+   `<PremiumGate feature="…">` (or checking `useEntitlement().has(...)`). Do
+   this deliberately so beta users aren't suddenly paywalled.
+
+## App Store note
+
+iOS may **honor** a web-purchased subscription but may not **sell** premium
+in-app without Apple IAP — keep the iOS app login-only for premium (the
+"Spotify method"). Add RevenueCat/native IAP later per the plan below.
+
+---
+
+## Original plan (for the native / multi-store phase)
+
+This was the blueprint; the web slice above implements its Stripe path.
 
 ## Core model: the account is the source of truth
 

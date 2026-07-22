@@ -18,12 +18,14 @@ import * as pdf from "./pdf.eval";
 import * as dutyLimits from "./dutyLimits.eval";
 import * as importMap from "./importMap.eval";
 import * as logbook from "./logbook.eval";
+import * as entitlement from "./entitlement.eval";
 import { Suite } from "./harness";
 
 const suites: Suite[] = [
   merge.run(), migrate.run(), documents.run(), csv.run(), scan.run(),
   pilots.run(), core.run(), dashboard.run(), airports.run(), fleet.run(),
   currency.run(), pdf.run(), dutyLimits.run(), importMap.run(), logbook.run(),
+  entitlement.run(),
 ];
 
 let totalPass = 0, totalFail = 0, totalProbes = 0;

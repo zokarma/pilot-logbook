@@ -64,3 +64,34 @@ create policy "app_state_update_own" on plb_app_state
   for update using (auth.uid() = user_id) with check (auth.uid() = user_id);
 create policy "app_state_delete_own" on plb_app_state
   for delete using (auth.uid() = user_id);
+
+-- ============================================================================
+-- Billing entitlements — premium subscription state (server-authoritative)
+-- ============================================================================
+-- The ONE place premium lives. It must NOT go in plb_app_state: that row is
+-- user-writable under RLS, so a user could grant themselves premium. This
+-- table is read-your-own only, with NO client write policy — only the billing
+-- webhook (running with the service-role key, which bypasses RLS) grants or
+-- revokes premium. See supabase/functions/stripe-webhook + src/lib/entitlement.ts.
+--
+-- Safe to re-run.
+create table if not exists plb_entitlements (
+  user_id uuid primary key references auth.users (id) on delete cascade,
+  tier text not null default 'free',        -- 'free' | 'pro' | 'professional'
+  status text not null default 'inactive',  -- 'active' | 'trialing' | 'past_due' | 'canceled' | 'inactive'
+  source text,                              -- 'stripe' (later: 'apple' | 'google')
+  stripe_customer_id text,
+  stripe_subscription_id text,
+  current_period_end timestamptz,           -- entitlement valid through this instant
+  updated_at timestamptz not null default now()
+);
+create index if not exists plb_entitlements_customer_idx
+  on plb_entitlements (stripe_customer_id);
+
+alter table plb_entitlements enable row level security;
+
+-- Read-your-own only. Deliberately NO insert/update/delete policy: the
+-- anon/authenticated client can never write entitlement.
+drop policy if exists "entitlements_select_own" on plb_entitlements;
+create policy "entitlements_select_own" on plb_entitlements
+  for select using (auth.uid() = user_id);
