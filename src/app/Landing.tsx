@@ -60,8 +60,20 @@ export default function Landing() {
     setMounted(true);
   }, [router]);
 
+  // Auto-forward already-signed-in visitors straight into the app — the
+  // marketing page is for logged-out visitors. Anonymous visitors stay put.
+  // (mounted stays false in the native shell, so this never fights the
+  // /logger redirect above.)
   const signedIn = mounted && ready && !!currentUser;
-  const appCta = signedIn ? "Go to your logbook" : "Get started — it’s free";
+  useEffect(() => {
+    if (signedIn) router.replace("/dashboard");
+  }, [signedIn, router]);
+
+  const appCta = "Get started — it’s free";
+
+  // While a signed-in visitor is being redirected, render nothing so the
+  // marketing page never flashes over their app.
+  if (signedIn) return null;
 
   return (
     <div className="lp">
@@ -76,8 +88,8 @@ export default function Landing() {
             <a className="link" href="#features">Features</a>
             <a className="link" href="#how">How it works</a>
             <Link className="link" href={PRICING_HREF}>Pricing</Link>
-            {!signedIn && <Link className="link" href={LOGIN_HREF}>Log in</Link>}
-            <Link className="btn btn-primary btn-sm" href={APP_HREF}>{signedIn ? "Open the app" : "Get started"}</Link>
+            <Link className="link" href={LOGIN_HREF}>Log in</Link>
+            <Link className="btn btn-primary btn-sm" href={APP_HREF}>Get started</Link>
           </div>
         </div>
       </nav>
