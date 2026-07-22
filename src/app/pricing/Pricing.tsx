@@ -38,7 +38,7 @@ const COMPARE: { label: string; free: Cell; pro: Cell; prof: Cell }[] = [
   { label: "Airline roster import", free: false, pro: false, prof: true },
   { label: "Duty & rest analysis", free: false, pro: false, prof: true },
   { label: "Company reports & advanced analytics", free: false, pro: false, prof: true },
-  { label: "iPhone, iPad & Mac apps", free: "Web", pro: "Web", prof: "All platforms" },
+  { label: "iPhone, iPad & Mac apps", free: "Web", pro: "All platforms", prof: "All platforms" },
   { label: "Support", free: "Community", pro: "Email", prof: "Priority" },
 ];
 
@@ -48,7 +48,7 @@ const SPOTLIGHT: { title: string; body: string; icon: React.ReactNode }[] = [
   { title: "Company reports", body: "Export the exact summaries your operator and insurer ask for, formatted and ready.", icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" /><path d="M14 3v5h5" /><path d="M9 13h6M9 17h4" /></svg> },
   { title: "Advanced analytics", body: "Trends by type, role, and category — see your hours the way a hiring board will.", icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 17l6-6 4 4 8-8" /><path d="M15 7h6v6" /></svg> },
   { title: "Duty & rest analysis", body: "703/704/705 flight-time, FDP and rest gauges against the operation you actually fly.", icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="13" r="8" /><path d="M12 9v4l2.5 2.5" /><path d="M9 2h6" /></svg> },
-  { title: "iPhone, iPad & Mac", body: "Log from the cockpit, review on the couch. One account, every Apple device, always in sync.", icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="7" y="2" width="10" height="20" rx="2" /><path d="M11 18h2" /></svg> },
+  { title: "Priority support", body: "Questions answered fast by people who know the CARs — straight to the front of the queue.", icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><circle cx="12" cy="12" r="3.5" /><path d="M5 5l4 4M15 15l4 4M19 5l-4 4M9 15l-4 4" /></svg> },
 ];
 
 const FAQS: { q: string; a: string }[] = [
@@ -186,6 +186,7 @@ export default function Pricing() {
                 <li><Check /> Advanced currency &amp; expiry alerts</li>
                 <li><Check /> Professional PDF export</li>
                 <li><Check /> Backup &amp; restore</li>
+                <li><Check /> <b>iPhone, iPad &amp; Mac apps</b></li>
               </ul>
             </div>
 
@@ -203,7 +204,6 @@ export default function Pricing() {
                 <li><Check /> Company reports</li>
                 <li><Check /> Advanced analytics</li>
                 <li><Check /> Duty &amp; rest analysis</li>
-                <li><Check /> iPhone, iPad &amp; Mac apps</li>
                 <li><Check /> Priority support</li>
               </ul>
             </div>
