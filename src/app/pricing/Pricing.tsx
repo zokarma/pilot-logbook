@@ -8,6 +8,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { startCheckout } from "@/lib/checkout";
+import { FAQS } from "@/lib/seo";
 
 /* ---------------- inline icons (camelCased for JSX) ---------------- */
 const Check = () => (
@@ -52,14 +53,8 @@ const SPOTLIGHT: { title: string; body: string; icon: React.ReactNode }[] = [
   { title: "Priority support", body: "Questions answered fast by people who know the CARs — straight to the front of the queue.", icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><circle cx="12" cy="12" r="3.5" /><path d="M5 5l4 4M15 15l4 4M19 5l-4 4M9 15l-4 4" /></svg> },
 ];
 
-const FAQS: { q: string; a: string }[] = [
-  { q: "Do I need a credit card to start?", a: "No. Create a free account and start logging immediately, or begin a 14-day Pro trial and scan your first 10 pages free — no card until you decide to keep it." },
-  { q: "What counts as a scan?", a: "One photographed logbook page. Pro includes a generous monthly allowance; Professional is unlimited, so you can digitize a lifetime of paper in one sitting." },
-  { q: "Does it work offline?", a: "Yes. Your logbook is mirrored to your device, so you can log in the air with no signal. It syncs automatically the moment you're back online." },
-  { q: "Is my logbook data safe?", a: "Your logbook is a legal document, and we treat it that way — encrypted, scoped to your account so no one else can read it, and yours to export as CSV or a Transport Canada-style PDF at any time." },
-  { q: "Can I cancel anytime?", a: "Anytime, from your account. You keep every flight you've logged and simply drop back to the free plan — nothing is deleted." },
-  { q: "Which devices are included?", a: "Free and Pro run in any browser and sync across devices. Professional adds the native iPhone, iPad, and Mac apps for cockpit-side logging and offline scanning." },
-];
+// FAQ content lives in src/lib/seo.ts so the visible Q&A and the FAQPage
+// structured data on this route stay in sync.
 
 function cmpCell(v: Cell) {
   if (v === true) return <span className="yes"><Check /></span>;

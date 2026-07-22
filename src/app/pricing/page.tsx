@@ -1,13 +1,39 @@
 import type { Metadata } from "next";
 import Pricing from "./Pricing";
+import JsonLd from "@/components/JsonLd";
+import { softwareApplicationLd, faqPageLd, breadcrumbLd } from "@/lib/seo";
 import "./pricing.css";
 
 export const metadata: Metadata = {
-  title: "Pricing · Pilot Logbook",
+  // Slots into "Pricing · Pilot Logbook" via the root title template.
+  title: "Pricing — Free, Pro & Professional plans",
   description:
-    "Photograph your paper logbook and let AI fill it in. Free, Pro ($7/mo), and Professional ($10/mo) plans — 14-day free trial, scan your first 10 pages free.",
+    "Photograph your paper logbook and let AI fill it in. Free forever, Pro ($7/mo), and Professional ($10/mo) plans — 14-day free trial, scan your first 10 pages free. Prices in USD.",
+  alternates: { canonical: "/pricing" },
+  openGraph: {
+    title: "Pilot Logbook Pricing — Free, Pro & Professional",
+    description:
+      "Free forever, Pro ($7/mo), and Professional ($10/mo). 14-day free trial, scan your first 10 pages free.",
+    url: "/pricing",
+  },
 };
 
 export default function PricingPage() {
-  return <Pricing />;
+  return (
+    <>
+      {/* Pricing (SoftwareApplication offers) + FAQ rich results, and a
+          breadcrumb trail — all read by Google and AI answer engines. */}
+      <JsonLd
+        data={[
+          softwareApplicationLd(),
+          faqPageLd(),
+          breadcrumbLd([
+            { name: "Home", path: "/" },
+            { name: "Pricing", path: "/pricing" },
+          ]),
+        ]}
+      />
+      <Pricing />
+    </>
+  );
 }
