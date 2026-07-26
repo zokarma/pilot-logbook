@@ -5,7 +5,8 @@
 
 import {
   effectiveTier, isPremium, hasFeature, tierHasFeature, entitlementFromRow,
-  Entitlement, GRACE_DAYS, FREE,
+  pickEffectiveSubscription, entitlementFromSubscriptions,
+  Entitlement, SubscriptionLike, GRACE_DAYS, FREE,
 } from "../src/lib/entitlement";
 import { Suite } from "./harness";
 
@@ -58,6 +59,78 @@ export function run(): Suite {
   s.check("garbage period end nulled", entitlementFromRow({ tier: "pro", status: "active", current_period_end: "not-a-date" }).currentPeriodEnd === null);
   s.check("non-object row → free defaults", entitlementFromRow(null).tier === "free" && entitlementFromRow("x").status === "inactive");
   s.check("a forged 'premium' row with a bad tier can't grant access", effectiveTier(entitlementFromRow({ tier: "premium", status: "active", current_period_end: iso(99) }), NOW) === "free");
+
+  // -- many subscriptions → one entitlement (plb_subscriptions → plb_entitlements) --
+  // The webhook mirrors this rule; it decides what a user with more than one
+  // Stripe subscription actually gets. The property that matters: one
+  // subscription can only ever ADD access, never take away what another grants.
+  {
+    const sub = (o: Partial<SubscriptionLike>): SubscriptionLike =>
+      ({ tier: "pro", status: "active", currentPeriodEnd: iso(20), ...o });
+    const tierOf = (subs: SubscriptionLike[]) => effectiveTier(entitlementFromSubscriptions(subs, NOW), NOW);
+
+    s.check("no subscriptions → free", entitlementFromSubscriptions([], NOW).tier === "free");
+    s.check("no subscriptions → null pick", pickEffectiveSubscription([], NOW) === null);
+    s.check("one active subscription → its tier", tierOf([sub({})]) === "pro");
+
+    // The upgrade window: both live at once, briefly.
+    s.check("holding pro + professional grants professional",
+      tierOf([sub({ tier: "pro" }), sub({ tier: "professional" })]) === "professional");
+    s.check("order doesn't matter",
+      tierOf([sub({ tier: "professional" }), sub({ tier: "pro" })]) === "professional");
+
+    // THE regression guard. Under the old one-row-per-user model, an event for
+    // a second subscription overwrote the first, so cancelling the stray one
+    // revoked access the live one was still paying for.
+    s.check("a lapsed subscription cannot revoke a live one",
+      tierOf([
+        sub({ tier: "professional", status: "canceled", currentPeriodEnd: iso(-90) }),
+        sub({ tier: "pro", status: "active", currentPeriodEnd: iso(20) }),
+      ]) === "pro");
+    s.check("a cancelled higher tier doesn't drag down a live lower tier",
+      tierOf([
+        sub({ tier: "professional", status: "canceled", currentPeriodEnd: iso(-90) }),
+        sub({ tier: "professional", status: "active", currentPeriodEnd: iso(30) }),
+      ]) === "professional");
+    s.check("an inactive/never-started subscription is ignored beside a live one",
+      tierOf([sub({ status: "inactive", tier: "professional" }), sub({ tier: "pro" })]) === "pro");
+
+    // Ties resolve to the furthest-out paid period, so the published row is the
+    // one that keeps the pilot flying longest.
+    s.check("equal tiers pick the later period end",
+      pickEffectiveSubscription([
+        sub({ currentPeriodEnd: iso(5) }), sub({ currentPeriodEnd: iso(40) }),
+      ], NOW)!.currentPeriodEnd === iso(40));
+
+    // All lapsed: still publish a coherent row (grace + "your plan ended"
+    // context) rather than blanking it — and it must still read as free.
+    {
+      const allLapsed = [
+        sub({ status: "canceled", currentPeriodEnd: iso(-90) }),
+        sub({ status: "canceled", currentPeriodEnd: iso(-40) }),
+      ];
+      s.check("all lapsed → reads free", tierOf(allLapsed) === "free");
+      s.check("...but the most recent one is still published",
+        entitlementFromSubscriptions(allLapsed, NOW).currentPeriodEnd === iso(-40));
+    }
+
+    // A cancelled subscription inside its already-paid remainder still counts.
+    s.check("cancelled but inside the paid period still grants",
+      tierOf([sub({ status: "canceled", currentPeriodEnd: iso(10) })]) === "pro");
+    s.check("cancelled inside grace still grants",
+      tierOf([sub({ status: "canceled", currentPeriodEnd: iso(-GRACE_DAYS) })]) === "pro");
+
+    // The derived row must survive a round trip through the DB shape the client
+    // actually reads, or the recompute publishes something useless.
+    {
+      const derived = entitlementFromSubscriptions([sub({ tier: "professional" })], NOW);
+      const roundTripped = entitlementFromRow({
+        tier: derived.tier, status: derived.status, current_period_end: derived.currentPeriodEnd,
+      });
+      s.check("the derived row survives entitlementFromRow unchanged",
+        effectiveTier(roundTripped, NOW) === "professional");
+    }
+  }
 
   return s;
 }

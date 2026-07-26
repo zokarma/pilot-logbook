@@ -70,17 +70,90 @@ function tierForPrice(priceId: string | undefined): "free" | "pro" | "profession
   return t === "pro" || t === "professional" ? t : "free";
 }
 
-// Write (or clear) a user's entitlement. Service-role bypasses RLS.
-async function upsertEntitlement(row: {
-  user_id: string; tier: string; status: string;
-  stripe_customer_id?: string | null; stripe_subscription_id?: string | null;
-  current_period_end?: string | null;
-}) {
-  const { error } = await admin.from("plb_entitlements").upsert(
+/* ------------- many subscriptions → one derived entitlement ---------------- */
+//
+// plb_subscriptions holds one row per Stripe subscription; plb_entitlements is
+// recomputed from them as the best current grant. A user can legitimately hold
+// two at once (an upgrade creates the new one before the old is cancelled), and
+// keying entitlement by user alone made that a race where the last writer won —
+// so a cancel on one subscription could revoke access another was still paying
+// for. Now a subscription can only ever ADD access.
+//
+// GRACE_MS and the two helpers below mirror GRACE_DAYS / effectiveTier /
+// pickEffectiveSubscription in src/lib/entitlement.ts (Edge Functions can't
+// import from src/). CHANGE THEM TOGETHER — entitlement.ts is the eval-covered
+// copy and the spec.
+const GRACE_MS = 3 * 86400000;
+const RANK: Record<string, number> = { free: 0, pro: 1, professional: 2 };
+
+interface SubRow {
+  stripe_subscription_id: string;
+  tier: string;
+  status: string;
+  stripe_customer_id: string | null;
+  current_period_end: string | null;
+}
+
+// The tier a single subscription grants right now (free once lapsed).
+function effectiveTierOf(s: { tier: string; status: string; current_period_end: string | null }): string {
+  if (s.tier !== "pro" && s.tier !== "professional") return "free";
+  const end = s.current_period_end ? Date.parse(s.current_period_end) : NaN;
+  const within = isNaN(end) ? null : Date.now() <= end + GRACE_MS;
+  if (s.status === "active" || s.status === "trialing" || s.status === "past_due") {
+    return within === false ? "free" : s.tier;
+  }
+  if (s.status === "canceled") return within === true ? s.tier : "free";
+  return "free";
+}
+
+// Recompute the user's single entitlement row from all of their subscriptions:
+// highest granting tier wins, ties broken on the furthest-out paid period.
+//
+// This is a snapshot taken at event time. If the winning subscription later
+// lapses while a lower-tier one is still live, the published row goes stale
+// until the next event re-derives it — Stripe emits one on every status change
+// (including the period-end delete), and the whole entitlement system already
+// depends on those arriving, so the window is event latency rather than a new
+// failure mode. Closing it entirely would mean the client deriving from
+// plb_subscriptions itself; see BILLING.md "known gaps".
+async function recomputeEntitlement(uid: string) {
+  const { data, error } = await admin
+    .from("plb_subscriptions")
+    .select("stripe_subscription_id, tier, status, stripe_customer_id, current_period_end")
+    .eq("user_id", uid);
+  if (error) throw new Error(`subscription read failed: ${error.message}`);
+
+  const subs = (data ?? []) as SubRow[];
+  const endOf = (s: SubRow) => {
+    const t = s.current_period_end ? Date.parse(s.current_period_end) : NaN;
+    return isNaN(t) ? Infinity : t;
+  };
+  let best: SubRow | null = null;
+  let bestRank = -1;
+  for (const s of subs) {
+    const rank = RANK[effectiveTierOf(s)] ?? 0;
+    if (rank > bestRank || (rank === bestRank && best !== null && endOf(s) > endOf(best))) {
+      best = s;
+      bestRank = rank;
+    }
+  }
+
+  const row = best
+    ? {
+        user_id: uid,
+        tier: best.tier,
+        status: best.status,
+        stripe_customer_id: best.stripe_customer_id,
+        stripe_subscription_id: best.stripe_subscription_id,
+        current_period_end: best.current_period_end,
+      }
+    : { user_id: uid, tier: "free", status: "inactive", stripe_customer_id: null, stripe_subscription_id: null, current_period_end: null };
+
+  const { error: upErr } = await admin.from("plb_entitlements").upsert(
     { ...row, source: "stripe", updated_at: new Date().toISOString() },
     { onConflict: "user_id" },
   );
-  if (error) throw new Error(`entitlement upsert failed: ${error.message}`);
+  if (upErr) throw new Error(`entitlement upsert failed: ${upErr.message}`);
 }
 
 // Resolve the app user id for a subscription. Two authenticated sources only:
@@ -92,6 +165,10 @@ async function userIdForSubscription(sub: Stripe.Subscription): Promise<string |
   if (metaUser) return metaUser;
   const customer = typeof sub.customer === "string" ? sub.customer : sub.customer?.id;
   if (!customer) return null;
+  const bySub = await admin.from("plb_subscriptions").select("user_id").eq("stripe_customer_id", customer).limit(1).maybeSingle();
+  if (bySub.data?.user_id) return bySub.data.user_id;
+  // Pre-split rows that the schema backfill hasn't covered (e.g. schema.sql not
+  // re-run yet). Harmless once it has.
   const { data } = await admin.from("plb_entitlements").select("user_id").eq("stripe_customer_id", customer).maybeSingle();
   return data?.user_id ?? null;
 }
@@ -111,16 +188,28 @@ async function applySubscription(sub: Stripe.Subscription) {
   }
   const priceId = sub.items.data[0]?.price?.id;
   const tier = tierForPrice(priceId);
-  await upsertEntitlement({
-    user_id: uid,
-    // Keep the tier even on cancel; the client honors current_period_end (+grace)
-    // then falls back to free on its own (src/lib/entitlement.ts).
-    tier,
-    status: sub.status,
-    stripe_customer_id: typeof sub.customer === "string" ? sub.customer : sub.customer?.id ?? null,
-    stripe_subscription_id: sub.id,
-    current_period_end: sub.current_period_end ? new Date(sub.current_period_end * 1000).toISOString() : null,
-  });
+
+  // Record THIS subscription. Keyed by subscription id, so it never disturbs
+  // any other subscription the user holds.
+  const { error } = await admin.from("plb_subscriptions").upsert(
+    {
+      stripe_subscription_id: sub.id,
+      user_id: uid,
+      // Keep the tier even on cancel; the paid-through instant below (+grace)
+      // is what ends access (src/lib/entitlement.ts).
+      tier,
+      status: sub.status,
+      source: "stripe",
+      stripe_customer_id: typeof sub.customer === "string" ? sub.customer : sub.customer?.id ?? null,
+      current_period_end: sub.current_period_end ? new Date(sub.current_period_end * 1000).toISOString() : null,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: "stripe_subscription_id" },
+  );
+  if (error) throw new Error(`subscription upsert failed: ${error.message}`);
+
+  // Then re-derive the one row the app reads.
+  await recomputeEntitlement(uid);
 }
 
 Deno.serve(async (req) => {

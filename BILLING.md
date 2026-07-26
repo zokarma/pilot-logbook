@@ -34,18 +34,24 @@ both together**. Any future paid endpoint must do the same.
 
 ## What's implemented
 
-- **`plb_entitlements` table** (`supabase/schema.sql`) — server-authoritative
-  premium state, **read-your-own only, no client write policy**. Only the
-  webhook (service-role) writes it.
+- **`plb_subscriptions` table** (`supabase/schema.sql`) — one row per Stripe
+  subscription, keyed by `stripe_subscription_id`. Same trust model as below:
+  read-your-own, no client write policy.
+- **`plb_entitlements` table** — server-authoritative premium state, the single
+  row the client and `scan-extract` read. **Read-your-own only, no client write
+  policy**; only the webhook (service-role) writes it. It is **derived** from
+  `plb_subscriptions` — see "one row per subscription" below.
 - **`supabase/functions/create-checkout`** — creates the Stripe Checkout
   Session. Requires the caller's JWT, derives their user id from it, resolves
   the plan → price id **server-side** (`STRIPE_PRICE_IDS`), and writes the id
   into `subscription_data.metadata.user_id`. That metadata is the binding
   between a payment and an account, and the payer cannot touch it.
 - **`supabase/functions/stripe-webhook`** — verifies the Stripe signature, maps
-  the subscription's price → tier, and upserts the row. It resolves the account
-  **only** from `subscription.metadata.user_id` or from a `stripe_customer_id`
-  already recorded against an account; `client_reference_id` is ignored.
+  the subscription's price → tier, upserts that subscription's own row in
+  `plb_subscriptions`, then **recomputes** the user's `plb_entitlements` row.
+  It resolves the account **only** from `subscription.metadata.user_id` or from
+  a `stripe_customer_id` already recorded against an account;
+  `client_reference_id` is ignored.
 - **`src/lib/entitlement.ts`** (pure, eval-covered) — `effectiveTier` (with a
   `GRACE_DAYS` window so a paying pilot is never locked out offline / on a
   retriable payment), `hasFeature`, and `entitlementFromRow` (a malformed row
@@ -72,6 +78,39 @@ both together**. Any future paid endpoint must do the same.
 > reintroduce a client-supplied user id or price** — `evals/checkout.eval.ts`
 > asserts both.
 
+### One row per subscription
+
+`plb_entitlements` holds one row per **user**, so it can only ever represent
+one subscription — which made it a slot any inbound event could claim.
+Whichever subscription wrote last owned the account's billing identity, and a
+cancel on *that* subscription revoked premium even if a different,
+still-paying subscription of the user's existed.
+
+That isn't only an attack shape. A user can legitimately hold two
+subscriptions at once — an upgrade creates the new one before the old is
+cancelled — and under the single-row model the second overwrote the first, so
+the first's renewal events then resolved to nobody.
+
+So subscriptions get their own table and `plb_entitlements` becomes derived:
+
+- `plb_subscriptions` — one row per Stripe subscription. Each webhook event
+  writes only that subscription's row, so it can never disturb another.
+- `plb_entitlements` — recomputed after every event as the **best current
+  grant** across the user's rows: highest granting tier wins, ties break on the
+  furthest-out paid period. A subscription can therefore only ever *add*
+  access; cancelling one removes its own row and cannot take away what another
+  is still paying for.
+
+The rule lives in `pickEffectiveSubscription` / `entitlementFromSubscriptions`
+(`src/lib/entitlement.ts`, pure and eval-covered). The webhook keeps a small
+mirror of it, exactly as `scan-extract` mirrors `effectiveTier` — Edge
+Functions can't import from `src/`, so **change them together**.
+
+Nothing downstream changed shape: `useEntitlement`, `entitlement.ts` and
+`scan-extract` still read the same single `plb_entitlements` row. Re-running
+`schema.sql` backfills existing subscribers from it (idempotent), so their
+grant and their customer-id lookup survive.
+
 ## Rollout status
 
 - **Test mode (Sandbox): DONE and verified end-to-end** — a trial checkout
@@ -87,10 +126,16 @@ both together**. Any future paid endpoint must do the same.
 Currency is **CAD**: Pro $10/mo · $100/yr, Professional $15/mo · $150/yr
 (annual = 2 months free). Prices/currency are per-price in Stripe.
 
-1. **DB:** run `supabase/schema.sql` — it is now **idempotent and safe to
-   re-run** (adds `plb_entitlements`; the old destructive `plb_app_state` drop
-   was removed). Verify RLS is on with the single `entitlements_select_own`
-   SELECT policy (no insert/update/delete).
+1. **DB:** run `supabase/schema.sql` — it is **idempotent and safe to re-run**
+   (adds `plb_entitlements` + `plb_subscriptions`; the old destructive
+   `plb_app_state` drop was removed). Verify RLS is on for both, each with a
+   single SELECT policy (`entitlements_select_own` / `subscriptions_select_own`)
+   and no insert/update/delete.
+   - Re-running is **required** when upgrading an existing deployment: the tail
+     of the file backfills `plb_subscriptions` from the current
+     `plb_entitlements` rows so existing subscribers keep their grant and stay
+     resolvable by Stripe customer id. It's `on conflict do nothing`, so a
+     later re-run never clobbers what the webhook has written since.
 2. **Stripe:** create the Pro & Professional products + monthly/yearly prices.
    Note the four **price ids** — that's all you need.
    - **No Payment Links.** Checkout Sessions are created by
@@ -182,7 +227,28 @@ Full operator SQL/verify screenshots-era procedure was run for the sandbox on
   before the FK write. A payer can no longer name another account at all, so
   neither the "surprise premium" case nor the sharper one — overwriting a
   paying user's Stripe binding so a stranger's cancel revokes premium they're
-  still billed for — is reachable. See "Why not Payment Links" above.
+  still billed for — is reachable. See "Why not Payment Links" above. The
+  entitlement row is also no longer a clobberable slot: it's derived from
+  per-subscription rows (see "One row per subscription"), so even a stray
+  subscription could only add access, never remove it.
+- **The derived entitlement row is a snapshot, not a live view.** It's
+  recomputed on each Stripe event, so if the winning subscription lapses while
+  a lower-tier one is still live, the row under-grants until the next event
+  re-derives it. Stripe emits an event on every status change (including the
+  period-end delete) and the whole system already depends on those arriving, so
+  in practice the window is event latency. To remove it, have `useEntitlement`
+  read `plb_subscriptions` (already read-your-own under RLS) and apply
+  `entitlementFromSubscriptions` client-side, keeping `plb_entitlements` for
+  `scan-extract`'s server-side gate.
+- **Plan changes create a second subscription rather than modifying the first.**
+  Checkout Sessions still start a *new* subscription each time, so upgrading
+  leaves the old one running until it's cancelled — the user is briefly billed
+  for both. The derived entitlement handles this correctly (they get the higher
+  tier), but nothing cancels the old subscription automatically. Adding the
+  Stripe **Customer Portal** for plan changes would modify the existing
+  subscription in place and settle it; until then an upgrade wants a manual
+  cancel, or a `create-checkout` step that cancels the caller's other active
+  subscriptions once the new one is confirmed.
 
 ## App Store note
 
