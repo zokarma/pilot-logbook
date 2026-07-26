@@ -208,7 +208,7 @@ export default function Landing() {
               <Link className="btn btn-ghost p-cta" href={PRICING_HREF}>See Professional</Link>
             </div>
           </div>
-          <p className="plans-note">Prices in USD. 14-day free trial on Pro &amp; Professional. <Link href={PRICING_HREF} style={{ color: "var(--cyan)" }}>Compare every feature &rarr;</Link></p>
+          <p className="plans-note">Prices in CAD. 14-day free trial on Pro &amp; Professional. <Link href={PRICING_HREF} style={{ color: "var(--cyan)" }}>Compare every feature &rarr;</Link></p>
         </div>
       </section>
 

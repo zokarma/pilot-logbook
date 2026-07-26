@@ -204,7 +204,7 @@ export default function Pricing() {
               </ul>
             </div>
           </div>
-          <p className="cmp-note">Prices in USD. 14-day free trial on Pro &amp; Professional — cancel before it ends and you&apos;re never charged.</p>
+          <p className="cmp-note">Prices in CAD. 14-day free trial on Pro &amp; Professional — cancel before it ends and you&apos;re never charged.</p>
         </div>
       </section>
 

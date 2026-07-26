@@ -35,7 +35,7 @@ export const SITE_KEYWORDS = [
 ];
 
 // Pricing tiers — mirrors /pricing so AI answers to "how much does Pilot
-// Logbook cost" are accurate. Prices in USD, monthly.
+// Logbook cost" are accurate. Prices in CAD, monthly.
 export const PLANS = [
   { name: "Free", price: 0, tagline: "Everything you need to keep a proper logbook." },
   { name: "Pro", price: 10, tagline: "Backed up, syncing everywhere — with AI logbook scanning." },
@@ -105,7 +105,7 @@ export function softwareApplicationLd(): Json {
     image: OG_IMAGE,
     offers: {
       "@type": "AggregateOffer",
-      priceCurrency: "USD",
+      priceCurrency: "CAD",
       lowPrice: "0",
       highPrice: "15",
       offerCount: PLANS.length,
@@ -113,7 +113,7 @@ export function softwareApplicationLd(): Json {
         "@type": "Offer",
         name: `${SITE_NAME} ${p.name}`,
         price: String(p.price),
-        priceCurrency: "USD",
+        priceCurrency: "CAD",
         category: p.name === "Free" ? "free" : "subscription",
         description: p.tagline,
       })),
