@@ -70,6 +70,18 @@ Set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` in your host'
 environment (e.g. Vercel → Project → Settings → Environment Variables). Both are
 public, so nothing sensitive lives in the repo or the host secrets.
 
+**Security headers** ship in [`vercel.json`](vercel.json): a Content-Security-Policy,
+`X-Frame-Options: DENY` / `frame-ancestors 'none'` (the authenticated app must not
+be framable), `nosniff`, HSTS, a `Referrer-Policy` and a `Permissions-Policy` that
+denies camera/mic/geolocation (the web build uses none of them — iOS scanning is
+native). Two CSP entries are deployment-coupled and need editing if your setup
+differs: `connect-src` allows `https://*.supabase.co` + `wss://*.supabase.co`
+(widen it if you put Supabase behind a **custom domain**, or Realtime and every
+query will be blocked), and `img-src` allows `*.tile.openstreetmap.org` for the
+Route Map's tiles. The headers are Vercel-specific and apply to the **website
+only** — the Capacitor iOS build serves the same `out/` from the app bundle and
+isn't affected.
+
 ### Notes / caveats
 
 - Security rests on **RLS + Supabase Auth**: the anon key can only do what the

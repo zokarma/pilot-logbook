@@ -3,11 +3,14 @@
 // Public pricing / upgrade landing page. Self-contained marketing surface —
 // all styling is scoped under `.pp` (pricing.css) so it can't touch the app
 // shell, and it follows the viewer's theme via the app's data-theme system.
-// CTAs point at the trial signup; wire them to real checkout when billing ships.
+// Plan CTAs call startCheckout, which asks the create-checkout Edge Function
+// for a Stripe Checkout Session and redirects to it (signed-out visitors are
+// sent to /login first).
 
 import Link from "next/link";
 import { useState } from "react";
-import { startCheckout } from "@/lib/checkout";
+import { startCheckout, BillingPeriod } from "@/lib/checkout";
+import type { Tier } from "@/lib/entitlement";
 import { FAQS } from "@/lib/seo";
 
 /* ---------------- inline icons (camelCased for JSX) ---------------- */
@@ -64,6 +67,22 @@ function cmpCell(v: Cell) {
 
 export default function Pricing() {
   const [annual, setAnnual] = useState(true);
+  // Which plan button is mid-request, and the error to show if it fails. A
+  // plan button that silently does nothing is a lost sale, so failures from
+  // create-checkout surface here rather than only in the console.
+  const [busyPlan, setBusyPlan] = useState<string | null>(null);
+  const [checkoutErr, setCheckoutErr] = useState<{ plan: string; msg: string } | null>(null);
+
+  async function buy(tier: Exclude<Tier, "free">) {
+    const period: BillingPeriod = annual ? "year" : "month";
+    setBusyPlan(tier);
+    setCheckoutErr(null);
+    const { error } = await startCheckout(tier, period);
+    // On success the browser is already navigating away; only a failure
+    // returns here with the page still mounted.
+    if (error) { setCheckoutErr({ plan: tier, msg: error }); }
+    setBusyPlan(null);
+  }
 
   return (
     <div className="pp">
@@ -173,7 +192,10 @@ export default function Pricing() {
               <div className="t-tag">Your logbook, backed up and syncing everywhere — with AI scanning.</div>
               <div className="price"><span className="amt">{annual ? "$8.33" : "$10"}</span><span className="per">/month</span></div>
               <div className="price-sub">{annual ? "$100 billed yearly — save $20." : "Billed monthly."}</div>
-              <button type="button" className="btn btn-primary btn-block cta" onClick={() => startCheckout("pro", annual ? "year" : "month")}>Start 14-day free trial</button>
+              <button type="button" className="btn btn-primary btn-block cta" disabled={busyPlan !== null} onClick={() => void buy("pro")}>
+                {busyPlan === "pro" ? "Starting checkout…" : "Start 14-day free trial"}
+              </button>
+              {checkoutErr?.plan === "pro" && <p className="checkout-err" role="alert">{checkoutErr.msg}</p>}
               <ul className="flist">
                 <li className="lead">Everything in Free, plus</li>
                 <li><Check /> <b>AI logbook scanning</b> — photo → filled rows</li>
@@ -192,7 +214,10 @@ export default function Pricing() {
               <div className="t-tag">For working pilots who live in their logbook.</div>
               <div className="price"><span className="amt">{annual ? "$12.50" : "$15"}</span><span className="per">/month</span></div>
               <div className="price-sub">{annual ? "$150 billed yearly — save $30." : "Billed monthly."}</div>
-              <button type="button" className="btn btn-ghost btn-block cta" onClick={() => startCheckout("professional", annual ? "year" : "month")}>Start 14-day free trial</button>
+              <button type="button" className="btn btn-ghost btn-block cta" disabled={busyPlan !== null} onClick={() => void buy("professional")}>
+                {busyPlan === "professional" ? "Starting checkout…" : "Start 14-day free trial"}
+              </button>
+              {checkoutErr?.plan === "professional" && <p className="checkout-err" role="alert">{checkoutErr.msg}</p>}
               <ul className="flist">
                 <li className="lead">Everything in Pro, plus</li>
                 <li><Check /> <b>Unlimited</b> AI scanning</li>

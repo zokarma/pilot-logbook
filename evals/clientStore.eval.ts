@@ -7,8 +7,9 @@
 //      three-way merge loses edits.
 //   2. "Bug-report screenshots never leave the browser." stripScreenshots is
 //      the only thing standing between a screenshot and the cloud row.
-// Local-only auth (no Supabase configured) is the third surface: salted
-// SHA-256 with in-place upgrade of legacy unsalted djb2 records.
+// Local-only auth (no Supabase configured) is the third surface: PBKDF2-
+// HMAC-SHA256 over a per-user salt, with in-place upgrade of every legacy
+// digest shape (unsalted djb2, salted one-round SHA-256, salted djb2).
 
 import {
   loadCache, saveCache, loadBase, saveBase, loadLastUser, saveLastUser, clearLastUser,
@@ -150,10 +151,15 @@ export async function run(): Promise<Suite> {
       s.check("signup opens a session", localSession() === "amelia");
       s.check("signup seeds an empty logbook for the new user", !!loadCache("amelia") && loadCache("amelia")!.flights.length === 0);
 
-      const users = JSON.parse(store.getItem("plb_local_users")!) as Record<string, { pass: string; salt?: string }>;
+      const users = JSON.parse(store.getItem("plb_local_users")!) as Record<string, { pass: string; salt?: string; scheme?: string; iterations?: number }>;
       s.check("the password is never stored in plaintext", !store.dump().includes("hunter2-correct-horse"));
       s.check("the stored digest is salted", !!users.amelia.salt && users.amelia.salt.length >= 16);
       s.check("the digest is SHA-256, not the legacy djb2", users.amelia.pass.length === 64 && users.amelia.pass !== hashStr("hunter2-correct-horse"));
+      // A KDF, not a bare hash: a stolen digest must not fall to a wordlist in
+      // seconds. The explicit scheme tag is what lets the verifier tell the
+      // hashing schemes apart instead of guessing (see the probe below).
+      s.check("the record records its hashing scheme", users.amelia.scheme === "pbkdf2-sha256");
+      s.check("PBKDF2 runs a real work factor", (users.amelia.iterations ?? 0) >= 100_000);
 
       const dup = await localSignup("amelia", "another");
       s.check("a duplicate username is refused (no silent overwrite)", dup.error === "Username already exists. Try logging in.");
@@ -180,10 +186,28 @@ export async function run(): Promise<Suite> {
       s.check("a rejected legacy login is NOT upgraded", !(JSON.parse(store.getItem("plb_local_users")!) as Record<string, { salt?: string }>).oldtimer.salt);
 
       s.check("a legacy record still logs in with the right password", !(await localLogin("oldtimer", "legacy-pass")).error);
-      const upgraded = (JSON.parse(store.getItem("plb_local_users")!) as Record<string, { pass: string; salt?: string }>).oldtimer;
-      s.check("the legacy record is upgraded to a salted SHA-256 digest in place", !!upgraded.salt && upgraded.pass.length === 64 && upgraded.pass !== hashStr("legacy-pass"));
+      const upgraded = (JSON.parse(store.getItem("plb_local_users")!) as Record<string, { pass: string; salt?: string; scheme?: string }>).oldtimer;
+      s.check("the legacy record is upgraded to a salted PBKDF2 digest in place",
+        !!upgraded.salt && upgraded.scheme === "pbkdf2-sha256" && upgraded.pass.length === 64 && upgraded.pass !== hashStr("legacy-pass"));
       s.check("the upgraded record accepts the same password on the next login", !(await localLogin("oldtimer", "legacy-pass")).error);
       s.check("the upgraded record still rejects the wrong password", (await localLogin("oldtimer", "nope")).error === "Incorrect password.");
+    }
+
+    /* ---- salted one-round SHA-256 (the previous scheme) also upgrades ----- */
+    {
+      // Written by the version before PBKDF2: salt present, no scheme tag.
+      const salt = "0123456789abcdef0123456789abcdef";
+      const legacyDigest = Array.from(
+        new Uint8Array(await g.crypto.subtle.digest("SHA-256", new TextEncoder().encode(salt + ":" + "sha-era-pass"))),
+        (b: number) => b.toString(16).padStart(2, "0"),
+      ).join("");
+      store.m.set("plb_local_users", JSON.stringify({ shaera: { pass: legacyDigest, salt } }));
+
+      s.check("a salted-SHA256 record rejects a wrong password", (await localLogin("shaera", "nope")).error === "Incorrect password.");
+      s.check("a salted-SHA256 record logs in with the right password", !(await localLogin("shaera", "sha-era-pass")).error);
+      const up = (JSON.parse(store.getItem("plb_local_users")!) as Record<string, { pass: string; scheme?: string }>).shaera;
+      s.check("it is rehashed to PBKDF2 in place", up.scheme === "pbkdf2-sha256" && up.pass !== legacyDigest);
+      s.check("and still accepts the same password afterwards", !(await localLogin("shaera", "sha-era-pass")).error);
     }
 
     /* ------------------------------ hash.ts ------------------------------- */
@@ -193,29 +217,39 @@ export async function run(): Promise<Suite> {
 
     /* ------------------------------- probes ------------------------------- */
     {
-      // crypto.subtle only exists in a secure context. A record CREATED without
-      // it stores a salted *djb2* digest but is marked salted, so the next login
-      // in a secure context hashes with SHA-256 and can never match.
+      // crypto.subtle only exists in a secure context. Signup there used to
+      // write a salted *djb2* digest indistinguishable from a salted SHA-256
+      // one, which locked the account out for good once the app was served
+      // over https. Now signup refuses outright rather than creating an
+      // account it can never verify.
       const realCrypto = g.crypto;
       Object.defineProperty(globalThis, "crypto", {
         value: { getRandomValues: (b: Uint8Array) => realCrypto.getRandomValues(b) },
         configurable: true, writable: true,
       });
       store.m.delete("plb_local_users");
-      await localSignup("insecure", "same-password");
+      const insecureSignup = await localSignup("insecure", "same-password");
+      const wroteRecord = !!store.getItem("plb_local_users") &&
+        Object.keys(JSON.parse(store.getItem("plb_local_users")!)).length > 0;
       Object.defineProperty(globalThis, "crypto", { value: realCrypto, configurable: true, writable: true });
-      const after = await localLogin("insecure", "same-password");
-      s.probe(
-        "account created in an insecure context (no crypto.subtle)",
-        after.error
-          ? `LOCKED OUT — signup over plain http stores a salted djb2 digest with a salt field, so the same password fails ("${after.error}") once the app is served from https/localhost where crypto.subtle exists. Only affects local-only mode (no Supabase); a marker distinguishing the two salted schemes would fix it.`
-          : "logs in fine — the two hash paths agree",
-      );
+
+      s.check("signup in an insecure context is refused, not silently weakened", !!insecureSignup.error);
+      s.check("...and no unverifiable account is left behind", !wroteRecord);
+
+      // A salted djb2 digest already on disk from that old path still logs in
+      // and gets rehashed — nobody is stranded by the fix.
+      const oldSalt = "fedcba9876543210fedcba9876543210";
+      store.m.set("plb_local_users", JSON.stringify({
+        stranded: { pass: hashStr(oldSalt + ":" + "rescue-me"), salt: oldSalt },
+      }));
+      s.check("a salted-djb2 record written over http can still log in", !(await localLogin("stranded", "rescue-me")).error);
+      const rescued = (JSON.parse(store.getItem("plb_local_users")!) as Record<string, { scheme?: string }>).stranded;
+      s.check("...and is rehashed to PBKDF2", rescued.scheme === "pbkdf2-sha256");
     }
 
     s.probe(
       "local-only mode security model",
-      "passwords are a single unsalted-iteration SHA-256 (not a KDF) and the logbook itself sits unencrypted in localStorage — the gate is an offline convenience, not protection against someone with the device. Documented as such in clientStore.ts; the cloud path (Supabase Auth + RLS) is the real security boundary.",
+      "passwords are now PBKDF2-HMAC-SHA256 (210k iterations, per-user salt), so a stolen digest resists a wordlist — but the logbook itself still sits unencrypted in localStorage, so the gate remains an offline convenience rather than protection against someone holding the device. The cloud path (Supabase Auth + RLS) is the real security boundary.",
     );
     s.probe(
       "mirror eviction",

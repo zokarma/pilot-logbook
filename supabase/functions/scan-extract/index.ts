@@ -38,7 +38,13 @@ function json(body: unknown, status: number) {
 }
 
 const MAX_IMAGES = 4;
-const MAX_BYTES = 8 * 1024 * 1024; // per image, roughly (base64 length checked)
+const MAX_BYTES = 8 * 1024 * 1024;        // per image (decoded, approximated from base64 length)
+const MAX_TOTAL_BYTES = 20 * 1024 * 1024; // per request, across all images
+// Hard ceiling on the raw request body, checked BEFORE req.json() parses it.
+// Without this, an authenticated caller can make the function buffer and parse
+// an arbitrarily large body — memory pressure that costs us before a single
+// per-image limit is ever consulted.
+const MAX_BODY_BYTES = 32 * 1024 * 1024;
 
 // Days a lapsed/retriable subscription still counts — mirrors GRACE_DAYS in
 // src/lib/entitlement.ts so the server and the client agree about who's premium.
@@ -94,14 +100,22 @@ interface ImagePart {
   data: string;
 }
 
+const ALLOWED_MEDIA = ["image/jpeg", "image/png", "image/webp", "image/gif", "application/pdf"];
+// Strict base64: the alphabet plus optional padding, nothing else. Anything
+// that isn't valid base64 can only ever be rejected downstream by Anthropic —
+// at our expense — so it is refused here instead of being forwarded.
+const BASE64_ONLY = /^[A-Za-z0-9+/]+={0,2}$/;
+
 // "data:image/png;base64,AAAA" or bare base64 → {media, data}. PDFs allowed.
 function parseImage(raw: unknown): ImagePart | null {
   if (typeof raw !== "string" || !raw) return null;
   const m = raw.match(/^data:([a-z0-9.+/-]+);base64,(.+)$/i);
   const media = m ? m[1].toLowerCase() : "image/jpeg";
-  const data = m ? m[2] : raw;
-  const ok = ["image/jpeg", "image/png", "image/webp", "image/gif", "application/pdf"].includes(media);
-  if (!ok || data.length > MAX_BYTES * 1.4) return null;
+  const data = (m ? m[2] : raw).replace(/\s+/g, "");
+  if (!ALLOWED_MEDIA.includes(media)) return null;
+  // base64 inflates by 4/3; compare decoded size against the per-image cap.
+  if (data.length * 3 / 4 > MAX_BYTES) return null;
+  if (!BASE64_ONLY.test(data)) return null;
   return { media, data };
 }
 
@@ -161,13 +175,30 @@ Deno.serve(async (req) => {
   const apiKey = Deno.env.get("ANTHROPIC_API_KEY");
   if (!apiKey) return json({ error: "Cloud AI is not configured (missing ANTHROPIC_API_KEY secret)." }, 503);
 
+  // Reject an oversized body before parsing it.
+  const declaredLen = Number(req.headers.get("content-length") ?? "0");
+  if (declaredLen > MAX_BODY_BYTES) return json({ error: "Request too large." }, 413);
+
   let body: { mode?: string; images?: unknown[] };
-  try { body = await req.json(); } catch { return json({ error: "Invalid JSON body" }, 400); }
+  try {
+    const raw = await req.text();
+    if (raw.length > MAX_BODY_BYTES) return json({ error: "Request too large." }, 413);
+    body = JSON.parse(raw);
+  } catch { return json({ error: "Invalid JSON body" }, 400); }
+  if (!body || typeof body !== "object") return json({ error: "Invalid JSON body" }, 400);
+
   const mode = body.mode === "document" ? "document" : "flights";
-  const images = (Array.isArray(body.images) ? body.images : [])
-    .slice(0, MAX_IMAGES)
-    .map(parseImage)
-    .filter((p): p is ImagePart => p !== null);
+  const images: ImagePart[] = [];
+  let totalBytes = 0;
+  for (const raw of (Array.isArray(body.images) ? body.images : []).slice(0, MAX_IMAGES)) {
+    const part = parseImage(raw);
+    if (!part) continue;
+    totalBytes += part.data.length * 3 / 4;
+    if (totalBytes > MAX_TOTAL_BYTES) {
+      return json({ error: "Those pages add up to more than 20 MB — scan fewer at a time." }, 413);
+    }
+    images.push(part);
+  }
   if (!images.length) return json({ error: "No usable images (JPEG/PNG/WebP/GIF or PDF, ≤8 MB each)." }, 400);
 
   const content: unknown[] = images.map((img) =>
