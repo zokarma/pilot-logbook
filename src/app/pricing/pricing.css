@@ -144,6 +144,9 @@
 .pp .price .per { font-family: var(--mono); font-size: 0.85rem; color: var(--ink-dim); }
 .pp .price-sub { font-size: 0.8rem; color: var(--ink-faint); margin-top: 4px; min-height: 1.4em; font-variant-numeric: tabular-nums; }
 .pp .tier .cta { margin-top: 20px; }
+.pp .tier .cta:disabled { opacity: 0.65; cursor: default; }
+/* Shown only when create-checkout refuses; normally absent, so no reserved space. */
+.pp .checkout-err { margin-top: 8px; font-size: 0.8rem; line-height: 1.35; color: #f87171; }
 .pp .flist { list-style: none; margin: 22px 0 0; padding: 20px 0 0; border-top: 1px dashed var(--line-2); display: flex; flex-direction: column; gap: 11px; }
 .pp .flist li { display: flex; gap: 0.7em; font-size: 0.9rem; color: var(--ink-dim); align-items: flex-start; }
 .pp .flist li svg { width: 17px; height: 17px; color: var(--green); flex: none; margin-top: 2px; }

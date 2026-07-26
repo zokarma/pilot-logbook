@@ -29,22 +29,41 @@ const admin = createClient(
   Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
 );
 
-// `client_reference_id` rides on a Payment Link URL, so it is caller-editable
-// text, not a trusted value. Anything that isn't a UUID can't be an
-// auth.users id: upserting it violates the FK, the handler 500s, and Stripe
-// then retries the same doomed event for ~3 days. Screen it here and drop the
-// event cleanly instead.
-// Deliberately shape-only (8-4-4-4-12 hex), not version/variant-pinned: any
-// such string is a legal Postgres uuid, and pinning to v4 would reject a real
-// account id if Supabase ever mints a different version.
+// A user id is only ever accepted from `subscription.metadata.user_id`, which
+// create-checkout writes from the caller's verified JWT. It is NEVER taken
+// from `checkout.session.client_reference_id`: that rode on a Payment Link URL
+// the payer could edit, so a checkout could be aimed at another account's id
+// and — plb_entitlements being keyed by user_id — overwrite that account's
+// customer/subscription binding, letting a stranger's later cancel revoke
+// premium the victim was still paying Stripe for. Payment Links are retired;
+// see BILLING.md.
+//
+// Shape-only validation (8-4-4-4-12 hex), not version/variant-pinned: any such
+// string is a legal Postgres uuid, and pinning to v4 would reject a real
+// account id if Supabase ever mints a different version. A non-uuid can't be
+// an auth.users id — upserting it violates the FK, the handler 500s, and
+// Stripe retries the doomed event for ~3 days.
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 function asUserId(v: unknown): string | null {
   return typeof v === "string" && UUID_RE.test(v) ? v.toLowerCase() : null;
 }
 
+// price id → tier. STRIPE_PRICE_IDS ("pro:month" → price id) is the source of
+// truth shared with create-checkout and is simply inverted here; the older
+// STRIPE_PRICE_MAP (price id → tier) still works for deployments that haven't
+// migrated. Setting both is fine — STRIPE_PRICE_IDS wins.
 function priceMap(): Record<string, string> {
-  try { return JSON.parse(Deno.env.get("STRIPE_PRICE_MAP") ?? "{}"); }
-  catch { return {}; }
+  const map: Record<string, string> = {};
+  try {
+    const legacy = JSON.parse(Deno.env.get("STRIPE_PRICE_MAP") ?? "{}") as Record<string, string>;
+    for (const [priceId, tier] of Object.entries(legacy)) map[priceId] = tier;
+  } catch { /* malformed — fall through to STRIPE_PRICE_IDS */ }
+  try {
+    const ids = JSON.parse(Deno.env.get("STRIPE_PRICE_IDS") ?? "{}") as Record<string, string>;
+    // "pro:month" → "price_…"  becomes  "price_…" → "pro"
+    for (const [plan, priceId] of Object.entries(ids)) map[priceId] = plan.split(":")[0];
+  } catch { /* malformed — keep whatever STRIPE_PRICE_MAP gave us */ }
+  return map;
 }
 function tierForPrice(priceId: string | undefined): "free" | "pro" | "professional" {
   const t = priceId ? priceMap()[priceId] : undefined;
@@ -64,23 +83,32 @@ async function upsertEntitlement(row: {
   if (error) throw new Error(`entitlement upsert failed: ${error.message}`);
 }
 
-// Resolve the app user id for a subscription: prefer explicit metadata / the
-// checkout's client_reference_id; else look up by the Stripe customer id we
-// stored on the first purchase.
-async function userIdForSubscription(sub: Stripe.Subscription, fallback?: string | null): Promise<string | null> {
+// Resolve the app user id for a subscription. Two authenticated sources only:
+// the metadata create-checkout stamped from the buyer's JWT, or — for
+// subscriptions that predate it — the Stripe customer id we already recorded
+// against an account on a previous, verified event.
+async function userIdForSubscription(sub: Stripe.Subscription): Promise<string | null> {
   const metaUser = asUserId(sub.metadata?.user_id ?? sub.metadata?.supabase_user_id);
   if (metaUser) return metaUser;
-  const fromCheckout = asUserId(fallback);
-  if (fromCheckout) return fromCheckout;
   const customer = typeof sub.customer === "string" ? sub.customer : sub.customer?.id;
   if (!customer) return null;
   const { data } = await admin.from("plb_entitlements").select("user_id").eq("stripe_customer_id", customer).maybeSingle();
   return data?.user_id ?? null;
 }
 
-async function applySubscription(sub: Stripe.Subscription, userId: string | null) {
-  const uid = await userIdForSubscription(sub, userId);
-  if (!uid) { console.error("no user for subscription", sub.id); return; }
+async function applySubscription(sub: Stripe.Subscription) {
+  const uid = await userIdForSubscription(sub);
+  if (!uid) {
+    // Reachable if a retired Payment Link is still live in Stripe: that
+    // checkout carries no metadata and no known customer, so it cannot be
+    // bound to an account. Loud and manual beats guessing from a field the
+    // payer controls. Deactivate any remaining Payment Links (BILLING.md).
+    console.error(
+      "UNBOUND subscription", sub.id, "customer", typeof sub.customer === "string" ? sub.customer : sub.customer?.id,
+      "— no metadata.user_id and no known customer; grant this entitlement manually and check for a live Payment Link",
+    );
+    return;
+  }
   const priceId = sub.items.data[0]?.price?.id;
   const tier = tierForPrice(priceId);
   await upsertEntitlement({
@@ -116,24 +144,21 @@ Deno.serve(async (req) => {
     switch (event.type) {
       case "checkout.session.completed": {
         const session = event.data.object as Stripe.Checkout.Session;
-        // We required login before checkout, so the app user id rides on
-        // client_reference_id (see src/lib/checkout.ts). Validated, not
-        // trusted — it comes off a URL the payer can edit.
-        const userId = asUserId(session.client_reference_id);
-        if (session.client_reference_id && !userId) {
-          console.error("ignoring malformed client_reference_id on", session.id);
-        }
         if (session.subscription) {
+          // Re-fetch the subscription rather than reading the session: the
+          // binding lives in subscription.metadata.user_id, written by
+          // create-checkout from the buyer's JWT. session.client_reference_id
+          // is deliberately not consulted (see asUserId above).
           const sub = await stripe.subscriptions.retrieve(
             typeof session.subscription === "string" ? session.subscription : session.subscription.id,
           );
-          await applySubscription(sub, userId);
+          await applySubscription(sub);
         }
         break;
       }
       case "customer.subscription.updated":
       case "customer.subscription.deleted": {
-        await applySubscription(event.data.object as Stripe.Subscription, null);
+        await applySubscription(event.data.object as Stripe.Subscription);
         break;
       }
       default:

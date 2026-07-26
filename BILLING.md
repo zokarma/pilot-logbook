@@ -37,8 +37,15 @@ both together**. Any future paid endpoint must do the same.
 - **`plb_entitlements` table** (`supabase/schema.sql`) — server-authoritative
   premium state, **read-your-own only, no client write policy**. Only the
   webhook (service-role) writes it.
+- **`supabase/functions/create-checkout`** — creates the Stripe Checkout
+  Session. Requires the caller's JWT, derives their user id from it, resolves
+  the plan → price id **server-side** (`STRIPE_PRICE_IDS`), and writes the id
+  into `subscription_data.metadata.user_id`. That metadata is the binding
+  between a payment and an account, and the payer cannot touch it.
 - **`supabase/functions/stripe-webhook`** — verifies the Stripe signature, maps
-  the subscription's price → tier via `STRIPE_PRICE_MAP`, and upserts the row.
+  the subscription's price → tier, and upserts the row. It resolves the account
+  **only** from `subscription.metadata.user_id` or from a `stripe_customer_id`
+  already recorded against an account; `client_reference_id` is ignored.
 - **`src/lib/entitlement.ts`** (pure, eval-covered) — `effectiveTier` (with a
   `GRACE_DAYS` window so a paying pilot is never locked out offline / on a
   retriable payment), `hasFeature`, and `entitlementFromRow` (a malformed row
@@ -47,8 +54,23 @@ both together**. Any future paid endpoint must do the same.
   localStorage), interpreted by the pure helpers.
 - **`src/components/PremiumGate.tsx`** — `<PremiumGate feature="…">` wrapper;
   enforcement is opt-in per feature.
-- **`src/lib/checkout.ts`** + the `/pricing` plan buttons — start a Stripe
-  Payment Link checkout with `client_reference_id = supabase user id`.
+- **`src/lib/checkout.ts`** + the `/pricing` plan buttons — invoke
+  `create-checkout` with **only** the plan (`{tier, period}`) and redirect to
+  the session URL it returns. Signed-out visitors go to `/login` first; a
+  failure shows a message under the plan button instead of doing nothing.
+
+> **Why not Payment Links (the previous flow).** A Payment Link carried the
+> account id in `?client_reference_id=<user id>` — a query param on a URL the
+> payer edits. Since `plb_entitlements` is keyed by `user_id`, a checkout aimed
+> at *someone else's* id overwrote that account's `stripe_customer_id` /
+> `stripe_subscription_id`, so a later cancel on the stranger's subscription
+> revoked premium the victim was still being billed for by Stripe (and the
+> victim's own renewal events stopped resolving). No webhook-side guard fixes
+> this: a Payment Link upgrade also creates a brand-new subscription, so
+> "legitimate upgrade" and "hijack" look identical at the row level. Deriving
+> the id from the caller's JWT removes the choice entirely. **Do not
+> reintroduce a client-supplied user id or price** — `evals/checkout.eval.ts`
+> asserts both.
 
 ## Rollout status
 
@@ -69,17 +91,23 @@ Currency is **CAD**: Pro $10/mo · $100/yr, Professional $15/mo · $150/yr
    re-run** (adds `plb_entitlements`; the old destructive `plb_app_state` drop
    was removed). Verify RLS is on with the single `entitlements_select_own`
    SELECT policy (no insert/update/delete).
-2. **Stripe:** create the Pro & Professional products + monthly/yearly prices,
-   then a **Payment Link** per price with a **14-day trial**.
-   - **Do NOT enable "collect client reference id"** on the link — the app
-     appends `?client_reference_id=<user id>` to the URL itself
-     (`lib/checkout.ts`), and an on-screen field only confuses customers (an
-     empty submit can blank the value). The URL param is the sole source.
-3. **Function** (Supabase CLI, from the repo root; project ref
+2. **Stripe:** create the Pro & Professional products + monthly/yearly prices.
+   Note the four **price ids** — that's all you need.
+   - **No Payment Links.** Checkout Sessions are created by
+     `create-checkout`, and the 14-day trial now comes from
+     `STRIPE_TRIAL_DAYS` (code, not a dashboard setting).
+   - **Deactivate any existing Payment Links** (Stripe → Payment Links →
+     Archive). A link left live still takes money, but its checkout carries no
+     `metadata.user_id`, so the webhook can't bind it to an account: it logs
+     `UNBOUND subscription …` and the entitlement needs granting by hand.
+3. **Functions** (Supabase CLI, from the repo root; project ref
    `gnfdhxzvivrmltrkdugy`):
    ```
    supabase functions deploy stripe-webhook --no-verify-jwt
+   supabase functions deploy create-checkout
    ```
+   `create-checkout` keeps JWT verification **on** — that's what makes the
+   buyer's identity trustworthy.
    Register the function URL
    (`https://<ref>.supabase.co/functions/v1/stripe-webhook`) as a Stripe
    webhook endpoint subscribing to `checkout.session.completed`,
@@ -89,21 +117,33 @@ Currency is **CAD**: Pro $10/mo · $100/yr, Professional $15/mo · $150/yr
    supabase secrets set STRIPE_SECRET_KEY=sk_…
    supabase secrets set STRIPE_WEBHOOK_SECRET=whsec_…
    ```
-   For `STRIPE_PRICE_MAP` (JSON), PowerShell mangles inline quotes — write a
-   temp `.env.stripe` (gitignored via `.env.*`) and load it, then delete it:
+   `STRIPE_PRICE_IDS` (JSON) maps **plan → price id** and is the single source
+   of truth for both functions: `create-checkout` reads it forward to pick a
+   price, and `stripe-webhook` inverts it for price → tier. PowerShell mangles
+   inline quotes, so write a temp `.env.stripe` (gitignored via `.env.*`), load
+   it, then delete it:
    ```powershell
-   'STRIPE_PRICE_MAP={"price_proM":"pro","price_proY":"pro","price_profM":"professional","price_profY":"professional"}' | Out-File -Encoding ascii .env.stripe
+   'STRIPE_PRICE_IDS={"pro:month":"price_proM","pro:year":"price_proY","professional:month":"price_profM","professional:year":"price_profY"}' | Out-File -Encoding ascii .env.stripe
    supabase secrets set --env-file .env.stripe
    Remove-Item .env.stripe
    ```
-   The function holds one secret set, so `STRIPE_SECRET_KEY`/`WEBHOOK_SECRET`
+   Optional: `STRIPE_TRIAL_DAYS` (default `14`, set `0` for no trial) and
+   `APP_URL` (default `https://pilotlogbook.ca`) — the latter is the allowlist
+   for Stripe's `success_url`/`cancel_url`, so a checkout can never redirect
+   off your own domain. The legacy `STRIPE_PRICE_MAP` (price id → tier) is
+   still honoured by the webhook if present, so an existing deployment keeps
+   working; `STRIPE_PRICE_IDS` wins where both are set, and you can drop
+   `STRIPE_PRICE_MAP` once it is.
+
+   The project holds one secret set, so `STRIPE_SECRET_KEY`/`WEBHOOK_SECRET`
    are either both test or both live — switching to live retires the test flow
    (test-mode signatures stop matching, by design). `SUPABASE_URL` /
-   `SUPABASE_SERVICE_ROLE_KEY` are auto-injected.
-4. **App env** (Vercel → Production, public): `NEXT_PUBLIC_STRIPE_LINK_PRO_MONTHLY`,
-   `_PRO_YEARLY`, `_PROFESSIONAL_MONTHLY`, `_PROFESSIONAL_YEARLY` = the payment
-   link URLs. **`NEXT_PUBLIC_` vars bake in at build time — redeploy after
-   changing them.** Until set, plan buttons fall back to `/login`.
+   `SUPABASE_ANON_KEY` / `SUPABASE_SERVICE_ROLE_KEY` are auto-injected.
+4. **App env** (Vercel): nothing Stripe-specific any more. The old
+   `NEXT_PUBLIC_STRIPE_LINK_*` vars are unused and can be deleted — the plan
+   buttons only need `NEXT_PUBLIC_SUPABASE_URL` / `_ANON_KEY`, and fall back to
+   `/login` without them. Prices and the trial now live in the function's
+   secrets, so changing a price no longer requires a frontend redeploy.
 5. **Enforcement is ON** (see the table at the top). Gated surfaces show a
    PRO/lock affordance that routes to `/pricing`; add more gates with
    `<PremiumGate feature="…">` or `useEntitlement().has(...)`.
@@ -111,13 +151,13 @@ Currency is **CAD**: Pro $10/mo · $100/yr, Professional $15/mo · $150/yr
 ## Going live (when incorporated)
 
 Live and Test are fully separate in Stripe. Repeat setup in **live mode**:
-recreate the 2 products + 4 prices (CAD), 4 Payment Links (14-day trial, **no**
-client-reference-id field), and a **live webhook endpoint** on the same
-function URL. Then re-set the three Supabase secrets with **live** values
-(`sk_live_…`, the live `whsec_…`, and `STRIPE_PRICE_MAP` with the **live**
-price IDs), swap the 4 Vercel link vars to the live URLs, and **redeploy**.
-Smoke-test with a real card — the trial means $0 due today, so verify the
-`plb_entitlements` row then cancel before day 14.
+recreate the 2 products + 4 prices (CAD) and a **live webhook endpoint** on the
+same function URL. Then re-set the Supabase secrets with **live** values
+(`sk_live_…`, the live `whsec_…`, and `STRIPE_PRICE_IDS` with the **live**
+price ids). No Vercel change and no frontend redeploy is needed — prices live
+in the function's secrets now, not in `NEXT_PUBLIC_` vars. Smoke-test with a
+real card — the trial means $0 due today, so verify the `plb_entitlements` row
+then cancel before day 14.
 
 Full operator SQL/verify screenshots-era procedure was run for the sandbox on
 2026-07; see the top-of-file status.
@@ -133,22 +173,16 @@ Full operator SQL/verify screenshots-era procedure was run for the sandbox on
   offers free users a 10-page trial, but enforcement gives free accounts *zero*
   scans (client hides it, server returns 402). Either build the free quota or
   drop the claim from the copy — right now the page overpromises.
-- ~~**Bad `client_reference_id` retries forever.**~~ **Fixed.** `stripe-webhook`
-  now screens the id against a UUID shape (`asUserId`) before it reaches the
-  upsert. A malformed id is logged and the event is 200-ed instead of throwing,
-  so a mangled Payment Link URL no longer triggers ~3 days of Stripe retries.
-  The same check is applied to `subscription.metadata.user_id`.
-- A payer can pass **someone else's** (well-formed) user id as
-  `client_reference_id` and grant *them* premium at their own expense.
-  Self-harming rather than an escalation, so it's accepted — worth knowing if
-  support ever sees a "surprise premium". Note the sharper edge: because
-  `plb_entitlements` is keyed by `user_id`, such a checkout **overwrites** that
-  account's `stripe_customer_id` / `stripe_subscription_id`, so if the victim
-  was already paying, a later cancel on the *attacker's* subscription would
-  revoke premium the victim is still being billed for by Stripe. Exploiting it
-  costs the attacker a real subscription and requires knowing a Supabase user
-  UUID (never exposed to other users), so it stays accepted — but a guard that
-  refuses to rebind a row already tied to a live subscription would close it.
+- ~~**Bad `client_reference_id` retries forever.**~~ ~~**A payer can pass
+  someone else's user id.**~~ **Both fixed** by moving from Payment Links to
+  server-created Checkout Sessions (`create-checkout`). The account id now
+  comes from the buyer's verified JWT and rides in
+  `subscription_data.metadata.user_id`; `stripe-webhook` reads only that (plus
+  a `stripe_customer_id` it already recorded) and validates the UUID shape
+  before the FK write. A payer can no longer name another account at all, so
+  neither the "surprise premium" case nor the sharper one — overwriting a
+  paying user's Stripe binding so a stranger's cancel revokes premium they're
+  still billed for — is reachable. See "Why not Payment Links" above.
 
 ## App Store note
 
