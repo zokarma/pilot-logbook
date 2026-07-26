@@ -7,6 +7,11 @@
 //
 // - Auth: caller is identified from their own Supabase JWT — anonymous calls
 //   are rejected, so the public anon key alone can't spend API credits.
+// - Entitlement: cloud scanning is a PAID feature, so the tier is checked HERE,
+//   server-side. The client hides the scan UI for free pilots, but a client
+//   gate can't protect a resource that costs money — without this check any
+//   signed-in free account could invoke the function directly and run up the
+//   ANTHROPIC_API_KEY bill.
 // - The ANTHROPIC_API_KEY lives ONLY in this function's secrets, never in the
 //   app bundle.
 // - Nothing is stored: images pass through to the model call and the JSON
@@ -34,6 +39,33 @@ function json(body: unknown, status: number) {
 
 const MAX_IMAGES = 4;
 const MAX_BYTES = 8 * 1024 * 1024; // per image, roughly (base64 length checked)
+
+// Days a lapsed/retriable subscription still counts — mirrors GRACE_DAYS in
+// src/lib/entitlement.ts so the server and the client agree about who's premium.
+const GRACE_MS = 3 * 86400000;
+
+// Does this plb_entitlements row grant a paid tier right now? Deliberately a
+// small, self-contained mirror of effectiveTier() in src/lib/entitlement.ts
+// (Edge Functions can't import from src/). Keep the two in step — and keep this
+// one FAIL-CLOSED: anything unrecognised reads as not-premium.
+function grantsPremium(row: Record<string, unknown> | null): boolean {
+  if (!row) return false;
+  const tier = row.tier;
+  if (tier !== "pro" && tier !== "professional") return false;
+
+  const status = row.status;
+  const rawEnd = row.current_period_end;
+  const end = typeof rawEnd === "string" ? Date.parse(rawEnd) : NaN;
+  const within = isNaN(end) ? null : Date.now() <= end + GRACE_MS;
+
+  // Active-ish: valid unless the paid period (+grace) has already passed.
+  if (status === "active" || status === "trialing" || status === "past_due") {
+    return within === null ? true : within;
+  }
+  // Canceled: honour the remainder of the period they already paid for.
+  if (status === "canceled") return within === true;
+  return false;
+}
 
 const FLIGHTS_PROMPT = `You are extracting rows from a photo of a pilot's paper logbook (often a Transport Canada layout: year/month printed once as a header, one flight per row).
 
@@ -107,6 +139,24 @@ Deno.serve(async (req) => {
   );
   const { data: { user }, error: userErr } = await userClient.auth.getUser();
   if (userErr || !user) return json({ error: "Invalid or expired session" }, 401);
+
+  // Paid-feature gate. Read through the CALLER's client: RLS
+  // (entitlements_select_own) means they can only ever see their own row, so
+  // the answer can't be forged — and the row itself is written solely by the
+  // stripe-webhook service role. Fail closed on a read error: we'd rather
+  // refuse a scan than hand out API credits on a database blip.
+  const { data: entRow, error: entErr } = await userClient
+    .from("plb_entitlements")
+    .select("tier, status, current_period_end")
+    .eq("user_id", user.id)
+    .maybeSingle();
+  if (entErr) {
+    console.error("entitlement lookup failed", entErr.message);
+    return json({ error: "Could not verify your subscription — please try again." }, 503);
+  }
+  if (!grantsPremium(entRow as Record<string, unknown> | null)) {
+    return json({ error: "AI scanning is a Pro feature. Upgrade at /pricing to enable it.", code: "upgrade_required" }, 402);
+  }
 
   const apiKey = Deno.env.get("ANTHROPIC_API_KEY");
   if (!apiKey) return json({ error: "Cloud AI is not configured (missing ANTHROPIC_API_KEY secret)." }, 503);
