@@ -1,9 +1,22 @@
 # Billing & Subscriptions
 
-**Status: web backend built (Stripe). Not yet enforced — no feature is gated
-until you wrap it in `<PremiumGate>`, so the app still behaves free.** What
-exists now, and the operator steps to switch it on, are at the top; the
-original plan (incl. RevenueCat / native IAP for later) follows.
+**Status: web backend built (Stripe) and enforcement ON.** The following
+surfaces are now gated to the tier shown; everything else stays free. What
+exists now, and the operator steps to run it, are at the top; the original
+plan (incl. RevenueCat / native IAP for later) follows.
+
+| Surface | Feature | Min tier |
+|---|---|---|
+| AI logbook scanning (logger) | `aiScan` | Pro |
+| Document OCR scanning (documents) | `docOcr` | Pro |
+| Professional PDF export (logger) | `proPdf` | Pro |
+| Custom currency rules (currency) | `advancedCurrency` | Pro |
+| Duty & rest analysis (whole page) | `dutyRest` | Professional |
+
+A gradient **Upgrade** link appears in the sidebar for non-premium users
+(`useEntitlement().isPremium`). Multi-device, native apps, backup, unlimited
+reminders/scan quotas, roster import and company reports are **not** gated as
+single toggles — they're architectural or quota concepts to wire in later.
 
 ## What's implemented
 

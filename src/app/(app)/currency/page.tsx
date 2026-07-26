@@ -12,6 +12,7 @@ import { fleetTypes, normalizeAircraftCode } from "@/lib/aircraft";
 import { flightsForCurrentPilot } from "@/lib/logbook";
 import { CurrencyRule } from "@/lib/types";
 import { useUi } from "@/components/UiProvider";
+import { useEntitlement } from "@/hooks/useEntitlement";
 import Link from "next/link";
 
 // A currency that lapses within this many days shows amber.
@@ -79,6 +80,9 @@ function StatusCard({ s, onDelete, hidden, onToggleHide }: { s: CurrencyStatus; 
 export default function CurrencyPage() {
   const { data, mutate } = useData();
   const { toast } = useUi();
+  // Custom currency rules are the "advanced" tier of currency tracking (Pro).
+  const { has, ready: entReady } = useEntitlement();
+  const rulesGated = entReady && !has("advancedCurrency");
   const [form, setForm] = useState({ name: "", metric: "landings" as CurrencyMetric, threshold: "3", windowDays: "90", aircraftType: "" });
   const [msg, setMsg] = useState("");
   // The add-rule form is collapsed behind the header button (same pattern as
@@ -109,6 +113,7 @@ export default function CurrencyPage() {
 
   function addRule(e: React.FormEvent) {
     e.preventDefault();
+    if (rulesGated) { setMsg("Custom currency rules are a Pro feature."); return; }
     const threshold = parseFloat(form.threshold);
     const windowDays = parseInt(form.windowDays, 10);
     if (!(threshold > 0)) { setMsg("Threshold must be a positive number."); return; }
@@ -161,15 +166,29 @@ export default function CurrencyPage() {
           </p>
         </div>
         {!showAdd && (
-          <button
-            onClick={() => setShowAdd(true)}
-            className="inline-flex items-center gap-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition shrink-0"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M12 5v14M5 12h14" />
-            </svg>
-            Add Rule
-          </button>
+          rulesGated ? (
+            <Link
+              href="/pricing"
+              title="Custom currency rules are a Pro feature — upgrade to unlock them"
+              className="inline-flex items-center gap-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition shrink-0"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="5" y="11" width="14" height="10" rx="2" /><path d="M8 11V7a4 4 0 0 1 8 0v4" />
+              </svg>
+              Add Rule
+              <span className="text-[10px] font-semibold bg-white/20 px-1.5 py-0.5 rounded">PRO</span>
+            </Link>
+          ) : (
+            <button
+              onClick={() => setShowAdd(true)}
+              className="inline-flex items-center gap-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition shrink-0"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 5v14M5 12h14" />
+              </svg>
+              Add Rule
+            </button>
+          )
         )}
       </div>
 

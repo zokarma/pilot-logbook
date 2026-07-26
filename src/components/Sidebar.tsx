@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import BugReporter from "./BugReporter";
+import { useEntitlement } from "@/hooks/useEntitlement";
 
 export const NAV: { href: string; label: string; icon: React.ReactNode }[] = [
   {
@@ -84,6 +85,7 @@ export const NAV: { href: string; label: string; icon: React.ReactNode }[] = [
 
 export default function Sidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
   const pathname = usePathname();
+  const { isPremium, ready: entReady } = useEntitlement();
 
   // On phones the sidebar is an overlay drawer — navigating should dismiss it.
   const onNavigate = () => {
@@ -123,6 +125,22 @@ export default function Sidebar({ open, onClose }: { open: boolean; onClose: () 
           </Link>
         ))}
       </nav>
+
+      {entReady && !isPremium && (
+        <div className="px-3 mt-4">
+          <Link
+            href="/pricing"
+            onClick={onNavigate}
+            title="Upgrade your plan"
+            className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg text-sm font-semibold text-white bg-gradient-to-r from-brand-500 to-brand-700 hover:from-brand-400 hover:to-brand-600 transition"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 2l2.5 6.5L21 9l-5 4 1.5 7L12 16l-5.5 4L8 13 3 9l6.5-.5z" />
+            </svg>
+            Upgrade
+          </Link>
+        </div>
+      )}
 
       <div className="px-3 mt-4 border-t border-slate-800 pt-3">
         <BugReporter variant="nav" />

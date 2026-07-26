@@ -21,6 +21,8 @@ import {
 } from "@/lib/scan";
 import { scanAvailability, scanDocuments, scanImages, AiReason } from "@/lib/scanBridge";
 import { cloudScanAvailable, cloudExtract } from "@/lib/cloudScan";
+import { useEntitlement } from "@/hooks/useEntitlement";
+import Link from "next/link";
 
 // Read picked files to base64 (data-URL prefix included; the native side
 // strips it). Used by the Upload path so photos/PDFs run the same OCR pipeline.
@@ -159,6 +161,10 @@ export default function ScanImport({ mode }: { mode: Mode }) {
   const cloudOk = cloudScanAvailable();
   const [useCloud, setUseCloud] = useState(false);
   const [usedCloud, setUsedCloud] = useState(false);
+  // Scanning is a premium feature (flights → aiScan, documents → docOcr, both Pro).
+  const { has, ready: entReady } = useEntitlement();
+  const scanFeature = mode === "flights" ? "aiScan" : "docOcr";
+  const scanGated = entReady && !has(scanFeature);
 
   useEffect(() => {
     let alive = true;
@@ -328,44 +334,60 @@ export default function ScanImport({ mode }: { mode: Mode }) {
   return (
     <>
       <span className="inline-flex items-center gap-2 flex-wrap">
-        {available && (
-          <button
-            onClick={startScan}
-            disabled={phase === "scanning"}
-            className="text-sm bg-brand-600 hover:bg-brand-700 disabled:opacity-60 text-white font-medium px-3 py-1.5 rounded-lg transition inline-flex items-center gap-1.5"
+        {scanGated ? (
+          <Link
+            href="/pricing"
+            title="AI scanning is a Pro feature — upgrade to unlock it"
+            className="text-sm bg-brand-600 hover:bg-brand-700 text-white font-medium px-3 py-1.5 rounded-lg transition inline-flex items-center gap-1.5"
           >
             <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2M3 12h18" />
+              <rect x="5" y="11" width="14" height="10" rx="2" /><path d="M8 11V7a4 4 0 0 1 8 0v4" />
             </svg>
-            {phase === "scanning" ? "Scanning…" : label}
-          </button>
+            {mode === "flights" ? "Scan Logbook (AI)" : "Scan Document (AI)"}
+            <span className="text-[10px] font-semibold bg-white/20 px-1.5 py-0.5 rounded">PRO</span>
+          </Link>
+        ) : (
+          <>
+            {available && (
+              <button
+                onClick={startScan}
+                disabled={phase === "scanning"}
+                className="text-sm bg-brand-600 hover:bg-brand-700 disabled:opacity-60 text-white font-medium px-3 py-1.5 rounded-lg transition inline-flex items-center gap-1.5"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2M3 12h18" />
+                </svg>
+                {phase === "scanning" ? "Scanning…" : label}
+              </button>
+            )}
+            <button
+              onClick={() => fileRef.current?.click()}
+              disabled={phase === "scanning"}
+              title={available ? "Upload a photo or PDF instead of using the camera" : "Upload a photo or PDF — extracted with cloud AI"}
+              className={"text-sm disabled:opacity-60 font-medium px-3 py-1.5 rounded-lg transition inline-flex items-center gap-1.5 " +
+                (available ? "bg-slate-800 hover:bg-slate-700 text-slate-200" : "bg-brand-600 hover:bg-brand-700 text-white")}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12" />
+              </svg>
+              {available ? "Upload" : (phase === "scanning" ? "Scanning…" : (mode === "flights" ? "Scan Logbook (AI)" : "Scan Document (AI)"))}
+            </button>
+            {available && cloudOk && (
+              <label className="flex items-center gap-1.5 text-xs text-slate-400 select-none" title="Uploads only: the image is sent securely to our AI service for extraction. Camera scans always stay on-device.">
+                <input type="checkbox" checked={useCloud} onChange={(e) => setUseCloud(e.target.checked)} />
+                AI-enhance uploads (cloud)
+              </label>
+            )}
+            <input
+              ref={fileRef}
+              type="file"
+              accept="image/*,application/pdf"
+              multiple
+              className="hidden"
+              onChange={onUpload}
+            />
+          </>
         )}
-        <button
-          onClick={() => fileRef.current?.click()}
-          disabled={phase === "scanning"}
-          title={available ? "Upload a photo or PDF instead of using the camera" : "Upload a photo or PDF — extracted with cloud AI"}
-          className={"text-sm disabled:opacity-60 font-medium px-3 py-1.5 rounded-lg transition inline-flex items-center gap-1.5 " +
-            (available ? "bg-slate-800 hover:bg-slate-700 text-slate-200" : "bg-brand-600 hover:bg-brand-700 text-white")}
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12" />
-          </svg>
-          {available ? "Upload" : (phase === "scanning" ? "Scanning…" : (mode === "flights" ? "Scan Logbook (AI)" : "Scan Document (AI)"))}
-        </button>
-        {available && cloudOk && (
-          <label className="flex items-center gap-1.5 text-xs text-slate-400 select-none" title="Uploads only: the image is sent securely to our AI service for extraction. Camera scans always stay on-device.">
-            <input type="checkbox" checked={useCloud} onChange={(e) => setUseCloud(e.target.checked)} />
-            AI-enhance uploads (cloud)
-          </label>
-        )}
-        <input
-          ref={fileRef}
-          type="file"
-          accept="image/*,application/pdf"
-          multiple
-          className="hidden"
-          onChange={onUpload}
-        />
       </span>
 
       {(phase === "review" || phase === "error") && (

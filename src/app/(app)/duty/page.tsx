@@ -5,6 +5,7 @@ import { useData } from "@/context/DataContext";
 import { dstr, flightDateStr, num } from "@/lib/logbook";
 import { DutyEntry } from "@/lib/types";
 import { OPERATION_TYPES, DUTY_LIMITS, DEFAULT_OPERATION, operationLimits, effectiveLimits, FDP_TABLE } from "@/lib/dutyLimits";
+import PremiumGate from "@/components/PremiumGate";
 
 // Windows match the CARs rolling periods the limits are written against:
 // 7 days (work), 28 days (flight time + work), 90 days (flight time).
@@ -102,6 +103,7 @@ export default function DutyPage() {
   };
 
   return (
+    <PremiumGate feature="dutyRest">
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
       <div className="lg:col-span-2 card p-5">
         <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
@@ -263,6 +265,7 @@ export default function DutyPage() {
         />
       )}
     </div>
+    </PremiumGate>
   );
 }
 
