@@ -197,18 +197,18 @@ export default function Landing() {
             <div className="plan pop">
               <span className="ribbon">Most popular</span>
               <div className="p-name">Pro</div>
-              <div className="p-price"><span className="amt">$7</span><span className="per">/month</span></div>
+              <div className="p-price"><span className="amt">$10</span><span className="per">/month</span></div>
               <div className="p-tag">Backed up, syncing everywhere — with AI scanning.</div>
               <Link className="btn btn-primary p-cta" href={PRICING_HREF}>See Pro</Link>
             </div>
             <div className="plan">
               <div className="p-name">Professional</div>
-              <div className="p-price"><span className="amt">$10</span><span className="per">/month</span></div>
+              <div className="p-price"><span className="amt">$15</span><span className="per">/month</span></div>
               <div className="p-tag">For working pilots who live in their logbook.</div>
               <Link className="btn btn-ghost p-cta" href={PRICING_HREF}>See Professional</Link>
             </div>
           </div>
-          <p className="plans-note">Prices in USD. 14-day free trial on Pro &amp; Professional. <Link href={PRICING_HREF} style={{ color: "var(--cyan)" }}>Compare every feature &rarr;</Link></p>
+          <p className="plans-note">Prices in CAD. 14-day free trial on Pro &amp; Professional. <Link href={PRICING_HREF} style={{ color: "var(--cyan)" }}>Compare every feature &rarr;</Link></p>
         </div>
       </section>
 
