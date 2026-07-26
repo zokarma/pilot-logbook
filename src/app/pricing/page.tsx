@@ -8,12 +8,12 @@ export const metadata: Metadata = {
   // Slots into "Pricing · Pilot Logbook" via the root title template.
   title: "Pricing — Free, Pro & Professional plans",
   description:
-    "Photograph your paper logbook and let AI fill it in. Free forever, Pro ($7/mo), and Professional ($10/mo) plans — 14-day free trial, scan your first 10 pages free. Prices in USD.",
+    "Photograph your paper logbook and let AI fill it in. Free forever, Pro ($10/mo), and Professional ($15/mo) plans — 14-day free trial, scan your first 10 pages free. Prices in USD.",
   alternates: { canonical: "/pricing" },
   openGraph: {
     title: "Pilot Logbook Pricing — Free, Pro & Professional",
     description:
-      "Free forever, Pro ($7/mo), and Professional ($10/mo). 14-day free trial, scan your first 10 pages free.",
+      "Free forever, Pro ($10/mo), and Professional ($15/mo). 14-day free trial, scan your first 10 pages free.",
     url: "/pricing",
   },
 };

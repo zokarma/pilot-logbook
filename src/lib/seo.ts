@@ -38,8 +38,8 @@ export const SITE_KEYWORDS = [
 // Logbook cost" are accurate. Prices in USD, monthly.
 export const PLANS = [
   { name: "Free", price: 0, tagline: "Everything you need to keep a proper logbook." },
-  { name: "Pro", price: 7, tagline: "Backed up, syncing everywhere — with AI logbook scanning." },
-  { name: "Professional", price: 10, tagline: "For working pilots who live in their logbook." },
+  { name: "Pro", price: 10, tagline: "Backed up, syncing everywhere — with AI logbook scanning." },
+  { name: "Professional", price: 15, tagline: "For working pilots who live in their logbook." },
 ] as const;
 
 // FAQ content — the single source rendered on /pricing AND emitted as FAQPage
@@ -107,7 +107,7 @@ export function softwareApplicationLd(): Json {
       "@type": "AggregateOffer",
       priceCurrency: "USD",
       lowPrice: "0",
-      highPrice: "10",
+      highPrice: "15",
       offerCount: PLANS.length,
       offers: PLANS.map((p) => ({
         "@type": "Offer",

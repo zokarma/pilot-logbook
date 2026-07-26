@@ -171,8 +171,8 @@ export default function Pricing() {
               <span className="ribbon">Most popular</span>
               <div className="t-name">Pro</div>
               <div className="t-tag">Your logbook, backed up and syncing everywhere — with AI scanning.</div>
-              <div className="price"><span className="amt">{annual ? "$5.83" : "$7"}</span><span className="per">/month</span></div>
-              <div className="price-sub">{annual ? "$70 billed yearly — save $14." : "Billed monthly."}</div>
+              <div className="price"><span className="amt">{annual ? "$8.33" : "$10"}</span><span className="per">/month</span></div>
+              <div className="price-sub">{annual ? "$100 billed yearly — save $20." : "Billed monthly."}</div>
               <button type="button" className="btn btn-primary btn-block cta" onClick={() => startCheckout("pro", annual ? "year" : "month")}>Start 14-day free trial</button>
               <ul className="flist">
                 <li className="lead">Everything in Free, plus</li>
@@ -190,8 +190,8 @@ export default function Pricing() {
             <div className="tier">
               <div className="t-name">Professional</div>
               <div className="t-tag">For working pilots who live in their logbook.</div>
-              <div className="price"><span className="amt">{annual ? "$8.33" : "$10"}</span><span className="per">/month</span></div>
-              <div className="price-sub">{annual ? "$100 billed yearly — save $20." : "Billed monthly."}</div>
+              <div className="price"><span className="amt">{annual ? "$12.50" : "$15"}</span><span className="per">/month</span></div>
+              <div className="price-sub">{annual ? "$150 billed yearly — save $30." : "Billed monthly."}</div>
               <button type="button" className="btn btn-ghost btn-block cta" onClick={() => startCheckout("professional", annual ? "year" : "month")}>Start 14-day free trial</button>
               <ul className="flist">
                 <li className="lead">Everything in Pro, plus</li>
