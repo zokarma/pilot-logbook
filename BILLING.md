@@ -36,27 +36,77 @@ single toggles — they're architectural or quota concepts to wire in later.
 - **`src/lib/checkout.ts`** + the `/pricing` plan buttons — start a Stripe
   Payment Link checkout with `client_reference_id = supabase user id`.
 
-## Operator setup (to go live)
+## Rollout status
 
-1. **DB:** run `supabase/schema.sql` (adds `plb_entitlements`; safe to re-run).
-2. **Stripe:** create the Pro & Professional products + monthly/yearly prices;
-   make a **Payment Link** per price with a 14-day trial and "collect
-   client reference id" on.
-3. **Function:**
+- **Test mode (Sandbox): DONE and verified end-to-end** — a trial checkout
+  wrote the `plb_entitlements` row (`tier: pro`, `status: trialing`) via the
+  webhook; enforcement + the Upgrade link are QA'd on both a Pro and a free
+  account and are **live on `www.pilotlogbook.ca`** (pointing at test-mode
+  Stripe links).
+- **Live mode: PENDING** — waiting on business incorporation before switching
+  Stripe to live. See "Going live" below.
+
+## Operator setup (the tested procedure)
+
+Currency is **CAD**: Pro $10/mo · $100/yr, Professional $15/mo · $150/yr
+(annual = 2 months free). Prices/currency are per-price in Stripe.
+
+1. **DB:** run `supabase/schema.sql` — it is now **idempotent and safe to
+   re-run** (adds `plb_entitlements`; the old destructive `plb_app_state` drop
+   was removed). Verify RLS is on with the single `entitlements_select_own`
+   SELECT policy (no insert/update/delete).
+2. **Stripe:** create the Pro & Professional products + monthly/yearly prices,
+   then a **Payment Link** per price with a **14-day trial**.
+   - **Do NOT enable "collect client reference id"** on the link — the app
+     appends `?client_reference_id=<user id>` to the URL itself
+     (`lib/checkout.ts`), and an on-screen field only confuses customers (an
+     empty submit can blank the value). The URL param is the sole source.
+3. **Function** (Supabase CLI, from the repo root; project ref
+   `gnfdhxzvivrmltrkdugy`):
    ```
    supabase functions deploy stripe-webhook --no-verify-jwt
-   supabase secrets set STRIPE_SECRET_KEY=… STRIPE_WEBHOOK_SECRET=… \
-     STRIPE_PRICE_MAP='{"price_pro_m":"pro","price_pro_y":"pro","price_prof_m":"professional","price_prof_y":"professional"}'
    ```
-   Add the function URL as a Stripe webhook endpoint subscribing to
-   `checkout.session.completed`, `customer.subscription.updated`,
-   `customer.subscription.deleted`.
-4. **App env** (Vercel, public): `NEXT_PUBLIC_STRIPE_LINK_PRO_MONTHLY`,
+   Register the function URL
+   (`https://<ref>.supabase.co/functions/v1/stripe-webhook`) as a Stripe
+   webhook endpoint subscribing to `checkout.session.completed`,
+   `customer.subscription.updated`, `customer.subscription.deleted`; copy its
+   signing secret. Then set the three secrets:
+   ```
+   supabase secrets set STRIPE_SECRET_KEY=sk_…
+   supabase secrets set STRIPE_WEBHOOK_SECRET=whsec_…
+   ```
+   For `STRIPE_PRICE_MAP` (JSON), PowerShell mangles inline quotes — write a
+   temp `.env.stripe` (gitignored via `.env.*`) and load it, then delete it:
+   ```powershell
+   'STRIPE_PRICE_MAP={"price_proM":"pro","price_proY":"pro","price_profM":"professional","price_profY":"professional"}' | Out-File -Encoding ascii .env.stripe
+   supabase secrets set --env-file .env.stripe
+   Remove-Item .env.stripe
+   ```
+   The function holds one secret set, so `STRIPE_SECRET_KEY`/`WEBHOOK_SECRET`
+   are either both test or both live — switching to live retires the test flow
+   (test-mode signatures stop matching, by design). `SUPABASE_URL` /
+   `SUPABASE_SERVICE_ROLE_KEY` are auto-injected.
+4. **App env** (Vercel → Production, public): `NEXT_PUBLIC_STRIPE_LINK_PRO_MONTHLY`,
    `_PRO_YEARLY`, `_PROFESSIONAL_MONTHLY`, `_PROFESSIONAL_YEARLY` = the payment
-   link URLs. Until set, the plan buttons fall back to signup.
-5. **Turn on enforcement** feature-by-feature by wrapping surfaces in
-   `<PremiumGate feature="…">` (or checking `useEntitlement().has(...)`). Do
-   this deliberately so beta users aren't suddenly paywalled.
+   link URLs. **`NEXT_PUBLIC_` vars bake in at build time — redeploy after
+   changing them.** Until set, plan buttons fall back to `/login`.
+5. **Enforcement is ON** (see the table at the top). Gated surfaces show a
+   PRO/lock affordance that routes to `/pricing`; add more gates with
+   `<PremiumGate feature="…">` or `useEntitlement().has(...)`.
+
+## Going live (when incorporated)
+
+Live and Test are fully separate in Stripe. Repeat setup in **live mode**:
+recreate the 2 products + 4 prices (CAD), 4 Payment Links (14-day trial, **no**
+client-reference-id field), and a **live webhook endpoint** on the same
+function URL. Then re-set the three Supabase secrets with **live** values
+(`sk_live_…`, the live `whsec_…`, and `STRIPE_PRICE_MAP` with the **live**
+price IDs), swap the 4 Vercel link vars to the live URLs, and **redeploy**.
+Smoke-test with a real card — the trial means $0 due today, so verify the
+`plb_entitlements` row then cancel before day 14.
+
+Full operator SQL/verify screenshots-era procedure was run for the sandbox on
+2026-07; see the top-of-file status.
 
 ## App Store note
 
