@@ -29,6 +29,19 @@ const admin = createClient(
   Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
 );
 
+// `client_reference_id` rides on a Payment Link URL, so it is caller-editable
+// text, not a trusted value. Anything that isn't a UUID can't be an
+// auth.users id: upserting it violates the FK, the handler 500s, and Stripe
+// then retries the same doomed event for ~3 days. Screen it here and drop the
+// event cleanly instead.
+// Deliberately shape-only (8-4-4-4-12 hex), not version/variant-pinned: any
+// such string is a legal Postgres uuid, and pinning to v4 would reject a real
+// account id if Supabase ever mints a different version.
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+function asUserId(v: unknown): string | null {
+  return typeof v === "string" && UUID_RE.test(v) ? v.toLowerCase() : null;
+}
+
 function priceMap(): Record<string, string> {
   try { return JSON.parse(Deno.env.get("STRIPE_PRICE_MAP") ?? "{}"); }
   catch { return {}; }
@@ -55,9 +68,10 @@ async function upsertEntitlement(row: {
 // checkout's client_reference_id; else look up by the Stripe customer id we
 // stored on the first purchase.
 async function userIdForSubscription(sub: Stripe.Subscription, fallback?: string | null): Promise<string | null> {
-  const metaUser = (sub.metadata?.user_id || sub.metadata?.supabase_user_id) as string | undefined;
+  const metaUser = asUserId(sub.metadata?.user_id ?? sub.metadata?.supabase_user_id);
   if (metaUser) return metaUser;
-  if (fallback) return fallback;
+  const fromCheckout = asUserId(fallback);
+  if (fromCheckout) return fromCheckout;
   const customer = typeof sub.customer === "string" ? sub.customer : sub.customer?.id;
   if (!customer) return null;
   const { data } = await admin.from("plb_entitlements").select("user_id").eq("stripe_customer_id", customer).maybeSingle();
@@ -103,8 +117,12 @@ Deno.serve(async (req) => {
       case "checkout.session.completed": {
         const session = event.data.object as Stripe.Checkout.Session;
         // We required login before checkout, so the app user id rides on
-        // client_reference_id (see src/lib/checkout.ts).
-        const userId = session.client_reference_id ?? null;
+        // client_reference_id (see src/lib/checkout.ts). Validated, not
+        // trusted — it comes off a URL the payer can edit.
+        const userId = asUserId(session.client_reference_id);
+        if (session.client_reference_id && !userId) {
+          console.error("ignoring malformed client_reference_id on", session.id);
+        }
         if (session.subscription) {
           const sub = await stripe.subscriptions.retrieve(
             typeof session.subscription === "string" ? session.subscription : session.subscription.id,

@@ -72,6 +72,43 @@ export function run(): Suite {
     s.probe("re-importing the same file", `no dedupe on flat import — importing the same CSV twice yields ${again.data.flights.length} flights from 3 rows. The scan confirm sheet flags duplicates; the CSV path does not.`);
   }
 
+  // -- spreadsheet formula injection (CWE-1236) --
+  // Free text reaches an export from an imported CSV or a cloud AI scan, not
+  // just the pilot's own typing. Excel/Sheets/LibreOffice execute any cell
+  // starting with = + - @ TAB or CR, so those must be neutralised on the way
+  // out — and un-neutralised on the way back in, or backups stop round-tripping.
+  {
+    const nasty = [
+      mkFlight("x1", { date: "2026-07-01", notes: '=cmd|\'/c calc\'!A0', year: 2026, month: 7, day: 1 }),
+      mkFlight("x2", { date: "2026-07-02", notes: "+1+1", pic: "@SUM(A1:A9)", year: 2026, month: 7, day: 2 }),
+      mkFlight("x3", { date: "2026-07-03", notes: "-3-3", sic: "\tTAB lead", year: 2026, month: 7, day: 3 }),
+    ];
+    const text = toCSV(nasty);
+    const lines = text.split("\r\n").slice(1);
+    s.check("a leading = is neutralised in the export", lines[0].includes("'=cmd|"));
+    s.check("a leading + is neutralised", lines[1].includes("'+1+1"));
+    s.check("a leading @ is neutralised", lines[1].includes("'@SUM(A1:A9)"));
+    s.check("a leading - is neutralised", lines[2].includes("'-3-3"));
+    s.check("a leading TAB is neutralised", /'\t?TAB lead|"'\tTAB lead"/.test(lines[2]));
+
+    // Plain numbers legitimately start with -, and MUST stay numeric.
+    const negative = toCSV([mkFlight("n1", { date: "2026-07-04", se: -1.5, year: 2026, month: 7, day: 4 })]);
+    s.check("a negative number is NOT quote-guarded (stays numeric in the sheet)",
+      negative.includes("-1.5") && !negative.includes("'-1.5"));
+
+    // The guard must be invisible across an export → import cycle.
+    const back = importCSV(mkData(), text, []);
+    s.check("guarded export re-imports cleanly", back.added === 3, `added=${back.added} error=${back.error ?? "none"}`);
+    s.check("round-trip: the guard quote is stripped from notes",
+      back.data.flights[0]?.notes === '=cmd|\'/c calc\'!A0',
+      JSON.stringify(back.data.flights[0]?.notes));
+    s.check("round-trip: guarded crew names survive exactly",
+      back.data.flights[1]?.pic === "@SUM(A1:A9)", JSON.stringify(back.data.flights[1]?.pic));
+
+    // A value that merely *starts* with an apostrophe is not a guard.
+    s.eq("parseCSV leaves a genuine leading apostrophe alone", parseCSV("a\n'tis"), [["a"], ["'tis"]]);
+  }
+
   // -- rejection / skip accounting --
   {
     const res = importCSV(mkData(), "Date,se\nbanana,1.0\n2026-07-01,1.0", []);

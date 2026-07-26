@@ -133,13 +133,22 @@ Full operator SQL/verify screenshots-era procedure was run for the sandbox on
   offers free users a 10-page trial, but enforcement gives free accounts *zero*
   scans (client hides it, server returns 402). Either build the free quota or
   drop the claim from the copy — right now the page overpromises.
-- **Bad `client_reference_id` retries forever.** If a checkout arrives with a
-  `client_reference_id` that isn't a real `auth.users` id, the upsert violates
-  the FK, the handler 500s and Stripe retries for ~3 days. Harmless but noisy;
-  validating the id (or 200-ing with a logged error) would settle it.
-- A payer can pass **someone else's** user id as `client_reference_id` and grant
-  *them* premium at their own expense. Self-harming rather than an escalation,
-  so it's accepted — worth knowing if support ever sees a "surprise premium".
+- ~~**Bad `client_reference_id` retries forever.**~~ **Fixed.** `stripe-webhook`
+  now screens the id against a UUID shape (`asUserId`) before it reaches the
+  upsert. A malformed id is logged and the event is 200-ed instead of throwing,
+  so a mangled Payment Link URL no longer triggers ~3 days of Stripe retries.
+  The same check is applied to `subscription.metadata.user_id`.
+- A payer can pass **someone else's** (well-formed) user id as
+  `client_reference_id` and grant *them* premium at their own expense.
+  Self-harming rather than an escalation, so it's accepted — worth knowing if
+  support ever sees a "surprise premium". Note the sharper edge: because
+  `plb_entitlements` is keyed by `user_id`, such a checkout **overwrites** that
+  account's `stripe_customer_id` / `stripe_subscription_id`, so if the victim
+  was already paying, a later cancel on the *attacker's* subscription would
+  revoke premium the victim is still being billed for by Stripe. Exploiting it
+  costs the attacker a real subscription and requires knowing a Supabase user
+  UUID (never exposed to other users), so it stays accepted — but a guard that
+  refuses to rebind a row already tied to a live subscription would close it.
 
 ## App Store note
 
