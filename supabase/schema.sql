@@ -85,11 +85,17 @@ create policy "app_state_delete_own" on plb_app_state
 -- ============================================================================
 -- Billing entitlements — premium subscription state (server-authoritative)
 -- ============================================================================
--- The ONE place premium lives. It must NOT go in plb_app_state: that row is
--- user-writable under RLS, so a user could grant themselves premium. This
--- table is read-your-own only, with NO client write policy — only the billing
--- webhook (running with the service-role key, which bypasses RLS) grants or
--- revokes premium. See supabase/functions/stripe-webhook + src/lib/entitlement.ts.
+-- The ONE place premium lives, and the ONLY billing table the app reads. It
+-- must NOT go in plb_app_state: that row is user-writable under RLS, so a user
+-- could grant themselves premium. This table is read-your-own only, with NO
+-- client write policy — only the billing webhook (running with the
+-- service-role key, which bypasses RLS) grants or revokes premium.
+--
+-- It is DERIVED: the webhook records each Stripe subscription in
+-- plb_subscriptions (below) and then recomputes this row as the best
+-- entitlement across them. Think of it as a materialized view the client and
+-- scan-extract read. See supabase/functions/stripe-webhook +
+-- src/lib/entitlement.ts (`pickEffectiveEntitlement`).
 --
 -- Safe to re-run.
 create table if not exists plb_entitlements (
@@ -112,3 +118,60 @@ alter table plb_entitlements enable row level security;
 drop policy if exists "entitlements_select_own" on plb_entitlements;
 create policy "entitlements_select_own" on plb_entitlements
   for select using (auth.uid() = user_id);
+
+-- ============================================================================
+-- Billing subscriptions — one row per Stripe subscription (the source rows)
+-- ============================================================================
+-- plb_entitlements holds ONE row per user, so it can only ever represent one
+-- subscription. That made it a slot any inbound event could claim: whichever
+-- subscription wrote last owned the account's billing identity, and a cancel
+-- on that subscription revoked the user's premium even if a different,
+-- still-paying subscription of theirs existed. It also mishandled the
+-- legitimate window where a user briefly holds two active subscriptions
+-- (an upgrade creates a new one before the old is cancelled) — the second
+-- overwrote the first, and the first's renewal events then resolved to nobody.
+--
+-- Keying by subscription instead makes each subscription independent. The
+-- webhook writes one row here per Stripe event, then recomputes the user's
+-- plb_entitlements row as the BEST grant across their rows. A subscription can
+-- therefore only ever ADD access; cancelling one removes only its own row and
+-- cannot revoke a grant another subscription is still paying for.
+--
+-- Same trust model as plb_entitlements: read-your-own, no client write policy,
+-- service-role webhook is the only writer.
+--
+-- Safe to re-run.
+create table if not exists plb_subscriptions (
+  stripe_subscription_id text primary key,
+  user_id uuid not null references auth.users (id) on delete cascade,
+  tier text not null default 'free',        -- 'free' | 'pro' | 'professional'
+  status text not null default 'inactive',  -- 'active' | 'trialing' | 'past_due' | 'canceled' | 'inactive'
+  source text,                              -- 'stripe' (later: 'apple' | 'google')
+  stripe_customer_id text,
+  current_period_end timestamptz,           -- this subscription's paid-through instant
+  updated_at timestamptz not null default now()
+);
+create index if not exists plb_subscriptions_user_idx
+  on plb_subscriptions (user_id);
+create index if not exists plb_subscriptions_customer_idx
+  on plb_subscriptions (stripe_customer_id);
+
+alter table plb_subscriptions enable row level security;
+
+drop policy if exists "subscriptions_select_own" on plb_subscriptions;
+create policy "subscriptions_select_own" on plb_subscriptions
+  for select using (auth.uid() = user_id);
+
+-- Backfill from the pre-split model so existing subscribers keep their grant
+-- and keep resolving by customer id. Idempotent: `on conflict do nothing`
+-- means a re-run never clobbers a row the webhook has since updated.
+insert into plb_subscriptions (
+  stripe_subscription_id, user_id, tier, status, source,
+  stripe_customer_id, current_period_end, updated_at
+)
+select
+  stripe_subscription_id, user_id, tier, status, source,
+  stripe_customer_id, current_period_end, updated_at
+from plb_entitlements
+where stripe_subscription_id is not null
+on conflict (stripe_subscription_id) do nothing;

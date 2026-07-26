@@ -134,6 +134,30 @@ export async function run(): Promise<Suite> {
       "trusting client_reference_id lets a payer bind a purchase to another account");
     s.check("the webhook binds via subscription metadata", /sub\.metadata\?\.user_id/.test(code));
     s.check("the webhook validates the id shape before the FK write", /asUserId\(/.test(code));
+
+    // plb_entitlements is DERIVED. A regression that upserts it directly from
+    // one subscription reinstates the slot-clobbering the split removed, so
+    // pin the shape: subscriptions are written per-id, entitlement only via
+    // the recompute.
+    s.check("each subscription is recorded on its own row, keyed by subscription id",
+      /plb_subscriptions[\s\S]{0,600}?onConflict: "stripe_subscription_id"/.test(code));
+    s.check("the entitlement row is recomputed, not written per-event",
+      /async function recomputeEntitlement/.test(code) && /await recomputeEntitlement\(uid\)/.test(code));
+    s.check("only recomputeEntitlement writes plb_entitlements",
+      code.split("plb_entitlements").length - 1 <= 2,
+      "plb_entitlements should be touched only by the recompute upsert and the legacy customer lookup");
+  }
+
+  {
+    const schema = readFileSync(new URL("../supabase/schema.sql", import.meta.url), "utf8");
+    s.check("plb_subscriptions is keyed by the Stripe subscription id",
+      /create table if not exists plb_subscriptions[\s\S]*?stripe_subscription_id text primary key/.test(schema));
+    s.check("plb_subscriptions has RLS on, read-your-own, no client write policy",
+      /alter table plb_subscriptions enable row level security/.test(schema) &&
+      /create policy "subscriptions_select_own" on plb_subscriptions\s*\n\s*for select using \(auth\.uid\(\) = user_id\)/.test(schema) &&
+      !/create policy[^\n]*on plb_subscriptions\s*\n\s*for (insert|update|delete)/.test(schema));
+    s.check("existing subscribers are backfilled idempotently",
+      /insert into plb_subscriptions[\s\S]*?from plb_entitlements[\s\S]*?on conflict \(stripe_subscription_id\) do nothing/.test(schema));
   }
 
   s.probe(

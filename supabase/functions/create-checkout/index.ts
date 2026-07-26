@@ -101,14 +101,27 @@ Deno.serve(async (req) => {
   }
 
   // Reuse this account's Stripe customer if it already has one, so an upgrade
-  // doesn't spawn a second customer with a duplicate payment method. RLS means
-  // this read can only ever return the caller's own row.
-  const { data: entRow } = await userClient
-    .from("plb_entitlements")
-    .select("stripe_customer_id")
+  // doesn't spawn a second customer with a duplicate payment method. Read from
+  // plb_subscriptions (one row per subscription, most recent first) rather than
+  // the derived plb_entitlements row, whose customer id tracks whichever
+  // subscription currently WINS and so can flip between them. RLS means either
+  // read can only ever return the caller's own rows.
+  const { data: subRows } = await userClient
+    .from("plb_subscriptions")
+    .select("stripe_customer_id, updated_at")
     .eq("user_id", user.id)
-    .maybeSingle();
-  const customerId = (entRow?.stripe_customer_id as string | null) ?? null;
+    .order("updated_at", { ascending: false })
+    .limit(1);
+  let customerId = (subRows?.[0]?.stripe_customer_id as string | null) ?? null;
+  if (!customerId) {
+    // Pre-split account whose rows haven't been backfilled yet.
+    const { data: entRow } = await userClient
+      .from("plb_entitlements")
+      .select("stripe_customer_id")
+      .eq("user_id", user.id)
+      .maybeSingle();
+    customerId = (entRow?.stripe_customer_id as string | null) ?? null;
+  }
 
   const trialDays = Number(Deno.env.get("STRIPE_TRIAL_DAYS") ?? "14");
   const origin = returnOrigin(req);
