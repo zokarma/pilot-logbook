@@ -20,7 +20,7 @@ const rule = (over: Partial<CurrencyRule>): CurrencyRule => ({
 });
 
 export function run(): Suite {
-  const s = new Suite(11, "Currency math (currency.ts)", "Recency gauges must not overstate currency — legal exposure if wrong.");
+  const s = new Suite(8, "Currency math (currency.ts)", "Recency gauges must not overstate currency — legal exposure if wrong.");
 
   // -- legacy defaults --
   s.check("a flight without a landings count is 1 landing", flightLandings(mkFlight("f")) === 1);

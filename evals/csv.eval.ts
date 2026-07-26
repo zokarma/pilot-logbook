@@ -9,7 +9,7 @@ import { Suite } from "./harness";
 import { mkData, mkFlight, mkPilot, clone } from "./fixtures";
 
 export function run(): Suite {
-  const s = new Suite(4, "CSV import/export (csv.ts)", "Bulk ingestion and the only backup path — silent row corruption multiplies across a whole logbook.");
+  const s = new Suite(5, "CSV import/export (csv.ts)", "Bulk ingestion and the only backup path — silent row corruption multiplies across a whole logbook.");
 
   // -- RFC-4180 parsing --
   s.eq("parseCSV: quoted commas, escaped quotes, embedded newline",

@@ -14,7 +14,7 @@ const iso = (offsetDays: number) => new Date(NOW.getTime() + offsetDays * 864000
 const ent = (o: Partial<Entitlement>): Entitlement => ({ tier: "pro", status: "active", currentPeriodEnd: iso(20), ...o });
 
 export function run(): Suite {
-  const s = new Suite(15, "Entitlement logic (entitlement.ts)", "Premium/feature gating — a lapsed sub reads free, a paying pilot is never wrongly locked out, junk never grants premium.");
+  const s = new Suite(11, "Entitlement logic (entitlement.ts)", "Premium/feature gating — a lapsed sub reads free, a paying pilot is never wrongly locked out, junk never grants premium.");
 
   // -- effective tier by status --
   s.check("active within period → its tier", effectiveTier(ent({ tier: "pro" }), NOW) === "pro");

@@ -7,7 +7,7 @@ import { Suite, approx } from "./harness";
 import { mkData, mkFlight, localDateOffset } from "./fixtures";
 
 export function run(): Suite {
-  const s = new Suite(8, "Dashboard duty & CARs gauges (dashboard.ts)", "Compliance display: window boundaries and rest-gap math must not mislead.");
+  const s = new Suite(12, "Dashboard duty & CARs gauges (dashboard.ts)", "Compliance display: window boundaries and rest-gap math must not mislead.");
 
   // -- active duty: today + trailing 7 days --
   {

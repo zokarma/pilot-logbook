@@ -9,7 +9,7 @@ import type { CustomAirport } from "../src/lib/types";
 import { Suite } from "./harness";
 
 export function run(): Suite {
-  const s = new Suite(9, "Airport DB (airports.ts)", "Route-map support data; wrong coords are cosmetic but visible.");
+  const s = new Suite(18, "Airport DB (airports.ts)", "Route-map support data; wrong coords are cosmetic but visible.");
 
   const cyvr = airportCoord("CYVR")!;
   s.check("CYVR resolves to Vancouver's real coordinates", !!cyvr && Math.abs(cyvr[0] - 49.1939) < 0.01 && Math.abs(cyvr[1] + 123.1844) < 0.01);

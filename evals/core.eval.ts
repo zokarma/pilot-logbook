@@ -8,7 +8,7 @@ import { Suite } from "./harness";
 import { mkData, mkFlight, mkPilot } from "./fixtures";
 
 export function run(): Suite {
-  const s = new Suite(7, "IDs & flight mirrors (id.ts, logbook.ts)", "Duplicate ids or drifting CSV mirrors silently corrupt references everywhere else.");
+  const s = new Suite(10, "IDs & flight mirrors (id.ts, logbook.ts)", "Duplicate ids or drifting CSV mirrors silently corrupt references everywhere else.");
 
   // -- id uniqueness under bulk-import pressure --
   {

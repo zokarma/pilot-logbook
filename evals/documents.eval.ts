@@ -23,7 +23,7 @@ const profile = (dob?: string): UserProfile => ({
 });
 
 export function run(): Suite {
-  const s = new Suite(3, "TC document expiry math (documents.ts)", "Wrong expiry dates create real legal exposure — a pilot could fly on an expired medical.");
+  const s = new Suite(4, "TC document expiry math (documents.ts)", "Wrong expiry dates create real legal exposure — a pilot could fly on an expired medical.");
 
   // -- calendar arithmetic --
   s.eq("addMonths: plain 12-month add", addMonths("2026-07-17", 12), "2027-07-17");

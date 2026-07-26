@@ -27,7 +27,7 @@ const fieldOf = (cols: ColumnMapping[], header: string) =>
   cols.find((c) => c.header === header)?.field ?? null;
 
 export function run(): Suite {
-  const s = new Suite(14, "CSV Import Wizard (importMap.ts)", "Header→field mapping, shape veto, templates, and the plan→apply pipeline for bulk import.");
+  const s = new Suite(6, "CSV Import Wizard (importMap.ts)", "Header→field mapping, shape veto, templates, and the plan→apply pipeline for bulk import.");
 
   // ---------- header + value helpers ----------
   s.eq("normHeader strips case + punctuation/space", normHeader("ICAO From "), "icaofrom");
@@ -243,7 +243,7 @@ export function run(): Suite {
 
   s.probe(
     "wizard imports don't promote non-owner crew to Pilot profiles",
-    "planImport pre-sets picId/sicId to \"\" (not undefined), so migrateData's free-text→profile promotion is skipped for wizard imports — only the owner's own crew slot gets a real id (set explicitly in applyMappedImport). Other crew survive as text mirrors (fl.pic/sic) only. This differs from the legacy structured CSV path and matches migrate finding F3; promoting them would need planImport to leave the ids undefined.",
+    "planImport pre-sets picId/sicId to \"\" (not undefined), so migrateData's free-text→profile promotion is skipped for wizard imports — only the owner's own crew slot gets a real id (set explicitly in applyMappedImport). Other crew survive as text mirrors (fl.pic/sic) only. This differs from the legacy structured CSV path and shares its root cause with the migrate probe on empty-string ids (EVALS.md finding F23); promoting them would need planImport to leave the ids undefined.",
   );
 
   s.probe(

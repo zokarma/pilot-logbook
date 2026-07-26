@@ -12,7 +12,7 @@ import { Suite } from "./harness";
 import { ocrPage } from "./fixtures";
 
 export function run(): Suite {
-  const s = new Suite(5, "OCR scan parser (scan.ts)", "Newest data-entry path; heuristic accuracy and honest confidence flagging keep bad rows out of the logbook.");
+  const s = new Suite(7, "OCR scan parser (scan.ts)", "Newest data-entry path; heuristic accuracy and honest confidence flagging keep bad rows out of the logbook.");
 
   // ---- flights: golden page with a TC-style year/month header ----
   const page = ocrPage([
