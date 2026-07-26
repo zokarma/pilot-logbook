@@ -19,9 +19,14 @@ npm run dev          # http://localhost:8090
 npm run build        # static export to out/ + full type check — run this to verify changes
 npm run lint
 npm run build:mobile # next build && cap sync (refresh the iOS bundle)
+npx tsx evals/run.ts # feature evals — 21 suites over the pure lib code, seconds, no network
 ```
 
-There is no unit-test tooling. Verify with `npm run build` (type errors surface here) and the preview tools.
+There is no unit-test framework. Verify with `npm run build` (type errors surface
+here), the preview tools, and **`npx tsx evals/run.ts`** — the eval suites in
+`evals/` assert behavior across every feature in `src/lib` and exit non-zero on a
+failed check. Results, findings and known coverage gaps are recorded in
+`EVALS.md`; run them before a release and add a suite alongside any new feature.
 
 ## Architecture
 

@@ -6,7 +6,7 @@ import { fleetTypes, normalizeAircraftCode, aircraftName, AIRCRAFT_TYPES } from 
 import { Suite } from "./harness";
 
 export function run(): Suite {
-  const s = new Suite(10, "Fleet manager (aircraft.ts + AppData.fleet)", "Custom aircraft types feed every flight picker; merge/dedupe/sort must be predictable.");
+  const s = new Suite(15, "Fleet manager (aircraft.ts + AppData.fleet)", "Custom aircraft types feed every flight picker; merge/dedupe/sort must be predictable.");
 
   // -- code normalization (the dedup key) --
   s.eq("normalize uppercases + strips spaces", normalizeAircraftCode("c 172"), "C172");

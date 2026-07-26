@@ -7,7 +7,7 @@ import { Suite } from "./harness";
 import { mkData, mkFlight, mkPilot } from "./fixtures";
 
 export function run(): Suite {
-  const s = new Suite(6, "Pilot dedupe & merge (pilots.ts)", "Merging/deleting profiles rewrites flight references; mistakes re-attribute legal records.");
+  const s = new Suite(9, "Pilot dedupe & merge (pilots.ts)", "Merging/deleting profiles rewrites flight references; mistakes re-attribute legal records.");
 
   // -- dup keys: initial+surname normalization --
   s.check("'Ben Pearce' and 'B. Pearce' share a dup key", pilotDupKey(mkPilot("a", "Ben", "Pearce")) === pilotDupKey(mkPilot("b", "B.", "Pearce")));

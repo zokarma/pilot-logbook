@@ -8,7 +8,7 @@ import { mkFlight } from "./fixtures";
 import { Suite } from "./harness";
 
 export function run(): Suite {
-  const s = new Suite(15, "Registration lookup (logbook.ts)", "Smart tail→type fill on the flight form and quick edit.");
+  const s = new Suite(16, "Registration lookup (logbook.ts)", "Smart tail→type fill on the flight form and quick edit.");
 
   const flights = [
     mkFlight("f1", { date: "2026-07-01", registration: "C-FRZR", aircraftType: "C172" }),

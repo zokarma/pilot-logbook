@@ -7,7 +7,7 @@ import { Suite, approx } from "./harness";
 import { mkData, mkFlight, mkPilot } from "./fixtures";
 
 export function run(): Suite {
-  const s = new Suite(12, "PDF export model (pdf.ts)", "Totals math on a document pilots hand to examiners/insurers.");
+  const s = new Suite(14, "PDF export model (pdf.ts)", "Totals math on a document pilots hand to examiners/insurers.");
 
   // -- chunking + totals --
   {
