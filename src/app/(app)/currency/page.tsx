@@ -82,7 +82,10 @@ export default function CurrencyPage() {
   const { toast } = useUi();
   // Custom currency rules are the "advanced" tier of currency tracking (Pro).
   const { has, ready: entReady } = useEntitlement();
-  const rulesGated = entReady && !has("advancedCurrency");
+  // Guard the action with `has` (false until resolved → fails closed); badge
+  // only once `ready`, so subscribers never see a PRO flash.
+  const rulesAllowed = has("advancedCurrency");
+  const rulesGated = entReady && !rulesAllowed;
   const [form, setForm] = useState({ name: "", metric: "landings" as CurrencyMetric, threshold: "3", windowDays: "90", aircraftType: "" });
   const [msg, setMsg] = useState("");
   // The add-rule form is collapsed behind the header button (same pattern as
@@ -113,7 +116,7 @@ export default function CurrencyPage() {
 
   function addRule(e: React.FormEvent) {
     e.preventDefault();
-    if (rulesGated) { setMsg("Custom currency rules are a Pro feature."); return; }
+    if (!rulesAllowed) { setMsg("Custom currency rules are a Pro feature."); return; }
     const threshold = parseFloat(form.threshold);
     const windowDays = parseInt(form.windowDays, 10);
     if (!(threshold > 0)) { setMsg("Threshold must be a positive number."); return; }
@@ -181,7 +184,8 @@ export default function CurrencyPage() {
           ) : (
             <button
               onClick={() => setShowAdd(true)}
-              className="inline-flex items-center gap-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition shrink-0"
+              disabled={!entReady}
+              className="inline-flex items-center gap-2 bg-brand-600 hover:bg-brand-700 disabled:opacity-60 text-white text-sm font-medium px-4 py-2 rounded-lg transition shrink-0"
             >
               <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M12 5v14M5 12h14" />

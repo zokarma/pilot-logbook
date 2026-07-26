@@ -18,6 +18,20 @@ A gradient **Upgrade** link appears in the sidebar for non-premium users
 reminders/scan quotas, roster import and company reports are **not** gated as
 single toggles — they're architectural or quota concepts to wire in later.
 
+**Client gates are UI only — they are not security.** Anyone can edit
+localStorage or the JS bundle, so a client check can never protect something
+that costs money. The one paid *server* resource is the `scan-extract` Edge
+Function (it spends `ANTHROPIC_API_KEY`), so that function **re-checks the
+tier server-side** and returns `402 upgrade_required` for free accounts. Its
+`grantsPremium()` is a deliberate small mirror of `effectiveTier()` in
+`src/lib/entitlement.ts` (Edge Functions can't import from `src/`) — **change
+both together**. Any future paid endpoint must do the same.
+
+> Not yet implemented: **per-user scan quotas / rate limiting**. `scan-extract`
+> now refuses non-premium callers, but a premium account can still call it
+> without limit (4 images per request, unbounded requests). Metering needs a
+> counter table; see "known gaps" below.
+
 ## What's implemented
 
 - **`plb_entitlements` table** (`supabase/schema.sql`) — server-authoritative
@@ -107,6 +121,25 @@ Smoke-test with a real card — the trial means $0 due today, so verify the
 
 Full operator SQL/verify screenshots-era procedure was run for the sandbox on
 2026-07; see the top-of-file status.
+
+## Known gaps
+
+- **No scan quota / rate limit.** `scan-extract` is premium-only but unmetered,
+  so a subscriber (or a stolen session) can call it as often as they like. The
+  `/pricing` copy promises "Limited / month" on Pro vs "Unlimited" on
+  Professional — that distinction is **not enforced anywhere yet**. Needs a
+  usage-counter table written by the function (service role) + a monthly cap.
+- **"Scan your first 10 pages free" is not implemented.** The landing/FAQ copy
+  offers free users a 10-page trial, but enforcement gives free accounts *zero*
+  scans (client hides it, server returns 402). Either build the free quota or
+  drop the claim from the copy — right now the page overpromises.
+- **Bad `client_reference_id` retries forever.** If a checkout arrives with a
+  `client_reference_id` that isn't a real `auth.users` id, the upsert violates
+  the FK, the handler 500s and Stripe retries for ~3 days. Harmless but noisy;
+  validating the id (or 200-ing with a logged error) would settle it.
+- A payer can pass **someone else's** user id as `client_reference_id` and grant
+  *them* premium at their own expense. Self-harming rather than an escalation,
+  so it's accepted — worth knowing if support ever sees a "surprise premium".
 
 ## App Store note
 

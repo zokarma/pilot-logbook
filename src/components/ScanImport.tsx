@@ -164,7 +164,13 @@ export default function ScanImport({ mode }: { mode: Mode }) {
   // Scanning is a premium feature (flights → aiScan, documents → docOcr, both Pro).
   const { has, ready: entReady } = useEntitlement();
   const scanFeature = mode === "flights" ? "aiScan" : "docOcr";
-  const scanGated = entReady && !has(scanFeature);
+  // `has` is false until the entitlement resolves — guard the scan actions with
+  // it so nothing can start on a half-loaded answer, but only swap in the PRO
+  // affordance once `ready` (otherwise subscribers get a lock-icon flash). The
+  // buttons stay disabled in between. The server enforces this too: scan-extract
+  // re-checks the tier, since a client gate can't protect paid API credits.
+  const scanAllowed = has(scanFeature);
+  const scanGated = entReady && !scanAllowed;
 
   useEffect(() => {
     let alive = true;
@@ -233,11 +239,13 @@ export default function ScanImport({ mode }: { mode: Mode }) {
   }
 
   function startScan() {
+    if (!scanAllowed) return; // buttons are disabled until entitlement resolves
     // From the confirm sheet this adds a page to the batch under review.
     void runScan(() => scanDocuments(mode), phase === "review");
   }
 
   async function onUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    if (!scanAllowed) { e.target.value = ""; return; }
     const append = phase === "review";
     // Copy the File objects out of the live FileList BEFORE resetting the input —
     // on WebKit, clearing input.value empties the FileList we'd otherwise read.
@@ -351,7 +359,7 @@ export default function ScanImport({ mode }: { mode: Mode }) {
             {available && (
               <button
                 onClick={startScan}
-                disabled={phase === "scanning"}
+                disabled={phase === "scanning" || !entReady}
                 className="text-sm bg-brand-600 hover:bg-brand-700 disabled:opacity-60 text-white font-medium px-3 py-1.5 rounded-lg transition inline-flex items-center gap-1.5"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -362,7 +370,7 @@ export default function ScanImport({ mode }: { mode: Mode }) {
             )}
             <button
               onClick={() => fileRef.current?.click()}
-              disabled={phase === "scanning"}
+              disabled={phase === "scanning" || !entReady}
               title={available ? "Upload a photo or PDF instead of using the camera" : "Upload a photo or PDF — extracted with cloud AI"}
               className={"text-sm disabled:opacity-60 font-medium px-3 py-1.5 rounded-lg transition inline-flex items-center gap-1.5 " +
                 (available ? "bg-slate-800 hover:bg-slate-700 text-slate-200" : "bg-brand-600 hover:bg-brand-700 text-white")}

@@ -17,7 +17,12 @@ export default function LoggerPage() {
   const { data, currentUser } = useData();
   const router = useRouter();
   const { has, ready: entReady } = useEntitlement();
-  const pdfGated = entReady && !has("proPdf");
+  // `has` is false until the entitlement resolves, so guard the ACTION with it
+  // (fails closed) but only badge the button once we actually know — otherwise
+  // a subscriber sees a PRO flash on every load. The button stays disabled
+  // until then, so neither tier can act on a half-loaded answer.
+  const pdfAllowed = has("proPdf");
+  const pdfGated = entReady && !pdfAllowed;
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [csvMsg, setCsvMsg] = useState<{ text: string; kind: "ok" | "error" | "info" } | null>(null);
@@ -58,7 +63,7 @@ export default function LoggerPage() {
 
   async function exportPdf() {
     // Professional PDF export is a Pro feature — route non-subscribers to pricing.
-    if (pdfGated) { router.push("/pricing"); return; }
+    if (!pdfAllowed) { router.push("/pricing"); return; }
     if (!data.flights.length) { setCsvMsg({ text: "No flights to export.", kind: "error" }); return; }
     setPdfBusy(true);
     try {
@@ -149,7 +154,7 @@ export default function LoggerPage() {
           <div className="flex items-center gap-2">
             <ScanImport mode="flights" />
             <button onClick={exportCsv} className="text-sm bg-slate-800 hover:bg-slate-700 text-slate-200 font-medium px-3 py-1.5 rounded-lg transition">Export CSV</button>
-            <button onClick={() => void exportPdf()} disabled={pdfBusy} title={pdfGated ? "Professional PDF export is a Pro feature" : "Export a summary + TC-style logbook PDF"} className="text-sm bg-slate-800 hover:bg-slate-700 disabled:opacity-60 text-slate-200 font-medium px-3 py-1.5 rounded-lg transition inline-flex items-center gap-1.5">{pdfBusy ? "Building PDF…" : "Export PDF"}{pdfGated && <span className="text-[10px] font-semibold bg-brand-600 text-white px-1.5 py-0.5 rounded">PRO</span>}</button>
+            <button onClick={() => void exportPdf()} disabled={pdfBusy || !entReady} title={pdfGated ? "Professional PDF export is a Pro feature" : "Export a summary + TC-style logbook PDF"} className="text-sm bg-slate-800 hover:bg-slate-700 disabled:opacity-60 text-slate-200 font-medium px-3 py-1.5 rounded-lg transition inline-flex items-center gap-1.5">{pdfBusy ? "Building PDF…" : "Export PDF"}{pdfGated && <span className="text-[10px] font-semibold bg-brand-600 text-white px-1.5 py-0.5 rounded">PRO</span>}</button>
             <button onClick={() => fileRef.current?.click()} className="text-sm bg-slate-800 hover:bg-slate-700 text-slate-200 font-medium px-3 py-1.5 rounded-lg transition">Import CSV</button>
             <input ref={fileRef} type="file" accept=".csv,text/csv" className="hidden" onChange={onFile} />
           </div>
