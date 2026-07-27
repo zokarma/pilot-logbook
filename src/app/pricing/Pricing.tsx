@@ -42,7 +42,9 @@ const COMPARE: { label: string; free: Cell; pro: Cell }[] = [
   { label: "CSV import & export", free: true, pro: true },
   { label: "Document expiry reminders", free: true, pro: true },
   { label: "Currency tracking", free: "Built-in CARs rules", pro: "+ your own custom rules" },
-  { label: "PDF export", free: "Basic", pro: "TC-style logbook pages" },
+  // PDF export is gated end-to-end (logger routes non-subscribers to /pricing),
+  // so there is no "basic" free PDF. Free export is CSV, on the row above.
+  { label: "PDF export", free: false, pro: "TC-style logbook pages" },
   { label: "AI logbook scanning", free: false, pro: "Unlimited" },
   { label: "Document & licence scanning", free: false, pro: true },
   { label: "Duty & rest analysis (703/704/705)", free: false, pro: true },
@@ -277,6 +279,7 @@ export default function Pricing() {
             <Link className="link" href="/">Home</Link>
             <a className="link" href="#faq">FAQ</a>
             <Link className="link" href="/login">Log in</Link>
+            <a className="link" href="mailto:support@403studio.ca">Contact</a>
             <Link className="link" href="/privacy">Privacy</Link>
           </nav>
         </div>

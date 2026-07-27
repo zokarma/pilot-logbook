@@ -106,6 +106,7 @@ export default function Help() {
             <Link className="link" href="/">Home</Link>
             <Link className="link" href="/pricing">Pricing</Link>
             <Link className="link" href="/login">Log in</Link>
+            <a className="link" href="mailto:support@403studio.ca">Contact</a>
             <Link className="link" href="/privacy">Privacy</Link>
           </nav>
         </div>

@@ -8,18 +8,19 @@ import { useEffect, useState } from "react";
 // version below re-announces; patch bumps that don't change the list shouldn't.
 
 export const WHATSNEW_KEY = "plb_whatsnew_seen";
-export const WHATSNEW_VERSION = "0.14";
+// Track the APP_VERSION minor this announcement belongs to — a banner reading
+// "v0.14" on a 0.15 build tells returning pilots the wrong story.
+export const WHATSNEW_VERSION = "0.15";
 const KEY = WHATSNEW_KEY;
 const WHATS_NEW = {
   version: WHATSNEW_VERSION,
   title: "What's new",
   items: [
-    "Expiry reminders — get a heads-up before documents & recurrent training lapse",
-    "Undo deletes — remove a flight, then restore it from the toast",
-    "Search and date filters on your flight log",
-    "Type a tail number and the aircraft type fills itself in",
-    "Log circuits — multiple landings on a single flight",
-    "Route map: place your own airfields so every flight shows",
+    "Expiry reminders — a heads-up before documents & recurrent training lapse",
+    "Track your PPC and PCC alongside your recency",
+    "Set up for your role — your fleet, columns and flight form now match the flying you do",
+    "Customize which boxes appear on the flight form, any time",
+    "Help & guides — short answers to the things pilots actually ask",
   ],
 };
 

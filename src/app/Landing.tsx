@@ -36,7 +36,7 @@ const FEATURES: { title: string; body: string; icon: React.ReactNode }[] = [
   { title: "AI logbook scanning", body: "Photograph a paper page and AI fills in every flight — dates, aircraft, routes, hours, crew. Included with Pro.", icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2M3 12h18" /></svg> },
   { title: "Currency & duty", body: "Day/night recency and IFR approaches on every plan; 703/704/705 duty and rest gauges on Pro.", icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="13" r="8" /><path d="M12 9v4l2.5 2.5" /><path d="M9 2h6" /></svg> },
   { title: "Document reminders", body: "Medicals, ratings, PPC/PCC and recurrent training — with Transport Canada expiry math built in.", icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" /><path d="M14 3v5h5" /><path d="M9 13h6M9 17h4" /></svg> },
-  { title: "Yours, offline & exportable", body: "Works in the air with no signal, syncs everywhere, and exports to CSV or a TC-style PDF anytime.", icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /></svg> },
+  { title: "Yours, offline & exportable", body: "Works in the air with no signal, syncs everywhere, and exports to CSV anytime — TC-style PDF pages on Pro.", icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /></svg> },
 ];
 
 // The same product at four stages of a licence — this is the "student to
@@ -46,7 +46,7 @@ const AUDIENCES: { title: string; body: string }[] = [
   { title: "Training", body: "Log circuits with the landings that count, watch dual and PIC time build, and keep your medical in view." },
   { title: "Building time", body: "Cross-country, night and instrument time totalled automatically, with a route map of everywhere you've been." },
   { title: "Commercial", body: "Duty and rest gauges for the 703/704/705 operation you fly, plus PPC/PCC and recurrent training tracked to the day." },
-  { title: "Airline", body: "Multi-crew legs, type-by-type totals, and a TC-style PDF whenever someone asks for your hours." },
+  { title: "Airline", body: "Multi-crew legs, type-by-type totals, and — on Pro — a TC-style PDF whenever someone asks for your hours." },
 ];
 
 const STEPS: { title: string; body: string }[] = [
@@ -142,7 +142,7 @@ export default function Landing() {
         <div className="statbar"><div className="wrap row">
           <span className="trust-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /></svg> Private to your account</span>
           <span className="trust-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12.5 3 21l9-4 9 4-2-8.5" /><circle cx="12" cy="8" r="6" /></svg> Works offline, in the air</span>
-          <span className="trust-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" /><path d="M14 3v5h5" /></svg> Export to CSV &amp; TC-style PDF</span>
+          <span className="trust-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" /><path d="M14 3v5h5" /></svg> Export your logbook to CSV anytime</span>
           <span className="trust-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2v4M12 18v4M2 12h4M18 12h4" /><circle cx="12" cy="12" r="4" /></svg> Built around the CARs</span>
         </div></div>
       </header>
@@ -257,6 +257,9 @@ export default function Landing() {
             <Link className="link" href={PRICING_HREF}>Pricing</Link>
             <Link className="link" href="/help">Help</Link>
             <Link className="link" href={LOGIN_HREF}>Log in</Link>
+            {/* Both plans promise email support, so the address has to be
+                reachable from the public site — not buried in the privacy page. */}
+            <a className="link" href="mailto:support@403studio.ca">Contact</a>
             <Link className="link" href="/privacy">Privacy</Link>
           </nav>
         </div>

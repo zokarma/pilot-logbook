@@ -130,6 +130,13 @@ export function run(): Suite {
       /free: false/.test(row("Document & licence scanning")) && FEATURE_MIN_TIER.docOcr === "pro");
     s.check("currency tracking stays usable on Free, with custom rules at Pro",
       /free: "Built-in CARs rules"/.test(row("Currency tracking")) && FEATURE_MIN_TIER.advancedCurrency === "pro");
+    // The table once advertised a "Basic" free PDF while the logger bounced
+    // every non-subscriber to /pricing — a paid feature sold as partly free.
+    // PDF is gated at Pro, so the free column must stay a plain no.
+    s.check("PDF export is sold as Pro-only and gated at Pro",
+      /free: false/.test(row("PDF export")) && FEATURE_MIN_TIER.proPdf === "pro");
+    s.check("free export is still promised somewhere (CSV), so 'your data' holds",
+      /\{ label: "CSV import & export", free: true/.test(pricing));
     s.check("no gated feature is left without a tier", (Object.keys(FEATURE_MIN_TIER) as Feature[]).every((f) => (["free", "pro", "professional"] as Tier[]).includes(FEATURE_MIN_TIER[f])));
 
     // HARD CHECK (was a probe): a feature may only be declared if something in
