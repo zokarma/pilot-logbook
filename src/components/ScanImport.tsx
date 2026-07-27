@@ -162,6 +162,15 @@ export default function ScanImport({ mode }: { mode: Mode }) {
   const [useCloud, setUseCloud] = useState(false);
   const [usedCloud, setUsedCloud] = useState(false);
   // Scanning is a premium feature (flights → aiScan, documents → docOcr, both Pro).
+  //
+  // DELIBERATE: this gates the WHOLE scan UI, camera included — not just the
+  // cloud engine. Letting free users scan on-device looks generous (Apple's
+  // Vision costs nothing per page) but hands them the weakest path: without
+  // fragment x-positions the heuristic parser in lib/scan.ts takes only the
+  // first decimal on a row, so a six-column hour line loses everything but one
+  // value (see the recorded probe in evals/scan.eval.ts). That reads as a
+  // broken feature, not a free one. Reviewed and kept 2026-07-27 — don't
+  // "improve" this by ungating the camera without re-testing that parser.
   const { has, ready: entReady } = useEntitlement();
   const scanFeature = mode === "flights" ? "aiScan" : "docOcr";
   // `has` is false until the entitlement resolves — guard the scan actions with
