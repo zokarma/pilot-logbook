@@ -2,7 +2,10 @@
 // Reference gauges, not legal advice — but the windows and rest-gap math still
 // have to be right.
 
-import { computeActiveDuty, computeCars } from "../src/lib/dashboard";
+import {
+  computeActiveDuty, computeCars,
+  isDashboardPreview, PREVIEW_PRIMARY, PREVIEW_SECONDARY,
+} from "../src/lib/dashboard";
 import { Suite, approx } from "./harness";
 import { mkData, mkFlight, localDateOffset } from "./fixtures";
 
@@ -102,6 +105,34 @@ export function run(): Suite {
     "gauges are advisory only",
     "Caps now come from the pilot's CARs operation (703/704/705) via dutyLimits.ts, defaulting to the conservative 705 set; FDP is capped at the sliding-scale ceiling (13h). Labels still present them as reference values.",
   );
+
+  /* ---------------- empty-dashboard preview ---------------- */
+  // A logbook is a legal record, so the "don't show a wall of zeros" treatment
+  // must stay purely cosmetic: example figures on screen, never sample flights
+  // written into the pilot's data where they could reach a CSV or PDF export.
+  {
+    const empty = mkData();
+    s.check("preview is on when the pilot has logged nothing", isDashboardPreview(empty));
+
+    const withFlight = mkData({ flights: [mkFlight("f1", { se: 1.2 })] });
+    s.check("preview switches off with the first real flight", !isDashboardPreview(withFlight));
+
+    // Scoped to the CURRENT pilot: another pilot's flights must not suppress it.
+    const otherPilot = mkData({ currentPilotId: "me", flights: [mkFlight("f1", { pilotId: "them", se: 2 })] });
+    s.check("another pilot's flights don't count as yours", isDashboardPreview(otherPilot));
+
+    // The preview must not mutate anything.
+    const before = JSON.stringify(empty);
+    isDashboardPreview(empty);
+    s.check("checking preview state never mutates the logbook", JSON.stringify(empty) === before);
+    s.check("no sample flight is ever created for the preview", empty.flights.length === 0);
+
+    // Values are display strings only — nothing numeric that could be summed
+    // into a total by mistake.
+    const vals = [...Object.values(PREVIEW_PRIMARY), ...Object.values(PREVIEW_SECONDARY)];
+    s.check("preview figures are display strings", vals.length > 0 && vals.every((v) => typeof v === "string" && v.length > 0));
+    s.check("preview covers every primary stat", ["totalTime", "currentMonth", "annualTotal", "totalFlights"].every((k) => !!PREVIEW_PRIMARY[k]));
+  }
 
   return s;
 }

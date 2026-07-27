@@ -8,7 +8,10 @@ import { aircraftName } from "@/lib/aircraft";
 import {
   currentPilot, flightDate, flightsForCurrentPilot, flightDateStr, ifrHours, num, pilotName, totalHours,
 } from "@/lib/logbook";
-import { DASH_METRICS, computeActiveDuty, computeCars, isHidden, roleAutoHidden } from "@/lib/dashboard";
+import {
+  DASH_METRICS, computeActiveDuty, computeCars, isHidden, roleAutoHidden,
+  isDashboardPreview, PREVIEW_PRIMARY, PREVIEW_SECONDARY,
+} from "@/lib/dashboard";
 import { OPERATION_TYPES, DUTY_LIMITS, DEFAULT_OPERATION } from "@/lib/dutyLimits";
 import { builtinCurrencyStatuses, customCurrencyStatuses } from "@/lib/currency";
 import { documentStatus, STATUS_META } from "@/lib/documents";
@@ -92,20 +95,27 @@ export default function DashboardPage() {
   const curMonthHrs = fl.filter((x) => { const d = flightDate(x); return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth(); }).reduce((s, x) => s + totalHours(x), 0);
   const curYearHrs = fl.filter((x) => flightDate(x).getFullYear() === now.getFullYear()).reduce((s, x) => s + totalHours(x), 0);
 
+  // Nothing logged yet → show example figures so the dashboard demonstrates
+  // its own shape instead of a wall of zeros. Presentation only: no sample
+  // flight is ever written to the logbook (see lib/dashboard PREVIEW_*).
+  const preview = isDashboardPreview(data);
+  const pv = (key: string, real: string, table: Record<string, string>) =>
+    preview ? table[key] ?? real : real;
+
   const primary: [string, string, string, string][] = [
-    ["totalTime", "Total Time", total.toFixed(1) + " hrs", "clock"],
-    ["currentMonth", "Current Month", curMonthHrs.toFixed(1) + " hrs", "trend"],
-    ["annualTotal", "Annual Total", curYearHrs.toFixed(1) + " hrs", "bar"],
-    ["totalFlights", "Total Flights", String(fl.length), "plane"],
+    ["totalTime", "Total Time", pv("totalTime", total.toFixed(1) + " hrs", PREVIEW_PRIMARY), "clock"],
+    ["currentMonth", "Current Month", pv("currentMonth", curMonthHrs.toFixed(1) + " hrs", PREVIEW_PRIMARY), "trend"],
+    ["annualTotal", "Annual Total", pv("annualTotal", curYearHrs.toFixed(1) + " hrs", PREVIEW_PRIMARY), "bar"],
+    ["totalFlights", "Total Flights", pv("totalFlights", String(fl.length), PREVIEW_PRIMARY), "plane"],
   ];
   const secondary: [string, string, string, string][] = [
-    ["pic", "PIC Hours", pic.toFixed(1), "text-emerald-400"],
-    ["dual", "Dual (SIC) Hours", dual.toFixed(1), "text-violet-400"],
-    ["xc", "Cross Country", xc.toFixed(1), "text-amber-400"],
-    ["day", "Day Hours", dayH.toFixed(1), "text-yellow-400"],
-    ["night", "Night Hours", nightH.toFixed(1), "text-indigo-400"],
-    ["ifr", "IFR Hours", ifr.toFixed(1), "text-sky-400"],
-    ["routes", "Unique Routes", String(routes.size), "text-teal-400"],
+    ["pic", "PIC Hours", pv("pic", pic.toFixed(1), PREVIEW_SECONDARY), "text-emerald-400"],
+    ["dual", "Dual (SIC) Hours", pv("dual", dual.toFixed(1), PREVIEW_SECONDARY), "text-violet-400"],
+    ["xc", "Cross Country", pv("xc", xc.toFixed(1), PREVIEW_SECONDARY), "text-amber-400"],
+    ["day", "Day Hours", pv("day", dayH.toFixed(1), PREVIEW_SECONDARY), "text-yellow-400"],
+    ["night", "Night Hours", pv("night", nightH.toFixed(1), PREVIEW_SECONDARY), "text-indigo-400"],
+    ["ifr", "IFR Hours", pv("ifr", ifr.toFixed(1), PREVIEW_SECONDARY), "text-sky-400"],
+    ["routes", "Unique Routes", pv("routes", String(routes.size), PREVIEW_SECONDARY), "text-teal-400"],
   ];
 
   const byType: Record<string, number> = {};
@@ -195,13 +205,15 @@ export default function DashboardPage() {
           <span>Customize</span>
         </button>
       </div>
-      {/* Onboarding lands here, so a switching pilot's first view is a wall of
-          zeros. Point them at the import before they conclude the app is empty
-          because it's useless. Disappears with the first flight. */}
-      {!fl.length && (
+      {/* Onboarding lands here, so a switching pilot's first view would be a wall
+          of zeros. The figures below are examples until a real flight exists —
+          say so plainly, right above them, so they can't be mistaken for data. */}
+      {preview && (
         <div className="card p-4 border border-brand-500/30 bg-brand-500/5 flex flex-wrap items-center justify-between gap-3">
           <p className="text-sm text-slate-300 min-w-0">
-            Your dashboard fills in as you log flights. Already have a logbook elsewhere?
+            <span className="font-semibold text-brand-300">Example figures</span>
+            <span className="mx-2 text-slate-500">·</span>
+            Nothing is logged yet — these are here to show what your dashboard will look like. They&apos;re replaced by your own the moment you add a flight.
           </p>
           <Link
             href="/logger"
@@ -243,8 +255,8 @@ export default function DashboardPage() {
       {/* Flight Stats */}
       {primaryVisible.length > 0 && (
         <div>
-          <h3 className={sectionH}>Flight Stats</h3>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <h3 className={sectionH}>Flight Stats{preview && <ExampleChip />}</h3>
+          <div className={"grid grid-cols-2 lg:grid-cols-4 gap-4" + (preview ? " opacity-50" : "")}>
             {primaryVisible.map(([key, label, val, ic]) => (
               <div key={key} className="card p-4">
                 <div className="flex items-start justify-between">
@@ -261,8 +273,8 @@ export default function DashboardPage() {
       {/* Flight Time Breakdown */}
       {secondaryVisible.length > 0 && (
         <div>
-          <h3 className={sectionH}>Flight Time Breakdown</h3>
-          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
+          <h3 className={sectionH}>Flight Time Breakdown{preview && <ExampleChip />}</h3>
+          <div className={"grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3" + (preview ? " opacity-50" : "")}>
             {secondaryVisible.map(([key, label, val, color]) => (
               <div key={key} className="card p-3">
                 <div className="text-[11px] uppercase tracking-wide text-slate-400">{label}</div>
@@ -438,5 +450,15 @@ export default function DashboardPage() {
         </div>
       )}
     </section>
+  );
+}
+
+// Marks a section whose figures are illustrative, not the pilot's own. Paired
+// with reduced opacity so the distinction survives a quick glance.
+function ExampleChip() {
+  return (
+    <span className="ml-2 normal-case text-[10px] font-semibold tracking-normal text-brand-300 bg-brand-500/10 border border-brand-500/30 px-1.5 py-0.5 rounded">
+      Example
+    </span>
   );
 }
