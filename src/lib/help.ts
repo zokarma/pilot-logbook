@@ -177,8 +177,11 @@ export const HELP: HelpSection[] = [
       {
         id: "scan-plans",
         question: "Do I need a paid plan to scan?",
-        answer: "AI scanning is a Pro feature, and it's included in the 14-day Pro trial so you can try it before paying.",
-        note: "On iPhone and iPad, camera scanning is processed on the device itself. Cloud AI scanning is the Pro feature.",
+        answer: "Yes — scanning is a Pro feature on every platform, camera and upload alike. It's included in the 14-day Pro trial, so you can digitize a stack of paper before deciding.",
+        // Careful: this is a PRIVACY statement, not a pricing one. Camera
+        // captures staying on the device does NOT mean camera scanning is free
+        // — ScanImport gates the whole scan UI (camera included) behind Pro.
+        note: "On iPhone and iPad the camera capture is read on the device itself and never leaves it; uploads are the ones sent for cloud extraction.",
         pro: true,
       },
       {
