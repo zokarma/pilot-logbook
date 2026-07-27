@@ -27,33 +27,35 @@ const Plus = () => (
 const START_HREF = "/login"; // signup lives on the auth page; swap for checkout later
 
 /* ---------------- feature data ---------------- */
+// EVERY row here must be something the product actually does, and any row that
+// differs between plans must correspond to a real gate in FEATURE_MIN_TIER.
+// claims.eval.ts fails the build if this table drifts from the code.
 type Cell = boolean | string;
-const COMPARE: { label: string; free: Cell; pro: Cell; prof: Cell }[] = [
-  { label: "Manual logbook", free: true, pro: true, prof: true },
-  { label: "Flight totals & reports", free: true, pro: true, prof: true },
-  { label: "Currency tracking", free: "Basic", pro: "Advanced alerts", prof: "Advanced alerts" },
-  { label: "Cloud sync", free: "Limited", pro: "Unlimited", prof: "Unlimited" },
-  { label: "Multiple devices", free: false, pro: true, prof: true },
-  { label: "PDF export", free: "Basic", pro: "Professional", prof: "Professional" },
-  { label: "Backup & restore", free: false, pro: true, prof: true },
-  { label: "Aircraft database", free: true, pro: true, prof: true },
-  { label: "Document expiry reminders", free: "Limited", pro: "Unlimited", prof: "Unlimited" },
-  { label: "AI / OCR logbook scanning", free: false, pro: "Limited / month", prof: "Unlimited" },
-  { label: "OCR licence & document scanning", free: false, pro: "Limited", prof: "Unlimited" },
-  { label: "Airline roster import", free: false, pro: false, prof: true },
-  { label: "Duty & rest analysis", free: false, pro: false, prof: true },
-  { label: "Company reports & advanced analytics", free: false, pro: false, prof: true },
-  { label: "iPhone, iPad & Mac apps", free: "Web", pro: "All platforms", prof: "All platforms" },
-  { label: "Support", free: "Community", pro: "Email", prof: "Priority" },
+const COMPARE: { label: string; free: Cell; pro: Cell }[] = [
+  { label: "Manual logbook", free: true, pro: true },
+  { label: "Flight totals & reports", free: true, pro: true },
+  { label: "Route map", free: true, pro: true },
+  { label: "Aircraft fleet manager", free: true, pro: true },
+  { label: "Cloud sync across your devices", free: true, pro: true },
+  { label: "Works offline", free: true, pro: true },
+  { label: "CSV import & export", free: true, pro: true },
+  { label: "Document expiry reminders", free: true, pro: true },
+  { label: "Currency tracking", free: "Built-in CARs rules", pro: "+ your own custom rules" },
+  { label: "PDF export", free: "Basic", pro: "TC-style logbook pages" },
+  { label: "AI logbook scanning", free: false, pro: "Unlimited" },
+  { label: "Document & licence scanning", free: false, pro: true },
+  { label: "Duty & rest analysis (703/704/705)", free: false, pro: true },
+  { label: "iPhone & iPad app", free: true, pro: true },
+  { label: "Support", free: "Email", pro: "Email" },
 ];
 
 const SPOTLIGHT: { title: string; body: string; icon: React.ReactNode }[] = [
   { title: "Unlimited AI scanning", body: "Digitize decades of paper in an afternoon. No monthly cap, no per-page counting.", icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2M3 12h18" /></svg> },
-  { title: "Airline roster import", body: "Pull your pairings straight in — block time logged before you're off the jet bridge.", icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M8 3v3M16 3v3M4 8h16M5 5h14a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z" /></svg> },
-  { title: "Company reports", body: "Export the exact summaries your operator and insurer ask for, formatted and ready.", icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" /><path d="M14 3v5h5" /><path d="M9 13h6M9 17h4" /></svg> },
-  { title: "Advanced analytics", body: "Trends by type, role, and category — see your hours the way a hiring board will.", icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 17l6-6 4 4 8-8" /><path d="M15 7h6v6" /></svg> },
   { title: "Duty & rest analysis", body: "703/704/705 flight-time, FDP and rest gauges against the operation you actually fly.", icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="13" r="8" /><path d="M12 9v4l2.5 2.5" /><path d="M9 2h6" /></svg> },
-  { title: "Priority support", body: "Questions answered fast by people who know the CARs — straight to the front of the queue.", icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><circle cx="12" cy="12" r="3.5" /><path d="M5 5l4 4M15 15l4 4M19 5l-4 4M9 15l-4 4" /></svg> },
+  { title: "Your own currency rules", body: "Company and personal minima on top of the CARs built-ins — “3 landings in 90 days on type”.", icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5" /></svg> },
+  { title: "TC-style PDF export", body: "Proper logbook pages with page, forward and grand totals — the format examiners expect.", icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" /><path d="M14 3v5h5" /><path d="M9 13h6M9 17h4" /></svg> },
+  { title: "Document & licence scanning", body: "Photograph a medical or licence and the dates land in your document tracker automatically.", icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="5" width="18" height="14" rx="2" /><path d="M3 10h18" /></svg> },
+  { title: "Everything in Free, always", body: "Logging, totals, currency, route map, reminders and exports never go behind the paywall.", icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /></svg> },
 ];
 
 // FAQ content lives in src/lib/seo.ts so the visible Q&A and the FAQPage
@@ -114,8 +116,8 @@ export default function Pricing() {
               <a className="btn btn-ghost" href="#compare">See what&apos;s included</a>
             </div>
             <div className="reassure">
-              <span><Check /> Scan your first 10 pages free</span>
-              <span><Check /> No credit card to start</span>
+              <span><Check /> Free plan, no card needed</span>
+              <span><Check /> 14-day Pro trial</span>
               <span><Check /> Cancel anytime</span>
             </div>
           </div>
@@ -145,7 +147,7 @@ export default function Pricing() {
 
         {/* trust bar */}
         <div className="trustbar"><div className="wrap row">
-          <span className="trust-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /></svg> Encrypted &amp; account-scoped</span>
+          <span className="trust-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /></svg> Private to your account</span>
           <span className="trust-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12.5 3 21l9-4 9 4-2-8.5" /><circle cx="12" cy="8" r="6" /></svg> Works offline, in the air</span>
           <span className="trust-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" /><path d="M14 3v5h5" /></svg> Export anytime — CSV &amp; TC-style PDF</span>
           <span className="trust-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2v4M12 18v4M2 12h4M18 12h4" /><circle cx="12" cy="12" r="4" /></svg> Your logbook, your data</span>
@@ -179,17 +181,18 @@ export default function Pricing() {
               <ul className="flist">
                 <li><Check /> Unlimited manual flight logging</li>
                 <li><Check /> Flight totals &amp; reports</li>
-                <li><Check /> Basic currency tracking</li>
-                <li><Check /> Aircraft database &amp; route map</li>
-                <li><Check /> Basic PDF export</li>
+                <li><Check /> Currency tracking (CARs built-ins)</li>
+                <li><Check /> Aircraft fleet &amp; route map</li>
+                <li><Check /> Document expiry reminders</li>
+                <li><Check /> CSV import &amp; export, basic PDF</li>
+                <li><Check /> iPhone &amp; iPad app, works offline</li>
               </ul>
             </div>
 
             {/* PRO */}
             <div className="tier pro">
-              <span className="ribbon">Most popular</span>
               <div className="t-name">Pro</div>
-              <div className="t-tag">Your logbook, backed up and syncing everywhere — with AI scanning.</div>
+              <div className="t-tag">For pilots digitizing a career&apos;s worth of paper — and flying commercially.</div>
               <div className="price"><span className="amt">{annual ? "$8.33" : "$10"}</span><span className="per">/month</span></div>
               <div className="price-sub">{annual ? "$100 billed yearly — save $20." : "Billed monthly."}</div>
               <button type="button" className="btn btn-primary btn-block cta" disabled={busyPlan !== null} onClick={() => void buy("pro")}>
@@ -198,38 +201,15 @@ export default function Pricing() {
               {checkoutErr?.plan === "pro" && <p className="checkout-err" role="alert">{checkoutErr.msg}</p>}
               <ul className="flist">
                 <li className="lead">Everything in Free, plus</li>
-                <li><Check /> <b>AI logbook scanning</b> — photo → filled rows</li>
-                <li><Check /> Licence &amp; document OCR</li>
-                <li><Check /> <b>Unlimited</b> cloud sync &amp; multi-device</li>
-                <li><Check /> Advanced currency &amp; expiry alerts</li>
-                <li><Check /> Professional PDF export</li>
-                <li><Check /> Backup &amp; restore</li>
-                <li><Check /> <b>iPhone, iPad &amp; Mac apps</b></li>
-              </ul>
-            </div>
-
-            {/* PROFESSIONAL */}
-            <div className="tier">
-              <div className="t-name">Professional</div>
-              <div className="t-tag">For working pilots who live in their logbook.</div>
-              <div className="price"><span className="amt">{annual ? "$12.50" : "$15"}</span><span className="per">/month</span></div>
-              <div className="price-sub">{annual ? "$150 billed yearly — save $30." : "Billed monthly."}</div>
-              <button type="button" className="btn btn-ghost btn-block cta" disabled={busyPlan !== null} onClick={() => void buy("professional")}>
-                {busyPlan === "professional" ? "Starting checkout…" : "Start 14-day free trial"}
-              </button>
-              {checkoutErr?.plan === "professional" && <p className="checkout-err" role="alert">{checkoutErr.msg}</p>}
-              <ul className="flist">
-                <li className="lead">Everything in Pro, plus</li>
-                <li><Check /> <b>Unlimited</b> AI scanning</li>
-                <li><Check /> Airline roster import</li>
-                <li><Check /> Company reports</li>
-                <li><Check /> Advanced analytics</li>
-                <li><Check /> Duty &amp; rest analysis</li>
-                <li><Check /> Priority support</li>
+                <li><Check /> <b>Unlimited</b> AI logbook scanning</li>
+                <li><Check /> Licence &amp; document scanning</li>
+                <li><Check /> <b>Duty &amp; rest analysis</b> (703/704/705)</li>
+                <li><Check /> Your own custom currency rules</li>
+                <li><Check /> TC-style logbook PDF export</li>
               </ul>
             </div>
           </div>
-          <p className="cmp-note">Prices in CAD. 14-day free trial on Pro &amp; Professional — cancel before it ends and you&apos;re never charged.</p>
+          <p className="cmp-note">Prices in CAD. 14-day free trial on Pro — cancel before it ends and you&apos;re never charged.</p>
         </div>
       </section>
 
@@ -243,7 +223,7 @@ export default function Pricing() {
           <div className="table-scroll">
             <table className="cmp">
               <thead>
-                <tr><th>Feature</th><th>Free</th><th className="col-pro">Pro</th><th>Professional</th></tr>
+                <tr><th>Feature</th><th>Free</th><th className="col-pro">Pro</th></tr>
               </thead>
               <tbody>
                 {COMPARE.map((r) => (
@@ -251,7 +231,6 @@ export default function Pricing() {
                     <td>{r.label}</td>
                     <td>{cmpCell(r.free)}</td>
                     <td className="col-pro">{cmpCell(r.pro)}</td>
-                    <td>{cmpCell(r.prof)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -266,9 +245,9 @@ export default function Pricing() {
         <div className="wrap">
           <div className="spotlight">
             <div className="sec-head" style={{ marginBottom: 8, textAlign: "left", maxWidth: "none" }}>
-              <p className="eyebrow">Professional</p>
+              <p className="eyebrow">Pro</p>
               <h2>Built for the pilots who fly for a living</h2>
-              <p style={{ maxWidth: "60ch" }}>When your logbook is a career record, not a hobby, Professional turns it into a working tool — unlimited scanning, roster import, and the analytics your chief pilot asks for.</p>
+              <p style={{ maxWidth: "60ch" }}>When your logbook is a career record, not a hobby, Pro turns it into a working tool — unlimited scanning, duty and rest gauges for the operation you actually fly, and exports in the format examiners expect.</p>
             </div>
             <div className="feat-grid">
               {SPOTLIGHT.map((f) => (
@@ -307,7 +286,7 @@ export default function Pricing() {
           <div className="final">
             <p className="eyebrow" style={{ justifyContent: "center" }}>14-day free trial</p>
             <h2>Your next logbook entry could log itself.</h2>
-            <p>Start free, scan your first 10 pages on us, and see your paper logbook fill itself in. No card to start. Cancel anytime.</p>
+            <p>Start free and keep your logbook forever, or try Pro for 14 days and watch your paper logbook fill itself in. No card to start. Cancel anytime.</p>
             <div className="btns">
               <Link className="btn btn-primary" href={START_HREF}>Start your free trial</Link>
               <a className="btn btn-ghost" href="#pricing">Compare plans</a>

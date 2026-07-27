@@ -170,6 +170,7 @@ export function mergeAppData(base: AppData | null, local: AppData, remote: AppDa
     currencyHidden: pickField(base, local, remote, "currencyHidden"),
     flightColumns: pickField(base, local, remote, "flightColumns"),
     profile: pickField(base, local, remote, "profile"),
+    notificationPrefs: pickField(base, local, remote, "notificationPrefs"),
   };
 }
 

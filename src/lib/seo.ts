@@ -38,19 +38,19 @@ export const SITE_KEYWORDS = [
 // Logbook cost" are accurate. Prices in CAD, monthly.
 export const PLANS = [
   { name: "Free", price: 0, tagline: "Everything you need to keep a proper logbook." },
-  { name: "Pro", price: 10, tagline: "Backed up, syncing everywhere — with AI logbook scanning." },
-  { name: "Professional", price: 15, tagline: "For working pilots who live in their logbook." },
+  { name: "Pro", price: 10, tagline: "AI scanning, duty limits, and pro exports." },
 ] as const;
 
 // FAQ content — the single source rendered on /pricing AND emitted as FAQPage
 // structured data (Google requires the Q&A be visible on the page, which it is).
 export const FAQS: { q: string; a: string }[] = [
-  { q: "Do I need a credit card to start?", a: "No. Create a free account and start logging immediately, or begin a 14-day Pro trial and scan your first 10 pages free — no card until you decide to keep it." },
-  { q: "What counts as a scan?", a: "One photographed logbook page. Pro includes a generous monthly allowance; Professional is unlimited, so you can digitize a lifetime of paper in one sitting." },
+  { q: "Do I need a credit card to start?", a: "No. Create a free account and start logging immediately — no card, no expiry. The free plan is a complete logbook: unlimited flights, currency tracking, document reminders, and CSV and PDF export." },
+  { q: "What counts as a scan?", a: "One photographed logbook page. AI scanning is a Pro feature and Pro has no page limit, so you can digitize a lifetime of paper in one sitting. The 14-day trial lets you scan as much as you like before deciding." },
   { q: "Does it work offline?", a: "Yes. Your logbook is mirrored to your device, so you can log in the air with no signal. It syncs automatically the moment you're back online." },
-  { q: "Is my logbook data safe?", a: "Your logbook is a legal document, and we treat it that way — encrypted, scoped to your account so no one else can read it, and yours to export as CSV or a Transport Canada-style PDF at any time." },
+  { q: "Is my logbook data safe?", a: "Your logbook is a legal document, and we treat it that way. It's encrypted in transit and at rest in the cloud, and row-level security scopes every record to your account so no one else can read it. A copy is also kept on your own device for offline use, and everything is yours to export as CSV or a Transport Canada-style PDF at any time." },
   { q: "Can I cancel anytime?", a: "Anytime, from your account. You keep every flight you've logged and simply drop back to the free plan — nothing is deleted." },
-  { q: "Which devices are included?", a: "Free and Pro run in any browser and sync across devices. Professional adds the native iPhone, iPad, and Mac apps for cockpit-side logging and offline scanning." },
+  { q: "Which devices are included?", a: "Every plan runs in any modern browser and syncs across your devices, and the native iPhone and iPad app is included on every plan too — it works offline, so you can log in the cockpit with no signal. There's no separate Mac app; the iPad app also runs on Apple-silicon Macs." },
+  { q: "Is this built for Canadian pilots?", a: "Yes. Currency, duty and document expiry are modelled on the Canadian Aviation Regulations — CAR 401.05 recency, 703/704/705 duty and rest limits, and Transport Canada medical validity. Pilots outside Canada can still log flights, import and export, but the regulatory gauges won't match their rules. They're a reference aid either way: the CARs and your company minima always govern." },
 ];
 
 // Feature list surfaced to crawlers/AI as concrete capabilities.
@@ -106,8 +106,10 @@ export function softwareApplicationLd(): Json {
     offers: {
       "@type": "AggregateOffer",
       priceCurrency: "CAD",
-      lowPrice: "0",
-      highPrice: "15",
+      // Derived from PLANS — a hardcoded band silently kept advertising the
+      // withdrawn $15 tier to crawlers after it left /pricing.
+      lowPrice: String(Math.min(...PLANS.map((p) => p.price))),
+      highPrice: String(Math.max(...PLANS.map((p) => p.price))),
       offerCount: PLANS.length,
       offers: PLANS.map((p) => ({
         "@type": "Offer",

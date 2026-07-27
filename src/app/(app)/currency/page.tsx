@@ -10,10 +10,17 @@ import {
 import { documentStatus, STATUS_META } from "@/lib/documents";
 import { fleetTypes, normalizeAircraftCode } from "@/lib/aircraft";
 import { flightsForCurrentPilot } from "@/lib/logbook";
-import { CurrencyRule } from "@/lib/types";
+import { CurrencyRule, PilotDocument } from "@/lib/types";
 import { useUi } from "@/components/UiProvider";
 import { useEntitlement } from "@/hooks/useEntitlement";
 import Link from "next/link";
+
+// Most recent document of a given type (by expiry date), or null.
+function latestDocByType(docs: PilotDocument[], type: string): PilotDocument | null {
+  const matches = docs.filter((d) => d.type === type);
+  if (!matches.length) return null;
+  return [...matches].sort((a, b) => (b.expiryDate || "").localeCompare(a.expiryDate || ""))[0];
+}
 
 // A currency that lapses within this many days shows amber.
 const WARN_DAYS = 30;
@@ -77,6 +84,31 @@ function StatusCard({ s, onDelete, hidden, onToggleHide }: { s: CurrencyStatus; 
   );
 }
 
+// A recency card driven by a document's expiry (recurrent flight checks:
+// PPC / PCC). Rendered only when the pilot has that document on file.
+function DocExpiryCard({ title, subtitle, doc, hidden, onToggleHide }: {
+  title: string; subtitle: string; doc: PilotDocument; hidden: boolean; onToggleHide: () => void;
+}) {
+  const info = documentStatus(doc);
+  const border = info.status === "expired" ? "border-red-500/40"
+    : info.status === "expiring" ? "border-amber-400/40" : "border-emerald-500/30";
+  return (
+    <div className={`card p-4 border ${border}` + (hidden ? " opacity-50" : "")}>
+      <div className="flex items-start justify-between gap-2 mb-2">
+        <div>
+          <h3 className="font-semibold text-sm">{title}{hidden && <span className="text-slate-500 font-normal"> · hidden</span>}</h3>
+          <p className="text-[11px] text-slate-500">{subtitle}</p>
+        </div>
+        <span className="flex items-center gap-3">
+          <span className={`text-xs font-semibold ${STATUS_META[info.status].cls}`}>{STATUS_META[info.status].short.toUpperCase()}</span>
+          <button onClick={onToggleHide} className="text-xs text-slate-400 hover:text-slate-200">{hidden ? "Show" : "Hide"}</button>
+        </span>
+      </div>
+      <p className="text-sm text-slate-300">{info.label}</p>
+    </div>
+  );
+}
+
 export default function CurrencyPage() {
   const { data, mutate } = useData();
   const { toast } = useUi();
@@ -106,13 +138,12 @@ export default function CurrencyPage() {
     });
   }
 
-  // 24-month recurrent training rides on the Documents system.
-  const recurrentDoc = useMemo(() => {
-    const docs = data.documents.filter((d) => d.type === "Recurrent Training");
-    if (!docs.length) return null;
-    return [...docs].sort((a, b) => (b.expiryDate || "").localeCompare(a.expiryDate || ""))[0];
-  }, [data.documents]);
+  // Document-driven recency items ride on the Documents system.
+  const recurrentDoc = useMemo(() => latestDocByType(data.documents, "Recurrent Training"), [data.documents]);
   const recurrentStatus = recurrentDoc ? documentStatus(recurrentDoc) : null;
+  // Recurrent flight checks (PPC/PCC) — shown only when the pilot tracks one.
+  const ppcDoc = useMemo(() => latestDocByType(data.documents, "Pilot Proficiency Check (PPC)"), [data.documents]);
+  const pccDoc = useMemo(() => latestDocByType(data.documents, "Pilot Competency Check (PCC)"), [data.documents]);
 
   function addRule(e: React.FormEvent) {
     e.preventDefault();
@@ -288,6 +319,26 @@ export default function CurrencyPage() {
             </p>
           )}
         </div>
+
+        {/* Recurrent flight checks — appear once the pilot tracks one (Documents page). */}
+        {ppcDoc && (
+          <DocExpiryCard
+            title="Pilot Proficiency Check (PPC)"
+            subtitle="CAR 704 / 705 · reference only"
+            doc={ppcDoc}
+            hidden={hiddenSet.has("ppc")}
+            onToggleHide={() => toggleHidden("ppc")}
+          />
+        )}
+        {pccDoc && (
+          <DocExpiryCard
+            title="Pilot Competency Check (PCC)"
+            subtitle="CAR 703 · reference only"
+            doc={pccDoc}
+            hidden={hiddenSet.has("pcc")}
+            onToggleHide={() => toggleHidden("pcc")}
+          />
+        )}
 
         {customs.map((s) => (
           <StatusCard key={s.key} s={s} hidden={hiddenSet.has(s.key)} onToggleHide={() => toggleHidden(s.key)} onDelete={() => deleteRule(s.key)} />

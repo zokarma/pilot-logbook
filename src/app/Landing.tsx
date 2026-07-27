@@ -32,9 +32,9 @@ const Arrow = () => (
 );
 
 const FEATURES: { title: string; body: string; icon: React.ReactNode }[] = [
-  { title: "AI logbook scanning", body: "Photograph a paper page and AI fills in every flight — dates, aircraft, routes, hours, crew.", icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2M3 12h18" /></svg> },
-  { title: "Currency & duty", body: "Day/night recency, IFR approaches, and 703/704/705 duty limits tracked automatically.", icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="13" r="8" /><path d="M12 9v4l2.5 2.5" /><path d="M9 2h6" /></svg> },
-  { title: "Document reminders", body: "Medicals, ratings, and recurrent training with Transport Canada expiry math built in.", icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" /><path d="M14 3v5h5" /><path d="M9 13h6M9 17h4" /></svg> },
+  { title: "AI logbook scanning", body: "Photograph a paper page and AI fills in every flight — dates, aircraft, routes, hours, crew. Included with Pro.", icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2M3 12h18" /></svg> },
+  { title: "Currency & duty", body: "Day/night recency and IFR approaches on every plan; 703/704/705 duty and rest gauges on Pro.", icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="13" r="8" /><path d="M12 9v4l2.5 2.5" /><path d="M9 2h6" /></svg> },
+  { title: "Document reminders", body: "Medicals, ratings, PPC/PCC and recurrent training — with Transport Canada expiry math built in.", icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" /><path d="M14 3v5h5" /><path d="M9 13h6M9 17h4" /></svg> },
   { title: "Yours, offline & exportable", body: "Works in the air with no signal, syncs everywhere, and exports to CSV or a TC-style PDF anytime.", icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /></svg> },
 ];
 
@@ -133,7 +133,7 @@ export default function Landing() {
 
         {/* stat / trust bar */}
         <div className="statbar"><div className="wrap row">
-          <span className="trust-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /></svg> Encrypted &amp; account-scoped</span>
+          <span className="trust-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /></svg> Private to your account</span>
           <span className="trust-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12.5 3 21l9-4 9 4-2-8.5" /><circle cx="12" cy="8" r="6" /></svg> Works offline, in the air</span>
           <span className="trust-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" /><path d="M14 3v5h5" /></svg> Export to CSV &amp; TC-style PDF</span>
           <span className="trust-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2v4M12 18v4M2 12h4M18 12h4" /><circle cx="12" cy="12" r="4" /></svg> Built around the CARs</span>
@@ -195,20 +195,13 @@ export default function Landing() {
               <Link className="btn btn-ghost p-cta" href={APP_HREF}>Start free</Link>
             </div>
             <div className="plan pop">
-              <span className="ribbon">Most popular</span>
               <div className="p-name">Pro</div>
               <div className="p-price"><span className="amt">$10</span><span className="per">/month</span></div>
-              <div className="p-tag">Backed up, syncing everywhere — with AI scanning.</div>
+              <div className="p-tag">Unlimited AI scanning, duty limits, and pro exports.</div>
               <Link className="btn btn-primary p-cta" href={PRICING_HREF}>See Pro</Link>
             </div>
-            <div className="plan">
-              <div className="p-name">Professional</div>
-              <div className="p-price"><span className="amt">$15</span><span className="per">/month</span></div>
-              <div className="p-tag">For working pilots who live in their logbook.</div>
-              <Link className="btn btn-ghost p-cta" href={PRICING_HREF}>See Professional</Link>
-            </div>
           </div>
-          <p className="plans-note">Prices in CAD. 14-day free trial on Pro &amp; Professional. <Link href={PRICING_HREF} style={{ color: "var(--cyan)" }}>Compare every feature &rarr;</Link></p>
+          <p className="plans-note">Prices in CAD. 14-day free trial on Pro. <Link href={PRICING_HREF} style={{ color: "var(--cyan)" }}>Compare every feature &rarr;</Link></p>
         </div>
       </section>
 

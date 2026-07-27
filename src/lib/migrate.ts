@@ -2,7 +2,7 @@
 // load. When you add or rename a field, extend this rather than assuming stored
 // data has it. Operates in place on the passed object and returns it.
 
-import { AppData, Flight, Pilot, emptyData } from "./types";
+import { AppData, Flight, Pilot, emptyData, defaultNotificationPrefs } from "./types";
 import { normalizeFlightColumns } from "./flightColumns";
 import { uid } from "./id";
 
@@ -34,6 +34,12 @@ export function migrateData(input: Partial<AppData> | null | undefined): AppData
   if (!Array.isArray(d.currencyRules)) d.currencyRules = [];
   if (!Array.isArray(d.currencyHidden)) d.currencyHidden = [];
   if (!Array.isArray(d.customAirports)) d.customAirports = [];
+  if (!d.notificationPrefs || typeof d.notificationPrefs !== "object") {
+    d.notificationPrefs = defaultNotificationPrefs();
+  } else {
+    // Back-fill any missing keys so older prefs objects are complete.
+    d.notificationPrefs = { ...defaultNotificationPrefs(), ...d.notificationPrefs };
+  }
 
   // Build a quick name -> pilotId map; create profiles for any free-text PIC/SIC/SOC.
   const nameToId: Record<string, string> = {};

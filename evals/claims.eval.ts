@@ -97,85 +97,97 @@ export function run(): Suite {
 
   /* ------------------ the price a crawler sees == the price we show ------------ */
   {
-    const [free, pro, prof] = PLANS;
-    s.check("plan names match the entitlement tier labels", stable(PLANS.map((p) => p.name)) === stable([TIER_LABEL.free, TIER_LABEL.pro, TIER_LABEL.professional]));
-    s.check(`/pricing shows the structured-data monthly prices ($${pro.price} / $${prof.price})`, pricing.includes(`"$${pro.price}"`) && pricing.includes(`"$${prof.price}"`));
+    const [free, pro] = PLANS;
+    s.check("we sell exactly two plans (Professional was withdrawn — its features were never built)", PLANS.length === 2);
+    s.check("plan names match the entitlement tier labels", stable(PLANS.map((p) => p.name)) === stable([TIER_LABEL.free, TIER_LABEL.pro]));
+    s.check(`/pricing shows the structured-data monthly price ($${pro.price})`, pricing.includes(`"$${pro.price}"`));
     s.check(`/pricing shows the free tier as $${free.price}`, pricing.includes(`$${free.price}</span>`));
-    s.check("the landing page quotes the same prices", landing.includes(`>$${pro.price}<`) && landing.includes(`>$${prof.price}<`));
-    s.check("the /pricing meta description quotes the same prices", pricingMeta.includes(`Pro ($${pro.price}/mo)`) && pricingMeta.includes(`Professional ($${prof.price}/mo)`));
+    s.check("the landing page quotes the same price", landing.includes(`>$${pro.price}<`));
     s.check("prices are stated in CAD wherever they appear", pricing.includes("Prices in CAD") && landing.includes("Prices in CAD"));
 
     // Annual copy has to survive a pilot with a calculator.
-    const annual = { pro: 100, prof: 150 };
+    const annualPro = 100;
     s.check("Pro annual math is self-consistent ($100/yr → $8.33/mo, save $20)",
       pricing.includes('"$8.33"') && pricing.includes("$100 billed yearly") &&
-      Math.round((annual.pro / 12) * 100) / 100 === 8.33 && pro.price * 12 - annual.pro === 20 && pricing.includes("save $20"));
-    s.check("Professional annual math is self-consistent ($150/yr → $12.50/mo, save $30)",
-      pricing.includes('"$12.50"') && pricing.includes("$150 billed yearly") &&
-      annual.prof / 12 === 12.5 && prof.price * 12 - annual.prof === 30 && pricing.includes("save $30"));
+      Math.round((annualPro / 12) * 100) / 100 === 8.33 && pro.price * 12 - annualPro === 20 && pricing.includes("save $20"));
+
+    // The withdrawn tier must not reappear in any customer-facing surface until
+    // its features exist. The Tier type keeps "professional" so legacy
+    // subscriptions still resolve — that's code, not a promise.
+    const publicCopy = [pricing, pricingMeta, landing, read("src/lib/seo.ts")].join("\n");
+    s.check("the withdrawn Professional tier is not advertised anywhere", !/Professional/.test(publicCopy.replace(/professional["']?\s*[:,)]/g, "")));
+    s.check("no $15 / $12.50 Professional pricing survives in the copy", !pricing.includes("$15") && !pricing.includes("$12.50") && !landing.includes(">$15<"));
   }
 
   /* ---------------- comparison table vs the enforced entitlement matrix -------- */
   {
     const row = (label: string): string => (pricing.match(new RegExp(`\\{ label: "${label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}".*`)) || [""])[0];
-    const dutyRow = row("Duty & rest analysis");
-    s.check("comparison table lists Duty & rest as Professional-only, matching FEATURE_MIN_TIER",
-      /free: false, pro: false, prof: true/.test(dutyRow) && FEATURE_MIN_TIER.dutyRest === "professional");
+    s.check("Duty & rest is sold as Pro-only and gated at Pro",
+      /free: false, pro: true/.test(row("Duty & rest analysis (703/704/705)")) && FEATURE_MIN_TIER.dutyRest === "pro");
     s.check("AI scanning is sold as paid-only and gated at Pro",
-      /free: false/.test(row("AI / OCR logbook scanning")) && FEATURE_MIN_TIER.aiScan === "pro");
-    s.check("document OCR is sold as paid-only and gated at Pro",
-      /free: false/.test(row("OCR licence & document scanning")) && FEATURE_MIN_TIER.docOcr === "pro");
-    s.check("currency tracking stays usable on Free, with the advanced rules at Pro",
-      /free: "Basic"/.test(row("Currency tracking")) && FEATURE_MIN_TIER.advancedCurrency === "pro");
-    s.check("roster import / company reports / analytics are all sold as Professional-only",
-      (["rosterImport", "companyReports", "advancedAnalytics"] as Feature[]).every((f) => FEATURE_MIN_TIER[f] === "professional"));
+      /free: false/.test(row("AI logbook scanning")) && FEATURE_MIN_TIER.aiScan === "pro");
+    s.check("document scanning is sold as paid-only and gated at Pro",
+      /free: false/.test(row("Document & licence scanning")) && FEATURE_MIN_TIER.docOcr === "pro");
+    s.check("currency tracking stays usable on Free, with custom rules at Pro",
+      /free: "Built-in CARs rules"/.test(row("Currency tracking")) && FEATURE_MIN_TIER.advancedCurrency === "pro");
     s.check("no gated feature is left without a tier", (Object.keys(FEATURE_MIN_TIER) as Feature[]).every((f) => (["free", "pro", "professional"] as Tier[]).includes(FEATURE_MIN_TIER[f])));
-  }
 
-  /* -------------------------------- probes ------------------------------------ */
-  {
-    // A tier is only real if something in the UI actually asks for it. Comments
-    // don't count — PremiumGate documents itself with a `feature="…"` example.
+    // HARD CHECK (was a probe): a feature may only be declared if something in
+    // the UI actually enforces it. This is what stopped being true and put
+    // unbuilt promises on /pricing — never let it regress.
     const stripComments = (src: string): string => src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
     const ui = [...sourceFiles("src/app"), ...sourceFiles("src/components")].map((f) => stripComments(read(f))).join("\n");
     const features = Object.keys(FEATURE_MIN_TIER) as Feature[];
     const unwired = features.filter((f) => !new RegExp(`["'\`]${f}["'\`]`).test(ui));
-    const profUnwired = unwired.filter((f) => FEATURE_MIN_TIER[f] === "professional");
-    s.probe(
-      "gated features with no enforcement site in the UI",
-      `${unwired.length}/${features.length} declared features are never referenced by a PremiumGate or has(): ${unwired.join(", ")}. ` +
-      `Of those, ${profUnwired.length} are the Professional tier's headline promises (${profUnwired.join(", ")}) — advertised on /pricing at $${PLANS[2].price}/mo but not built, so a Professional subscriber today gets the Duty page and nothing else beyond Pro. ` +
-      `The enforced set is: ${features.filter((f) => !unwired.includes(f)).join(", ")}.`,
-    );
+    s.check("every declared feature is actually enforced somewhere in the UI", unwired.length === 0, unwired.join(", "));
+  }
 
-    const scanMeter = /scansUsed|scanCount|scanQuota|scanAllowance|pagesScanned/.test(ui);
-    s.probe(
-      "\"Pro: limited scans / Professional: unlimited\" is not metered",
-      scanMeter
-        ? "a scan counter exists in the UI"
-        : `no scan counter exists anywhere in src/app or src/components — ScanImport gates on has("aiScan") only, so Pro scanning is de-facto unlimited and aiScanUnlimited (the Professional differentiator, and the /pricing row "Limited / month" vs "Unlimited") is unenforced. The FAQ's "scan your first 10 pages free" has no counter behind it either.`,
-    );
+  /* ------------- claims that must stay defensible (were probes, now checks) ---- */
+  {
+    const devices = FAQS.find((f) => /devices/i.test(f.q))!.a;
+    s.check("the device FAQ does not promise a Mac app (no macOS target ships)",
+      !/\bMac app/i.test(devices.replace(/no separate Mac app/i, "")) && /iPhone and iPad/i.test(devices));
+    s.check("the device FAQ agrees with the comparison table (native apps on every plan)",
+      /every plan/i.test(devices) && /free: true, pro: true/.test((pricing.match(/\{ label: "iPhone & iPad app".*/) || [""])[0]));
 
-    const devices = FAQS.find((f) => /devices/i.test(f.q))!;
-    s.probe(
-      "FAQ device claim contradicts the entitlement matrix",
-      `structured-data FAQ says "${devices.a}" — i.e. Professional adds the native apps — but FEATURE_MIN_TIER.nativeApps is "${FEATURE_MIN_TIER.nativeApps}" and the /pricing comparison row says Pro already gets "All platforms". Google and AI answer engines quote the FAQ, so the answer a pilot gets is the wrong one. Also: the repo ships an iOS/iPadOS Capacitor target only — there is no macOS/Catalyst target, so "Mac apps" is true only via "iPad apps on Apple silicon Macs".`,
-    );
+    const safety = FAQS.find((f) => /safe/i.test(f.q))!.a;
+    s.check("the data-safety FAQ qualifies encryption rather than claiming it blanket-wide",
+      /in transit and at rest in the cloud/i.test(safety) && /on your own device/i.test(safety));
 
-    const trialCode = /trial/i.test(ui.replace(/free trial/gi, "")) ;
+    s.check("scanning copy does not promise a free allowance that isn't metered",
+      !/10 (pages|scans)/i.test([pricing, landing, read("src/lib/seo.ts")].join("\n")));
+
+    const canada = FAQS.find((f) => /canadian/i.test(f.q));
+    s.check("the FAQ states the regulatory scope is Canadian (CARs), not universal", !!canada && /CAR/.test(canada.a));
+  }
+
+  /* -------------------------------- probes ------------------------------------ */
+  {
+    const stripComments = (src: string): string => src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+    const ui = [...sourceFiles("src/app"), ...sourceFiles("src/components")].map((f) => stripComments(read(f))).join("\n");
+
+    const trialCode = /trial/i.test(ui.replace(/free trial/gi, ""));
     s.probe(
       "the 14-day free trial is a Stripe-side promise with no in-app representation",
-      `the copy sells a 14-day trial in ${(pricing.match(/free trial/gi) || []).length} places on /pricing plus the landing page, and entitlement.ts honors status "trialing" if Stripe sends it — but nothing in the client starts, counts down, or surfaces a trial${trialCode ? "" : " (no trial state in the UI at all)"}. It holds only if every Payment Link is configured with a 14-day trial in the Stripe dashboard; that's an operator step, not a code path, and no eval can catch it drifting.`,
+      `the copy sells a 14-day trial in ${(pricing.match(/free trial/gi) || []).length} places on /pricing plus the landing page, and entitlement.ts honors status "trialing" if Stripe sends it — but nothing in the client starts, counts down, or surfaces a trial${trialCode ? "" : " (no trial state in the UI at all)"}. It holds only if the Stripe price is configured with a 14-day trial; that's an operator step, not a code path, and no eval can catch it drifting. Deliberate: the operator confirmed the trial will be configured in Stripe before launch.`,
     );
 
     s.probe(
       "hero CTAs bypass checkout",
-      `START_HREF is "/login" in Pricing.tsx, so the hero and footer "Start your 14-day free trial" buttons go to signup while only the plan-card buttons call startCheckout(). Intentional (BILLING.md rule #1: log in before the paywall), but it means the most prominent CTA never reaches Stripe — worth confirming it's still what you want now that checkout is live.`,
+      `START_HREF is "/login" in Pricing.tsx, so the hero and footer trial buttons go to signup while only the plan-card button calls startCheckout(). Intentional (BILLING.md rule #1: log in before the paywall), but it means the most prominent CTA never reaches Stripe.`,
+    );
+
+    const scanMeter = /scansUsed|scanCount|scanQuota|scanAllowance|pagesScanned/.test(ui);
+    s.probe(
+      "free-scan allowance is deferred, not shipped",
+      scanMeter
+        ? "a scan counter now exists in the UI — the free allowance can be advertised again."
+        : `no scan counter exists, and the copy correctly says AI scanning is Pro-only. A free allowance was considered and deferred: it cannot be enforced client-side because scan-extract returns 402 for non-premium callers, and a browser counter is bypassable by clearing storage (direct Anthropic API cost exposure). Shipping it needs a server-side usage table plus scan-extract enforcement and a redeploy.`,
     );
 
     s.probe(
-      "\"encrypted\" claim in the data-safety FAQ",
-      `the FAQ says the logbook is "encrypted, scoped to your account". Accurate for the cloud row (Supabase at-rest encryption + RLS on plb_app_state) and in transit, but the offline mirror — the full logbook, plus bug-report screenshots — sits in plain localStorage on the device, and local-only mode has no encryption at all. Qualifying it ("encrypted in transit and at rest in the cloud") keeps the claim defensible.`,
+      "Professional tier withdrawn but still live in code",
+      `"professional" remains in the Tier union, RANK, TIER_LABEL and the stripe-webhook price map so any subscription sold while it was listed keeps resolving and outranking pro. It has no purchase path and no /pricing presence. If nobody ever bought it, the tier can be deleted outright; if anyone did, leave it until those subscriptions end.`,
     );
   }
 

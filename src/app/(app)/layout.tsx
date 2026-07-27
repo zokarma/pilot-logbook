@@ -10,6 +10,7 @@ import Onboarding from "@/components/Onboarding";
 import UiProvider from "@/components/UiProvider";
 import Tour from "@/components/Tour";
 import WhatsNewBanner, { WHATSNEW_KEY, WHATSNEW_VERSION } from "@/components/WhatsNewBanner";
+import NotificationsManager from "@/components/NotificationsManager";
 
 const NAV_OPEN_KEY = "plb_nav_open";
 
@@ -117,6 +118,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           </main>
         </div>
         {tourOpen && <Tour onFinish={finishTour} />}
+        <NotificationsManager />
       </div>
     </UiProvider>
   );

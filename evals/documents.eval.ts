@@ -3,7 +3,7 @@
 
 import {
   addMonths, ageOn, medicalValidityMonths, computeAutoExpiry, recalcDocument,
-  documentStatus, EXPIRING_SOON_DAYS,
+  documentStatus, docTypeDef, EXPIRING_SOON_DAYS,
 } from "../src/lib/documents";
 import { PilotDocument, UserProfile } from "../src/lib/types";
 import { Suite } from "./harness";
@@ -34,6 +34,16 @@ export function run(): Suite {
 
   s.eq("ageOn: turns 40 ON the birthday", ageOn("1986-07-17", "2026-07-17"), 40);
   s.eq("ageOn: still 39 the day before", ageOn("1986-07-18", "2026-07-17"), 39);
+
+  // -- recurrent flight checks (PPC/PCC): manual expiry, no auto formula --
+  {
+    const ppc = docTypeDef("Pilot Proficiency Check (PPC)");
+    const pcc = docTypeDef("Pilot Competency Check (PCC)");
+    s.check("PPC and PCC are catalogued", !!ppc && !!pcc);
+    s.check("PPC/PCC use manual expiry (validity is entered from the check-ride form)", ppc?.expiry === "manual" && pcc?.expiry === "manual");
+    s.check("PPC/PCC never auto-compute an expiry", computeAutoExpiry(doc({ type: "Pilot Proficiency Check (PPC)", expiryMode: "manual", issueDate: "2026-07-17" }), profile("1990-01-01")) === "");
+    s.eq("a manually-entered PPC expiry drives status", documentStatus(doc({ type: "Pilot Proficiency Check (PPC)", expiryMode: "manual", expiryDate: localDateOffset(10) })).status, "expiring");
+  }
 
   // -- medical validity table (age at exam) --
   s.eq("Cat 1, age 39 → 12 months", medicalValidityMonths("Category 1 Medical", 39), 12);

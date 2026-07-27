@@ -7,6 +7,11 @@
 // RULE: never trust the client for entitlement. This only READS a row that the
 // service-role webhook wrote; it can't grant premium on its own.
 
+// "professional" is NO LONGER SOLD — the site offers Free + Pro only (its
+// headline features were never built). The tier stays in the type system so any
+// subscription created while it was on sale still resolves, outranks pro, and
+// keeps working; it simply has no purchase path. Do not re-list it on /pricing
+// without building the features first (claims.eval.ts guards this).
 export type Tier = "free" | "pro" | "professional";
 export type SubStatus = "active" | "trialing" | "past_due" | "canceled" | "inactive";
 
@@ -66,30 +71,20 @@ export function isPremium(e: Entitlement | null | undefined, now?: Date): boolea
 
 /* ------------------------------ feature gating ------------------------------ */
 
+// Only capabilities that are ACTUALLY gated somewhere in the UI belong here.
+// A feature listed but never enforced becomes a promise on /pricing that the
+// product doesn't keep — claims.eval.ts fails the build if one drifts back in.
 export type Feature =
-  | "aiScan" | "multiDevice" | "backup" | "proPdf" | "advancedCurrency"
-  | "unlimitedReminders" | "docOcr" | "nativeApps"
-  | "aiScanUnlimited" | "rosterImport" | "companyReports"
-  | "advancedAnalytics" | "dutyRest" | "prioritySupport";
+  | "aiScan" | "proPdf" | "advancedCurrency" | "docOcr" | "dutyRest";
 
 // The lowest tier that unlocks each gated capability (mirrors the /pricing
-// comparison). Pro grants the everyday power features incl. the native apps &
-// multi-device; Professional adds the working-pilot tools.
+// comparison). Everything paid sits at Pro — the single upgrade.
 export const FEATURE_MIN_TIER: Record<Feature, Tier> = {
   aiScan: "pro",
-  multiDevice: "pro",
-  backup: "pro",
   proPdf: "pro",
   advancedCurrency: "pro",
-  unlimitedReminders: "pro",
   docOcr: "pro",
-  nativeApps: "pro",
-  aiScanUnlimited: "professional",
-  rosterImport: "professional",
-  companyReports: "professional",
-  advancedAnalytics: "professional",
-  dutyRest: "professional",
-  prioritySupport: "professional",
+  dutyRest: "pro",
 };
 
 export function tierHasFeature(tier: Tier, f: Feature): boolean {
