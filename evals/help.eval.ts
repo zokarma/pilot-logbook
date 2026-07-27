@@ -35,6 +35,16 @@ export function run(): Suite {
     s.check("no Apple Watch or widget-only claims", !/apple watch|watchos/.test(corpus));
     s.check("the withdrawn Professional tier is never mentioned", !/professional plan|professional tier/.test(corpus));
     s.check("no promise of free unlimited scanning", !/(unlimited|free).{0,20}scan(ning)?.{0,20}(free|for everyone|no charge)/.test(corpus));
+
+    // ScanImport gates the ENTIRE scan UI — camera included — behind Pro, so
+    // help copy must never imply the on-device camera scan is the free half.
+    // It said exactly that until this check existed: "camera scanning is
+    // processed on the device itself. Cloud AI scanning is the Pro feature."
+    const scanTopic = JSON.stringify(allHelpTopics().find((t) => t.id === "scan-plans")).toLowerCase();
+    s.check("scanning is gated at Pro in the entitlement matrix", FEATURE_MIN_TIER.aiScan === "pro" && FEATURE_MIN_TIER.docOcr === "pro");
+    s.check("help never sells camera scanning as the non-Pro alternative",
+      !/cloud (ai )?scanning is the pro feature|camera.{0,40}(free|no charge)/.test(scanTopic));
+    s.check("the scan-plans answer states scanning needs Pro", /pro/.test(scanTopic) && /every platform|camera and upload/.test(scanTopic));
     s.check("no claim that exports satisfy a regulator", !/regulator|audit|inspector|legally required/.test(corpus));
     s.check("no guarantee language around currency math", !/guarantee|guaranteed|ensures compliance|keeps you legal/.test(corpus));
   }
