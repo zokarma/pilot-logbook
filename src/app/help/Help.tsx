@@ -11,6 +11,7 @@
 
 import Link from "next/link";
 import { HELP } from "@/lib/help";
+import PublicAuthLinks from "@/components/PublicAuthLinks";
 
 const Arrow = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
@@ -30,8 +31,9 @@ export default function Help() {
             <Link className="link" href="/">Home</Link>
             <Link className="link" href="/pricing">Pricing</Link>
             <Link className="link" href="/demo">Live demo</Link>
-            <Link className="btn btn-ghost btn-sm" href="/login">Log in</Link>
-            <Link className="btn btn-primary btn-sm" href="/dashboard">Start free</Link>
+            <PublicAuthLinks>
+              <Link className="btn btn-primary btn-sm" href="/dashboard">Start free</Link>
+            </PublicAuthLinks>
           </div>
         </div>
       </nav>
