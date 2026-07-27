@@ -14,10 +14,10 @@
 // the effect below performs the actual SPA redirect.
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { useData } from "@/context/DataContext";
 import { isNativeApp } from "@/lib/native";
+import PublicAuthLinks, { useSignedIn } from "@/components/PublicAuthLinks";
 
 const APP_HREF = "/dashboard"; // the app opens on the dashboard
 const DEMO_HREF = "/demo";     // real app, seeded sample data, no sign-up
@@ -57,35 +57,22 @@ const STEPS: { title: string; body: string }[] = [
 
 export default function Landing() {
   const router = useRouter();
-  const { ready, currentUser } = useData();
 
-  // isNativeApp() and currentUser read window / client-only state, so resolve
-  // them after mount — the prerendered HTML and first client render must agree
-  // (no hydration mismatch). The marketing copy defaults to the logged-out CTA.
-  const [mounted, setMounted] = useState(false);
+  // The NATIVE shell also boots at "/", and there the marketing page is never
+  // wanted — send it straight to the logbook. (Web visitors stay put: see the
+  // note on signedIn below.)
   useEffect(() => {
-    if (isNativeApp()) {
-      router.replace("/logger");
-      return;
-    }
-    setMounted(true);
+    if (isNativeApp()) router.replace("/logger");
   }, [router]);
 
-  // Auto-forward already-signed-in visitors straight into the app — the
-  // marketing page is for logged-out visitors. Anonymous visitors stay put.
-  // (mounted stays false in the native shell, so this never fights the
-  // /logger redirect above.)
-  const signedIn = mounted && ready && !!currentUser;
-  useEffect(() => {
-    if (signedIn) router.replace("/dashboard");
-  }, [signedIn, router]);
+  // On the web the marketing site stays browsable when signed in. It used to
+  // force-redirect to /dashboard, which meant an existing pilot could never
+  // reach Home, Pricing or Help again — clicking "Home" just bounced them into
+  // their logbook. Now the nav simply offers "Open my logbook" instead.
+  const signedIn = useSignedIn();
 
   const appCta = "Start free";
   const demoCta = "Explore the live demo";
-
-  // While a signed-in visitor is being redirected, render nothing so the
-  // marketing page never flashes over their app.
-  if (signedIn) return null;
 
   return (
     <div className="lp">
@@ -103,8 +90,9 @@ export default function Landing() {
             <Link className="link" href="/help">Help</Link>
             {/* Returning pilots need one obvious way back in from any public
                 page — a button, not a text link lost among the section jumps. */}
-            <Link className="btn btn-ghost btn-sm" href={LOGIN_HREF}>Log in</Link>
-            <Link className="btn btn-primary btn-sm" href={DEMO_HREF}>Live demo</Link>
+            <PublicAuthLinks>
+              <Link className="btn btn-primary btn-sm" href={DEMO_HREF}>Live demo</Link>
+            </PublicAuthLinks>
           </div>
         </div>
       </nav>
@@ -118,7 +106,11 @@ export default function Landing() {
             <p className="sub">From your first circuit to your last leg of the month — hours, currency, duty and document expiries, all kept current for you. Works on your phone and the web, in the air or out of signal.</p>
             <div className="hero-cta">
               <Link className="btn btn-primary btn-lg" href={DEMO_HREF}>{demoCta} <Arrow /></Link>
-              <Link className="btn btn-ghost btn-lg" href={APP_HREF}>{appCta}</Link>
+              {/* "Start free" makes no sense to someone who already has an
+                  account — offer their logbook instead. */}
+              <Link className="btn btn-ghost btn-lg" href={APP_HREF}>
+                {signedIn ? "Open my logbook" : appCta}
+              </Link>
             </div>
             <div className="reassure">
               <span><Check /> No sign-up to look around</span>
@@ -248,7 +240,11 @@ export default function Landing() {
             <p>The demo is the real app, loaded with a sample logbook — click through the dashboard, currency and route map. Nothing to install, no card, no account.</p>
             <div className="btns">
               <Link className="btn btn-primary btn-lg" href={DEMO_HREF}>{demoCta} <Arrow /></Link>
-              <Link className="btn btn-ghost btn-lg" href={APP_HREF}>{appCta}</Link>
+              {/* "Start free" makes no sense to someone who already has an
+                  account — offer their logbook instead. */}
+              <Link className="btn btn-ghost btn-lg" href={APP_HREF}>
+                {signedIn ? "Open my logbook" : appCta}
+              </Link>
             </div>
           </div>
         </div>

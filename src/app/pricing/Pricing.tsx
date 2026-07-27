@@ -12,6 +12,7 @@ import { useState } from "react";
 import { startCheckout, BillingPeriod } from "@/lib/checkout";
 import type { Tier } from "@/lib/entitlement";
 import { FAQS } from "@/lib/seo";
+import PublicAuthLinks from "@/components/PublicAuthLinks";
 
 /* ---------------- inline icons (camelCased for JSX) ---------------- */
 const Check = () => (
@@ -103,8 +104,9 @@ export default function Pricing() {
             <Link className="link" href="/demo">Live demo</Link>
             {/* Same login affordance as the landing page — a returning pilot
                 may well land straight here from a bookmark or a price search. */}
-            <Link className="btn btn-ghost btn-sm" href="/login">Log in</Link>
-            <Link className="btn btn-primary btn-sm" href={START_HREF}>Start free</Link>
+            <PublicAuthLinks>
+              <Link className="btn btn-primary btn-sm" href={START_HREF}>Start free</Link>
+            </PublicAuthLinks>
           </div>
         </div>
       </nav>
