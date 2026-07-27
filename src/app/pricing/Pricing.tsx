@@ -100,6 +100,9 @@ export default function Pricing() {
             <a className="link" href="#compare">Compare</a>
             <a className="link" href="#faq">FAQ</a>
             <Link className="link" href="/demo">Live demo</Link>
+            {/* Same login affordance as the landing page — a returning pilot
+                may well land straight here from a bookmark or a price search. */}
+            <Link className="btn btn-ghost btn-sm" href="/login">Log in</Link>
             <Link className="btn btn-primary btn-sm" href={START_HREF}>Start free</Link>
           </div>
         </div>
@@ -268,8 +271,9 @@ export default function Pricing() {
         <div className="wrap cols">
           <p className="fine">Pilot Logbook keeps your flight records, currency, and documents in one place — with a paper trail you can export anytime. Currency and duty gauges are a reference aid; the CARs and your company minima always govern.</p>
           <nav aria-label="Footer">
-            <a className="link" href="#pricing">Pricing</a>
+            <Link className="link" href="/">Home</Link>
             <a className="link" href="#faq">FAQ</a>
+            <Link className="link" href="/login">Log in</Link>
             <Link className="link" href="/privacy">Privacy</Link>
           </nav>
         </div>

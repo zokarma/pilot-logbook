@@ -100,7 +100,9 @@ export default function Landing() {
             <a className="link" href="#features">Features</a>
             <a className="link" href="#who">Who it&apos;s for</a>
             <Link className="link" href={PRICING_HREF}>Pricing</Link>
-            <Link className="link" href={LOGIN_HREF}>Log in</Link>
+            {/* Returning pilots need one obvious way back in from any public
+                page — a button, not a text link lost among the section jumps. */}
+            <Link className="btn btn-ghost btn-sm" href={LOGIN_HREF}>Log in</Link>
             <Link className="btn btn-primary btn-sm" href={DEMO_HREF}>Live demo</Link>
           </div>
         </div>
