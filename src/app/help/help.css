@@ -1,0 +1,86 @@
+/* Help page — scoped under .hp so it can never leak into the app shell.
+   Deliberately shares the landing page's visual language (same tokens, nav and
+   footer treatment) so /help reads as part of the site rather than a document
+   dump bolted on the side. */
+
+.hp {
+  --ink: #e6edf7;
+  --ink-dim: #9fb0c9;
+  --ink-faint: #6c7f9b;
+  --cyan: #67d3ee;
+  --panel: rgba(15, 23, 42, 0.72);
+  --line: #1e2b41;
+  --green: #34d399;
+  background: #060b16;
+  color: var(--ink);
+  min-height: 100vh;
+}
+[data-theme="light"] .hp {
+  --ink: #0f1b2d;
+  --ink-dim: #47597a;
+  --ink-faint: #6b7c96;
+  --cyan: #0e7490;
+  --panel: #ffffff;
+  --line: #dbe4f0;
+  background: #f5f8fc;
+}
+
+.hp .wrap { max-width: 1120px; margin: 0 auto; padding: 0 24px; }
+
+/* nav — matches the landing/pricing pages */
+.hp .top { border-bottom: 1px solid var(--line); position: sticky; top: 0; z-index: 20; background: rgba(6, 11, 22, 0.86); backdrop-filter: blur(10px); }
+[data-theme="light"] .hp .top { background: rgba(245, 248, 252, 0.88); }
+.hp .top .inner { display: flex; align-items: center; justify-content: space-between; height: 68px; gap: 20px; }
+.hp .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; }
+.hp .brand svg { width: 26px; height: 26px; color: var(--cyan); flex: none; }
+.hp .brand small { display: block; font-size: 0.62rem; letter-spacing: 0.14em; color: var(--ink-faint); font-weight: 600; text-transform: uppercase; }
+.hp .nav-links { display: flex; align-items: center; gap: 10px 20px; flex-wrap: wrap; }
+.hp .link { color: var(--ink-dim); text-decoration: none; font-size: 0.93rem; font-weight: 500; }
+.hp .link:hover { color: var(--ink); }
+@media (max-width: 720px) { .hp .nav-links .link { display: none; } }
+
+.hp .btn { display: inline-flex; align-items: center; gap: 0.5em; border-radius: 11px; font-weight: 650; text-decoration: none; cursor: pointer; border: 1px solid transparent; white-space: nowrap; }
+.hp .btn-sm { padding: 0.55rem 0.95rem; font-size: 0.88rem; }
+.hp .btn-primary { background: linear-gradient(180deg, #7dd8f0, #46b8dd); color: #04222e; }
+.hp .btn-primary:hover { filter: brightness(1.06); }
+.hp .btn-ghost { border-color: var(--line); color: var(--ink); }
+.hp .btn-ghost:hover { border-color: var(--cyan); }
+
+/* header */
+.hp header.head { padding: 56px 0 30px; text-align: center; }
+.hp .eyebrow { display: flex; justify-content: center; gap: 0.5em; font-size: 0.76rem; letter-spacing: 0.16em; text-transform: uppercase; color: var(--cyan); font-weight: 700; }
+.hp h1 { font-size: clamp(2rem, 4.2vw, 2.9rem); font-weight: 780; margin-top: 0.7rem; letter-spacing: -0.02em; }
+.hp .sub { margin: 1rem auto 0; max-width: 58ch; color: var(--ink-dim); font-size: 1.06rem; line-height: 1.65; }
+
+/* jump links */
+.hp .jump { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 1.8rem; }
+.hp .jump a { font-size: 0.85rem; font-weight: 600; color: var(--ink-dim); border: 1px solid var(--line); background: var(--panel); padding: 0.5rem 0.85rem; border-radius: 999px; text-decoration: none; }
+.hp .jump a:hover { color: var(--ink); border-color: var(--cyan); }
+
+/* sections */
+.hp section { padding: 34px 0; }
+.hp .sec-title { font-size: 1.5rem; font-weight: 720; letter-spacing: -0.01em; scroll-margin-top: 88px; }
+.hp .sec-blurb { color: var(--ink-dim); margin-top: 0.35rem; font-size: 0.98rem; }
+
+.hp .topics { margin-top: 1.4rem; display: grid; gap: 14px; }
+.hp .topic { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 20px 22px; scroll-margin-top: 88px; }
+.hp .topic h3 { font-size: 1.06rem; font-weight: 680; display: flex; align-items: center; gap: 0.6em; flex-wrap: wrap; }
+.hp .topic .ans { color: var(--ink-dim); margin-top: 0.5rem; line-height: 1.65; }
+.hp .topic ol { margin: 0.9rem 0 0; padding-left: 1.25rem; display: grid; gap: 0.45rem; }
+.hp .topic li { color: var(--ink); line-height: 1.6; }
+.hp .topic li::marker { color: var(--cyan); font-weight: 700; }
+.hp .note { margin-top: 0.9rem; font-size: 0.9rem; color: var(--ink-faint); border-left: 2px solid var(--line); padding-left: 0.85rem; line-height: 1.6; }
+.hp .pro-tag { font-size: 0.66rem; letter-spacing: 0.1em; font-weight: 800; background: rgba(103, 211, 238, 0.16); color: var(--cyan); border: 1px solid rgba(103, 211, 238, 0.32); padding: 0.18rem 0.45rem; border-radius: 6px; }
+
+/* closing CTA */
+.hp .final { text-align: center; border: 1px solid var(--line); background: var(--panel); border-radius: 22px; padding: 42px 24px; }
+.hp .final h2 { font-size: clamp(1.5rem, 3vw, 2rem); font-weight: 740; }
+.hp .final p { color: var(--ink-dim); margin-top: 0.7rem; }
+.hp .final .btns { margin-top: 1.5rem; display: flex; gap: 0.8rem; justify-content: center; flex-wrap: wrap; }
+.hp .btn-lg { padding: 0.85rem 1.5rem; font-size: 1rem; }
+
+/* footer */
+.hp footer { border-top: 1px solid var(--line); margin-top: 40px; padding: 30px 0 60px; }
+.hp footer .cols { display: flex; justify-content: space-between; gap: 20px; flex-wrap: wrap; align-items: center; }
+.hp .fine { color: var(--ink-faint); font-size: 0.86rem; max-width: 70ch; line-height: 1.6; }
+.hp footer nav { display: flex; gap: 18px; flex-wrap: wrap; }

@@ -4,6 +4,8 @@
 // Overviews, Gemini) read to describe and cite the product — so keep it factual
 // and in sync with what the pages actually show. Pure/framework-free.
 
+import { allHelpTopics } from "./help";
+
 // Canonical production origin. Overridable per environment; defaults to the
 // custom domain so canonicals/sitemap/OG URLs are absolute and stable.
 export const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || "https://pilotlogbook.ca").replace(/\/+$/, "");
@@ -132,6 +134,24 @@ export function faqPageLd(): Json {
       "@type": "Question",
       name: f.q,
       acceptedAnswer: { "@type": "Answer", text: f.a },
+    })),
+  };
+}
+
+// FAQPage for /help, built from the same task guides the page renders. Steps
+// are folded into the answer text so the rich result carries the actual
+// instructions rather than a bare one-liner.
+export function helpFaqPageLd(): Json {
+  return {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    mainEntity: allHelpTopics().map((t) => ({
+      "@type": "Question",
+      name: t.question,
+      acceptedAnswer: {
+        "@type": "Answer",
+        text: [t.answer, ...(t.steps ?? []), t.note ?? ""].filter(Boolean).join(" "),
+      },
     })),
   };
 }
