@@ -6,14 +6,36 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useData } from "@/context/DataContext";
+import { isNativeApp } from "@/lib/native";
+import { notificationsAvailable, requestNotificationPermission } from "@/lib/notificationsBridge";
 import { useUi } from "./UiProvider";
+
+const LEAD_OPTIONS = [7, 14, 30, 60, 90];
 
 export default function SettingsModal({ onClose }: { onClose: () => void }) {
   const router = useRouter();
-  const { cloud, currentUser, deleteAccount } = useData();
+  const { data, mutate, cloud, currentUser, deleteAccount } = useData();
   const { confirmDialog } = useUi();
   const [deleting, setDeleting] = useState(false);
   const [deleteErr, setDeleteErr] = useState<string | null>(null);
+  const [permMsg, setPermMsg] = useState<string | null>(null);
+
+  const prefs = data.notificationPrefs;
+  const native = isNativeApp();
+  const setPref = <K extends keyof typeof prefs>(k: K, v: (typeof prefs)[K]) =>
+    mutate((d) => { d.notificationPrefs[k] = v; });
+
+  async function toggleDeviceReminders(on: boolean) {
+    setPermMsg(null);
+    if (on && notificationsAvailable()) {
+      const granted = await requestNotificationPermission();
+      if (!granted) {
+        setPermMsg("Notifications are turned off for Pilot Logbook. Enable them in iOS Settings, then try again.");
+        return;
+      }
+    }
+    setPref("enabled", on);
+  }
 
   async function onDeleteAccount() {
     // Deliberately two-step: account deletion is the one action with no undo.
@@ -57,6 +79,42 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
             data lives in this browser only. Set the Supabase environment variables to enable cloud sync — see the README.
           </p>
         )}
+
+        <div className="mt-6 pt-5 border-t border-slate-800">
+          <h4 className="text-sm font-semibold text-slate-200 mb-1">Reminders</h4>
+          <p className="text-xs text-slate-400 mb-3">
+            Get a heads-up before your documents and recurrent training expire. The bell in the top bar always shows
+            upcoming expiries{native ? "; turn on device notifications to be reminded even when the app is closed." : ". Device notifications are available in the iPhone/iPad app."}
+          </p>
+
+          <label className="flex items-center justify-between gap-3 py-1.5">
+            <span className="text-sm text-slate-300">Remind me before expiry</span>
+            <select
+              value={prefs.leadDays}
+              onChange={(e) => setPref("leadDays", parseInt(e.target.value, 10))}
+              className="px-2 py-1.5 border border-slate-700 rounded-lg text-sm bg-transparent"
+            >
+              {LEAD_OPTIONS.map((n) => <option key={n} value={n}>{n} days</option>)}
+            </select>
+          </label>
+
+          <label className="flex items-center justify-between gap-3 py-1.5">
+            <span className="text-sm text-slate-300">Licences, medicals &amp; certificates</span>
+            <input type="checkbox" checked={prefs.documents} onChange={(e) => setPref("documents", e.target.checked)} className="accent-cyan-500 w-4 h-4" />
+          </label>
+          <label className="flex items-center justify-between gap-3 py-1.5">
+            <span className="text-sm text-slate-300">Recurrent training</span>
+            <input type="checkbox" checked={prefs.recurrentTraining} onChange={(e) => setPref("recurrentTraining", e.target.checked)} className="accent-cyan-500 w-4 h-4" />
+          </label>
+
+          {native && (
+            <label className="flex items-center justify-between gap-3 py-1.5 mt-1 pt-2 border-t border-slate-800/70">
+              <span className="text-sm text-slate-300">Device notifications</span>
+              <input type="checkbox" checked={prefs.enabled} onChange={(e) => void toggleDeviceReminders(e.target.checked)} className="accent-cyan-500 w-4 h-4" />
+            </label>
+          )}
+          {permMsg && <p className="text-xs text-amber-300 mt-2">{permMsg}</p>}
+        </div>
 
         <div className="mt-6 pt-5 border-t border-slate-800">
           <h4 className="text-sm font-semibold text-slate-200 mb-1">Guided tour</h4>

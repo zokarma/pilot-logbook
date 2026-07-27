@@ -45,12 +45,14 @@ export function run(): Suite {
   s.check("isPremium false for free/lapsed", !isPremium(FREE, NOW) && !isPremium(ent({ status: "inactive" }), NOW));
 
   // -- feature gating ladder --
-  s.check("free unlocks nothing gated", !tierHasFeature("free", "aiScan") && !tierHasFeature("free", "multiDevice"));
-  s.check("pro unlocks the everyday features incl. native apps + multi-device", tierHasFeature("pro", "aiScan") && tierHasFeature("pro", "nativeApps") && tierHasFeature("pro", "multiDevice") && tierHasFeature("pro", "backup"));
-  s.check("pro does NOT unlock professional-only tools", !tierHasFeature("pro", "aiScanUnlimited") && !tierHasFeature("pro", "rosterImport") && !tierHasFeature("pro", "dutyRest"));
-  s.check("professional unlocks everything", ["aiScan", "nativeApps", "aiScanUnlimited", "rosterImport", "companyReports", "advancedAnalytics", "dutyRest", "prioritySupport"].every((f) => tierHasFeature("professional", f as never)));
-  s.check("hasFeature threads entitlement → tier → feature", hasFeature(ent({ tier: "professional" }), "rosterImport", NOW) && !hasFeature(ent({ tier: "pro" }), "rosterImport", NOW));
-  s.check("a lapsed professional loses professional features", !hasFeature(ent({ tier: "professional", status: "canceled", currentPeriodEnd: iso(-30) }), "rosterImport", NOW));
+  // Every paid capability sits at Pro — Professional is no longer sold (its
+  // headline features were never built), though the tier still resolves for
+  // any subscription created while it was listed.
+  s.check("free unlocks nothing gated", !tierHasFeature("free", "aiScan") && !tierHasFeature("free", "dutyRest") && !tierHasFeature("free", "proPdf"));
+  s.check("pro unlocks every paid capability we sell", (["aiScan", "proPdf", "advancedCurrency", "docOcr", "dutyRest"] as const).every((f) => tierHasFeature("pro", f)));
+  s.check("a legacy professional subscription still outranks pro (grandfathered)", (["aiScan", "dutyRest"] as const).every((f) => tierHasFeature("professional", f)));
+  s.check("hasFeature threads entitlement → tier → feature", hasFeature(ent({ tier: "pro" }), "dutyRest", NOW) && !hasFeature(FREE, "dutyRest", NOW));
+  s.check("a lapsed pro loses the paid features", !hasFeature(ent({ tier: "pro", status: "canceled", currentPeriodEnd: iso(-30) }), "aiScan", NOW));
 
   // -- row normalization (untrusted input) --
   s.check("snake_case DB row parsed", (() => { const e = entitlementFromRow({ tier: "professional", status: "active", current_period_end: iso(5), source: "stripe" }); return e.tier === "professional" && e.currentPeriodEnd === iso(5) && e.source === "stripe"; })());

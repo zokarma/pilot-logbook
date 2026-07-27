@@ -199,6 +199,8 @@ export interface AppData {
   // merge-synced by id like fleet. Unknown codes are NEVER given made-up
   // coordinates — they stay off the map until placed here.
   customAirports: CustomAirport[];
+  // Expiry-reminder preferences (in-app bell + iOS scheduled notifications).
+  notificationPrefs: NotificationPrefs;
 }
 
 export interface CustomAirport {
@@ -209,6 +211,20 @@ export interface CustomAirport {
   name?: string;
   createdAt?: string;
   updatedAt?: string;
+}
+
+// Expiry-reminder preferences. Drives the in-app reminders bell (web + iOS) and
+// scheduled iOS local notifications. `enabled` is the master switch for the
+// scheduled (device) notifications specifically — the in-app bell always shows.
+export interface NotificationPrefs {
+  enabled: boolean; // schedule iOS local notifications (requires permission)
+  leadDays: number; // remind this many days before an expiry (default 30)
+  documents: boolean; // remind for licences / medicals / certificates
+  recurrentTraining: boolean; // remind for the Recurrent Training document
+}
+
+export function defaultNotificationPrefs(): NotificationPrefs {
+  return { enabled: false, leadDays: 30, documents: true, recurrentTraining: true };
 }
 
 export function emptyData(): AppData {
@@ -231,6 +247,7 @@ export function emptyData(): AppData {
     currencyRules: [],
     currencyHidden: [],
     customAirports: [],
+    notificationPrefs: defaultNotificationPrefs(),
   };
 }
 

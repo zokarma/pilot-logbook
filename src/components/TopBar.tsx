@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useData, SyncState } from "@/context/DataContext";
+import { upcomingReminders } from "@/lib/notifications";
 import { NAV } from "./Sidebar";
 import SettingsModal from "./SettingsModal";
 import ProfileModal from "./ProfileModal";
@@ -63,6 +64,21 @@ export default function TopBar({ navOpen, onToggleNav }: { navOpen: boolean; onT
     return () => document.removeEventListener("mousedown", onDocClick);
   }, [menuOpen]);
 
+  // Reminders bell — upcoming/overdue document expiries (in-app; works on web
+  // and iOS). Recomputed each render from the current documents + prefs.
+  const reminders = useMemo(() => upcomingReminders(data), [data]);
+  const overdueCount = reminders.filter((r) => r.overdue).length;
+  const [bellOpen, setBellOpen] = useState(false);
+  const bellRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!bellOpen) return;
+    function onDocClick(e: MouseEvent) {
+      if (bellRef.current && !bellRef.current.contains(e.target as Node)) setBellOpen(false);
+    }
+    document.addEventListener("mousedown", onDocClick);
+    return () => document.removeEventListener("mousedown", onDocClick);
+  }, [bellOpen]);
+
   async function onLogout() {
     await logout();
     router.replace("/login");
@@ -91,6 +107,61 @@ export default function TopBar({ navOpen, onToggleNav }: { navOpen: boolean; onT
         <div className="flex items-center gap-3 text-sm">
           {sync && <span className={"text-xs font-medium " + sync.cls}>{sync.text}</span>}
           <span className="hidden sm:inline font-medium text-slate-300 truncate max-w-[16rem]">{logbookTitle}</span>
+
+          {/* Reminders bell */}
+          <div className="relative shrink-0" ref={bellRef}>
+            <button
+              onClick={() => setBellOpen((o) => !o)}
+              aria-label={reminders.length ? `${reminders.length} reminder${reminders.length === 1 ? "" : "s"}` : "Reminders"}
+              title="Reminders"
+              className="relative p-2 rounded-lg text-slate-300 hover:bg-slate-800 hover:text-white transition"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.73 21a2 2 0 0 1-3.46 0" />
+              </svg>
+              {reminders.length > 0 && (
+                <span className={"absolute -top-0.5 -right-0.5 min-w-[1rem] h-4 px-1 rounded-full text-[10px] font-bold flex items-center justify-center text-white " + (overdueCount > 0 ? "bg-red-500" : "bg-amber-500")}>
+                  {reminders.length}
+                </span>
+              )}
+            </button>
+            {bellOpen && (
+              <div className="absolute right-0 mt-2 w-80 max-w-[calc(100vw-1.5rem)] rounded-xl border border-slate-800 bg-slate-900 shadow-xl shadow-black/40 py-2 z-50">
+                <div className="px-4 pb-2 mb-1 border-b border-slate-800 flex items-center justify-between">
+                  <p className="text-sm font-semibold text-slate-100">Reminders</p>
+                  {reminders.length > 0 && <span className="text-xs text-slate-500">{reminders.length} upcoming</span>}
+                </div>
+                {reminders.length === 0 ? (
+                  <p className="px-4 py-3 text-sm text-slate-400">You&apos;re all caught up — no upcoming expiries.</p>
+                ) : (
+                  <ul className="max-h-80 overflow-y-auto">
+                    {reminders.map((r) => (
+                      <li key={r.docId}>
+                        <button
+                          onClick={() => { setBellOpen(false); router.push("/documents"); }}
+                          className="w-full text-left px-4 py-2.5 hover:bg-slate-800 transition flex items-start gap-2.5"
+                        >
+                          <span className={"mt-1.5 w-2 h-2 rounded-full shrink-0 " + (r.overdue ? "bg-red-500" : "bg-amber-400")} />
+                          <span className="min-w-0">
+                            <span className="block text-sm text-slate-100 truncate">{r.docType}</span>
+                            <span className={"block text-xs " + (r.overdue ? "text-red-400" : "text-amber-300")}>
+                              {r.overdue ? "Expired" : r.days === 0 ? "Expires today" : `Expires in ${r.days} day${r.days === 1 ? "" : "s"}`}
+                            </span>
+                          </span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                <div className="px-4 pt-2 mt-1 border-t border-slate-800">
+                  <button onClick={() => { setBellOpen(false); setShowSettings(true); }} className="text-xs font-medium text-brand-300 hover:text-brand-200">
+                    Reminder settings
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
           <button
             onClick={toggleTheme}
             aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}

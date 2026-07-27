@@ -14,6 +14,7 @@ const WHATS_NEW = {
   version: WHATSNEW_VERSION,
   title: "What's new",
   items: [
+    "Expiry reminders — get a heads-up before documents & recurrent training lapse",
     "Undo deletes — remove a flight, then restore it from the toast",
     "Search and date filters on your flight log",
     "Type a tail number and the aircraft type fills itself in",

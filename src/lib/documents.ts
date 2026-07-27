@@ -51,6 +51,13 @@ export const DOC_TYPES: DocTypeDef[] = [
   { value: "Type Rating", category: "Certificate", expiry: "manual" },
   { value: "Dangerous Goods Training", category: "Certificate", expiry: "auto", auto: { basis: "issue", months: 24 } },
   { value: "Recurrent Training", category: "Certificate", expiry: "auto", auto: { basis: "issue", months: 24 } },
+  // Recurrent flight checks. Validity depends on the operation (single- vs
+  // multi-crew, aircraft group, 6- vs 12-month) and is printed on the check-ride
+  // form, so expiry is entered by hand rather than computed. PPC applies to CAR
+  // 704/705 operations, PCC to CAR 703 — both are offered so a pilot flying more
+  // than one operation can track each.
+  { value: "Pilot Proficiency Check (PPC)", category: "Certificate", expiry: "manual" },
+  { value: "Pilot Competency Check (PCC)", category: "Certificate", expiry: "manual" },
   { value: "CRM Training", category: "Certificate", expiry: "auto", auto: { basis: "issue", months: 12 } },
   { value: "Other", category: "Certificate", expiry: "manual" },
 ];
