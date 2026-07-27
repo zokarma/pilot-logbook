@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useData } from "@/context/DataContext";
+import { showDutyForRole } from "@/lib/roleDefaults";
 import BugReporter from "./BugReporter";
 import { useEntitlement } from "@/hooks/useEntitlement";
 
@@ -85,6 +87,15 @@ export const NAV: { href: string; label: string; icon: React.ReactNode }[] = [
 
 export default function Sidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
   const pathname = usePathname();
+  const { data } = useData();
+
+  // Duty limits are a commercial-operation concern, so the tracker is hidden
+  // for student/private/instructor roles — but never once duty has actually
+  // been recorded, and never while the pilot is standing on the page. Changing
+  // role in Pilot Profile brings it back.
+  const nav = NAV.filter(
+    (n) => n.href !== "/duty" || pathname === "/duty" || showDutyForRole(data),
+  );
   const { isPremium, ready: entReady } = useEntitlement();
 
   // On phones the sidebar is an overlay drawer — navigating should dismiss it.
@@ -118,7 +129,7 @@ export default function Sidebar({ open, onClose }: { open: boolean; onClose: () 
       </Link>
 
       <nav className="flex-1 flex flex-col gap-1 px-3">
-        {NAV.map((n) => (
+        {nav.map((n) => (
           <Link key={n.href} href={n.href} title={n.label} onClick={onNavigate} data-tour={"nav" + n.href} className={itemCls(pathname === n.href)}>
             {n.icon}
             <span>{n.label}</span>

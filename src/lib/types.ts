@@ -4,6 +4,7 @@
 // that the CSV export and Supabase schema rely on — keep both in sync.
 
 import { DEFAULT_FLIGHT_COLUMN_KEYS } from "./flightColumns";
+import { DEFAULT_FORM_FIELD_KEYS } from "./formFields";
 
 // Takeoff/landing classification. "None" = this pilot didn't perform it (pilot
 // monitoring on a two-crew leg) — those flights contribute zero takeoffs or
@@ -176,6 +177,10 @@ export interface AppData {
   dashboardShown: string[];
   // Ordered list of visible Logged Flights columns (keys from lib/flightColumns).
   flightColumns: string[];
+  // Optional Add-a-Flight form fields the pilot has switched on (keys from
+  // lib/formFields). Seeded from their role at onboarding, editable from the
+  // form's Customize panel. Core fields are always shown and never listed here.
+  flightFormFields: string[];
   // First-time setup profile (null until the wizard runs) + aviation documents.
   profile: UserProfile | null;
   documents: PilotDocument[];
@@ -239,6 +244,7 @@ export function emptyData(): AppData {
     dashboardHidden: [],
     dashboardShown: [],
     flightColumns: [...DEFAULT_FLIGHT_COLUMN_KEYS],
+    flightFormFields: [...DEFAULT_FORM_FIELD_KEYS],
     profile: null,
     documents: [],
     importTemplates: [],

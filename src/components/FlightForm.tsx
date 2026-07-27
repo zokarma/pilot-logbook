@@ -6,6 +6,9 @@ import { fleetTypes, normalizeAircraftCode, CREW_ROLES } from "@/lib/aircraft";
 import { uid } from "@/lib/id";
 import { buildRegTypeIndex, flightDate, flightsForCurrentPilot, lookupRegistration, num, pilotName } from "@/lib/logbook";
 import { AircraftType, DayNight, Flight } from "@/lib/types";
+import {
+  OPTIONAL_FORM_FIELDS, DEFAULT_FORM_FIELD_KEYS, normalizeFormFields,
+} from "@/lib/formFields";
 import AirportDatalist from "./AirportDatalist";
 
 function todayStr(): string {
@@ -53,6 +56,7 @@ export default function FlightForm({
   const typeAuto = useRef(true);
   // Inline "add a new aircraft type" panel, shown when the picker's
   // "+ Add new type…" option is chosen. Adds to the pilot's per-user fleet.
+  const [customizing, setCustomizing] = useState(false);
   const [addingType, setAddingType] = useState(false);
   const [newType, setNewType] = useState({ code: "", name: "" });
   const [typeMsg, setTypeMsg] = useState("");
@@ -199,14 +203,76 @@ export default function FlightForm({
 
   const inputCls = "w-full px-3 py-2 border border-slate-700 rounded-lg";
 
+  // Which optional fields this pilot has switched on. Core fields (date,
+  // aircraft, registration, route, takeoff/landing, notes) are always rendered.
+  // An editing flight always shows a field that already holds a value, so a
+  // hidden field can never quietly strand data the pilot can't see or correct.
+  const enabled = useMemo(() => new Set(normalizeFormFields(data.flightFormFields)), [data.flightFormFields]);
+  const hasValue = (k: string) => {
+    if (!editing) return false;
+    const v = (editing as unknown as Record<string, unknown>)[k];
+    return typeof v === "number" ? v !== 0 : !!v;
+  };
+  const on = (k: string) => enabled.has(k) || hasValue(k);
+
+  function toggleField(key: string) {
+    mutate((d) => {
+      const cur = normalizeFormFields(d.flightFormFields);
+      d.flightFormFields = cur.includes(key)
+        ? cur.filter((k) => k !== key)
+        // Keep the catalogue order rather than append, so the form layout
+        // stays stable however the pilot toggles things.
+        : DEFAULT_FORM_FIELD_KEYS.filter((k) => cur.includes(k) || k === key);
+    });
+  }
+
   return (
     <div className="card p-5 mb-6">
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-lg font-semibold">{editing ? "Edit Flight" : "Log a Flight"}</h2>
-        <button onClick={onDone} className="text-sm text-slate-400 hover:text-slate-200">
-          {editing ? "Cancel edit" : "Close"}
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => setCustomizing((v) => !v)}
+            className="flex items-center gap-1.5 text-xs font-medium text-slate-300 bg-slate-800 hover:bg-slate-700 px-2.5 py-1.5 rounded-lg transition"
+          >
+            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14M5 12h14" /></svg>
+            Customize
+          </button>
+          <button onClick={onDone} className="text-sm text-slate-400 hover:text-slate-200">
+            {editing ? "Cancel edit" : "Close"}
+          </button>
+        </div>
       </div>
+
+      {customizing && (
+        <div className="mb-4 p-4 rounded-lg border border-slate-700 bg-slate-900/40">
+          <p className="text-xs text-slate-400 mb-3">
+            Choose the boxes you want on this form. Hiding one never changes a flight you&apos;ve already logged.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {OPTIONAL_FORM_FIELDS.map((f) => {
+              const isOn = enabled.has(f.key);
+              return (
+                <button
+                  key={f.key}
+                  type="button"
+                  onClick={() => toggleField(f.key)}
+                  title={f.hint}
+                  className={
+                    "text-xs font-medium px-2.5 py-1.5 rounded-lg border transition " +
+                    (isOn
+                      ? "bg-brand-600/15 border-brand-500/40 text-brand-200"
+                      : "bg-slate-800 border-slate-700 text-slate-400 hover:text-slate-200")
+                  }
+                >
+                  {isOn ? "✓ " : "+ "}{f.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
       <form onSubmit={submit} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <Field label="Date">
           <input type="date" required value={form.date} onChange={(e) => set("date", e.target.value)} className={inputCls} />
@@ -295,27 +361,34 @@ export default function FlightForm({
             {regList.map((r) => <option key={r} value={r} />)}
           </datalist>
         </Field>
-        <Field label="Pilot Being Logged Role">
-          <select value={form.loggedRole} onChange={(e) => set("loggedRole", e.target.value)} className={inputCls}>
-            {CREW_ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
-          </select>
-        </Field>
-        <Field label="PIC">
-          <select value={form.picId} onChange={(e) => set("picId", e.target.value)} className={inputCls}>
-            <option value="">— none —</option>{pilotOptions}
-          </select>
-        </Field>
-        <Field label="Student / First Officer">
-          <select value={form.sicId} onChange={(e) => set("sicId", e.target.value)} className={inputCls}>
-            <option value="">— none —</option>{pilotOptions}
-          </select>
-        </Field>
-        <Field label="Third Crew (optional)">
-          <select value={form.socId} onChange={(e) => set("socId", e.target.value)} className={inputCls}>
-            <option value="">— none —</option>{pilotOptions}
-          </select>
-        </Field>
-        <div />
+        {on("loggedRole") && (
+          <Field label="Pilot Being Logged Role">
+            <select value={form.loggedRole} onChange={(e) => set("loggedRole", e.target.value)} className={inputCls}>
+              {CREW_ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
+            </select>
+          </Field>
+        )}
+        {on("pic") && (
+          <Field label="PIC">
+            <select value={form.picId} onChange={(e) => set("picId", e.target.value)} className={inputCls}>
+              <option value="">— none —</option>{pilotOptions}
+            </select>
+          </Field>
+        )}
+        {on("sic") && (
+          <Field label="Student / First Officer">
+            <select value={form.sicId} onChange={(e) => set("sicId", e.target.value)} className={inputCls}>
+              <option value="">— none —</option>{pilotOptions}
+            </select>
+          </Field>
+        )}
+        {on("soc") && (
+          <Field label="Third Crew (optional)">
+            <select value={form.socId} onChange={(e) => set("socId", e.target.value)} className={inputCls}>
+              <option value="">— none —</option>{pilotOptions}
+            </select>
+          </Field>
+        )}
         <Field label="ICAO From">
           <input list="icaoList" maxLength={6} placeholder="CYYZ" value={form.from} onChange={(e) => set("from", e.target.value.toUpperCase())} className={inputCls + " uppercase"} />
         </Field>
@@ -350,15 +423,14 @@ export default function FlightForm({
             )}
           </div>
         </Field>
-        <NumField label="Single Engine (hrs)" value={form.se} onChange={(v) => set("se", v)} />
-        <NumField label="Multi Engine (hrs)" value={form.me} onChange={(v) => set("me", v)} />
-        <NumField label="Cross Country (hrs)" value={form.xc} onChange={(v) => set("xc", v)} />
-        <div />
-        <NumField label="Day (hrs)" value={form.dayHours} onChange={(v) => set("dayHours", v)} />
-        <NumField label="Night (hrs)" value={form.nightHours} onChange={(v) => set("nightHours", v)} />
-        <NumField label="IFR Actual (hrs)" value={form.ifrActual} onChange={(v) => set("ifrActual", v)} />
-        <NumField label="IFR Simulated (hrs)" value={form.ifrSim} onChange={(v) => set("ifrSim", v)} />
-        <IntField label="Approaches (count)" value={form.approaches} onChange={(v) => set("approaches", v)} />
+        {on("se") && <NumField label="Single Engine (hrs)" value={form.se} onChange={(v) => set("se", v)} />}
+        {on("me") && <NumField label="Multi Engine (hrs)" value={form.me} onChange={(v) => set("me", v)} />}
+        {on("xc") && <NumField label="Cross Country (hrs)" value={form.xc} onChange={(v) => set("xc", v)} />}
+        {on("dayHours") && <NumField label="Day (hrs)" value={form.dayHours} onChange={(v) => set("dayHours", v)} />}
+        {on("nightHours") && <NumField label="Night (hrs)" value={form.nightHours} onChange={(v) => set("nightHours", v)} />}
+        {on("ifrActual") && <NumField label="IFR Actual (hrs)" value={form.ifrActual} onChange={(v) => set("ifrActual", v)} />}
+        {on("ifrSim") && <NumField label="IFR Simulated (hrs)" value={form.ifrSim} onChange={(v) => set("ifrSim", v)} />}
+        {on("approaches") && <IntField label="Approaches (count)" value={form.approaches} onChange={(v) => set("approaches", v)} />}
         <div className="sm:col-span-2 lg:col-span-4">
           <label className="block text-xs font-medium text-slate-400 mb-1">Notes / Remarks</label>
           <textarea rows={2} value={form.notes} onChange={(e) => set("notes", e.target.value)} className={inputCls} />

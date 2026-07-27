@@ -10,6 +10,8 @@
 import { useRef, useState } from "react";
 import { useData } from "@/context/DataContext";
 import { PILOT_ROLES, recalcDocument } from "@/lib/documents";
+import { applyRoleDefaults, roleDefaultsDiffer } from "@/lib/roleDefaults";
+import { useUi } from "./UiProvider";
 
 const AVATAR_SIZE = 128; // px, square
 
@@ -41,6 +43,7 @@ function fileToAvatar(file: File): Promise<string> {
 
 export default function ProfileModal({ onClose }: { onClose: () => void }) {
   const { data, mutate } = useData();
+  const { confirmDialog } = useUi();
   const p = data.profile;
   const [firstName, setFirstName] = useState(p?.firstName ?? "");
   const [lastName, setLastName] = useState(p?.lastName ?? "");
@@ -63,8 +66,24 @@ export default function ProfileModal({ onClose }: { onClose: () => void }) {
     }
   }
 
-  function save() {
+  async function save() {
     if (!firstName.trim() || !lastName.trim()) { setMsg("First and last name are required."); return; }
+
+    // Changing role changes what this pilot needs on screen. Offer to retune —
+    // never silently, because they may have hand-picked their columns, fields
+    // and fleet, and this replaces all three.
+    let retune = false;
+    if (role !== p?.role && roleDefaultsDiffer(data, role)) {
+      retune = await confirmDialog({
+        title: `Set things up for ${role}?`,
+        message:
+          "Your aircraft list, flight-table columns and Add-a-Flight boxes can be retuned to suit the new role. " +
+          "This replaces any choices you've made in those three places — your flights and documents aren't touched.",
+        confirmLabel: "Retune",
+        cancelLabel: "Keep mine",
+      });
+    }
+
     mutate((d) => {
       if (!d.profile) return;
       d.profile.firstName = firstName.trim();
@@ -82,6 +101,7 @@ export default function ProfileModal({ onClose }: { onClose: () => void }) {
       }
       // A new date of birth changes medical validity — recalc auto documents.
       if (dobChanged) d.documents = d.documents.map((x) => recalcDocument(x, d.profile));
+      if (retune) applyRoleDefaults(d, role);
     });
     onClose();
   }
@@ -150,7 +170,7 @@ export default function ProfileModal({ onClose }: { onClose: () => void }) {
 
         <div className="flex justify-end gap-2 mt-5">
           <button onClick={onClose} className="text-sm bg-slate-800 hover:bg-slate-700 text-slate-200 font-medium px-4 py-2 rounded-lg transition">Cancel</button>
-          <button onClick={save} className="text-sm bg-brand-600 hover:bg-brand-700 text-white font-medium px-4 py-2 rounded-lg transition">Save</button>
+          <button onClick={() => void save()} className="text-sm bg-brand-600 hover:bg-brand-700 text-white font-medium px-4 py-2 rounded-lg transition">Save</button>
         </div>
       </div>
     </div>
