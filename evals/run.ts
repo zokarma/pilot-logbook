@@ -25,6 +25,7 @@ import * as checkout from "./checkout.eval";
 import * as claims from "./claims.eval";
 import * as recentErrors from "./recentErrors.eval";
 import * as notifications from "./notifications.eval";
+import * as roleDefaults from "./roleDefaults.eval";
 import * as demoData from "./demoData.eval";
 import * as help from "./help.eval";
 import { Suite } from "./harness";
@@ -36,7 +37,7 @@ const runners: (() => Suite | Promise<Suite>)[] = [
   importMap.run, scan.run, currency.run, pilots.run, core.run,
   entitlement.run, dashboard.run, dutyLimits.run, pdf.run, fleet.run,
   logbook.run, flightColumns.run, airports.run, checkout.run, claims.run,
-  recentErrors.run, notifications.run, demoData.run, help.run,
+  recentErrors.run, notifications.run, roleDefaults.run, demoData.run, help.run,
 ];
 
 async function main(): Promise<void> {

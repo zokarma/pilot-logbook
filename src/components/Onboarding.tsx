@@ -6,6 +6,7 @@ import { useData } from "@/context/DataContext";
 import { uid } from "@/lib/id";
 import { PilotDocument, UserProfile, Pilot } from "@/lib/types";
 import { PILOT_ROLES, documentStatus, STATUS_META, recalcDocument } from "@/lib/documents";
+import { applyRoleDefaults } from "@/lib/roleDefaults";
 import DocumentForm from "./DocumentForm";
 
 const inputCls = "w-full px-3 py-2 border border-slate-700 rounded-lg text-sm";
@@ -77,6 +78,11 @@ export default function Onboarding() {
       };
       d.profile = finalProfile;
       d.documents = docs.map((doc) => recalcDocument(doc, finalProfile));
+      // Tune the fleet list, flight-table columns and flight-form boxes to the
+      // role they just picked, so the first run isn't cluttered with gear they
+      // don't fly. Every list stays editable (Fleet page, Columns panel, the
+      // form's Customize panel).
+      applyRoleDefaults(d, role);
     });
     router.replace("/dashboard");
   }

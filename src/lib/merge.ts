@@ -169,6 +169,7 @@ export function mergeAppData(base: AppData | null, local: AppData, remote: AppDa
     fleetHidden: pickField(base, local, remote, "fleetHidden"),
     currencyHidden: pickField(base, local, remote, "currencyHidden"),
     flightColumns: pickField(base, local, remote, "flightColumns"),
+    flightFormFields: pickField(base, local, remote, "flightFormFields"),
     profile: pickField(base, local, remote, "profile"),
     notificationPrefs: pickField(base, local, remote, "notificationPrefs"),
   };

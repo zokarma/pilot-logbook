@@ -4,6 +4,7 @@
 
 import { AppData, Flight, Pilot, emptyData, defaultNotificationPrefs } from "./types";
 import { normalizeFlightColumns } from "./flightColumns";
+import { normalizeFormFields } from "./formFields";
 import { uid } from "./id";
 
 export function migrateData(input: Partial<AppData> | null | undefined): AppData {
@@ -26,6 +27,7 @@ export function migrateData(input: Partial<AppData> | null | undefined): AppData
   if (!Array.isArray(d.dashboardHidden)) d.dashboardHidden = [];
   if (!Array.isArray(d.dashboardShown)) d.dashboardShown = [];
   d.flightColumns = normalizeFlightColumns(d.flightColumns);
+  d.flightFormFields = normalizeFormFields(d.flightFormFields);
   if (!Array.isArray(d.documents)) d.documents = [];
   if (typeof d.profile === "undefined") d.profile = null;
   if (!Array.isArray(d.importTemplates)) d.importTemplates = [];
