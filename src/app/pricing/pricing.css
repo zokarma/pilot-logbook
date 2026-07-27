@@ -88,6 +88,14 @@
 .pp .reassure span { display: inline-flex; align-items: center; gap: 0.4em; }
 .pp .reassure svg { width: 15px; height: 15px; color: var(--green); flex: none; }
 
+/* Compact page head — /pricing is a decision page, so it gets a short centred
+   header instead of the landing page's two-column hero. */
+.pp header.hero.pp-head { padding: 56px 0 26px; text-align: center; }
+.pp .pp-head h1 { font-size: clamp(2rem, 4.2vw, 2.9rem); }
+.pp .pp-head .sub { margin-left: auto; margin-right: auto; max-width: 56ch; }
+.pp .pp-head .eyebrow { justify-content: center; }
+.pp .pp-head .reassure { justify-content: center; margin-top: 1.3rem; }
+
 /* scanning device mock */
 .pp .device { position: relative; border-radius: 20px; padding: 16px; background: linear-gradient(160deg, var(--panel-solid), color-mix(in srgb, var(--panel-solid) 70%, var(--bg))); border: 1px solid var(--line-2); box-shadow: var(--shadow); overflow: hidden; }
 .pp .device::before { content: ""; position: absolute; inset: 0; pointer-events: none; background: radial-gradient(400px 200px at 80% 0%, var(--cyan-glow), transparent 70%); }
