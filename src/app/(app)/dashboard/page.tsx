@@ -195,6 +195,23 @@ export default function DashboardPage() {
           <span>Customize</span>
         </button>
       </div>
+      {/* Onboarding lands here, so a switching pilot's first view is a wall of
+          zeros. Point them at the import before they conclude the app is empty
+          because it's useless. Disappears with the first flight. */}
+      {!fl.length && (
+        <div className="card p-4 border border-brand-500/30 bg-brand-500/5 flex flex-wrap items-center justify-between gap-3">
+          <p className="text-sm text-slate-300 min-w-0">
+            Your dashboard fills in as you log flights. Already have a logbook elsewhere?
+          </p>
+          <Link
+            href="/logger"
+            className="shrink-0 text-sm font-medium bg-brand-600 hover:bg-brand-700 text-white px-3.5 py-1.5 rounded-lg transition"
+          >
+            Import your logbook
+          </Link>
+        </div>
+      )}
+
       {customizing && (
         <div className="card p-5 -mt-4">
           <div className="flex items-center justify-between mb-3">

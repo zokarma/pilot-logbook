@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useData } from "@/context/DataContext";
 import { useEntitlement } from "@/hooks/useEntitlement";
@@ -164,7 +165,46 @@ export default function LoggerPage() {
         {flights.length ? (
           <FlightTable onFullEdit={edit} />
         ) : (
-          <p className="text-center text-slate-400 py-8">No flights logged yet. Add your first flight above.</p>
+          /* First run is the moment a switching pilot decides whether this is
+             worth it, and "import my existing logbook" is the thing they came
+             to do. It used to be a small tertiary button beside the exports,
+             so it's spelled out here as an equal option. */
+          <div className="py-8 max-w-2xl mx-auto">
+            <h3 className="text-center font-semibold text-slate-100">Let&apos;s get your flying in here</h3>
+            <p className="text-center text-sm text-slate-400 mt-1">
+              Already keep a logbook somewhere else? Bring it over — you don&apos;t have to retype years of flights.
+            </p>
+            <div className="grid gap-3 sm:grid-cols-3 mt-6">
+              <button
+                onClick={() => fileRef.current?.click()}
+                className="text-left p-4 rounded-xl border border-brand-500/40 bg-brand-500/5 hover:border-brand-400 transition"
+              >
+                <svg className="w-5 h-5 text-brand-300 mb-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3" /></svg>
+                <div className="font-medium text-sm text-slate-100">Import a CSV</div>
+                <div className="text-xs text-slate-400 mt-1">From another logbook app or a spreadsheet. We&apos;ll match up the columns.</div>
+              </button>
+
+              <button
+                onClick={() => setFormOpen(true)}
+                className="text-left p-4 rounded-xl border border-slate-700 hover:border-slate-600 transition"
+              >
+                <svg className="w-5 h-5 text-slate-300 mb-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14M5 12h14" /></svg>
+                <div className="font-medium text-sm text-slate-100">Log a flight</div>
+                <div className="text-xs text-slate-400 mt-1">Type one in. The form remembers your aircraft and route next time.</div>
+              </button>
+
+              <div className="p-4 rounded-xl border border-slate-800">
+                <svg className="w-5 h-5 text-slate-400 mb-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2M3 12h18" /></svg>
+                <div className="font-medium text-sm text-slate-300">Scan paper pages</div>
+                <div className="text-xs text-slate-400 mt-1">
+                  Photograph a page and let AI read it — use Scan Logbook above. <span className="text-slate-500">Pro feature.</span>
+                </div>
+              </div>
+            </div>
+            <p className="text-center text-xs text-slate-500 mt-5">
+              Not sure what your file needs? See the <Link href="/help#import-csv" className="text-brand-300 hover:text-brand-200">import guide</Link>.
+            </p>
+          </div>
         )}
       </div>
 
