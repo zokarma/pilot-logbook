@@ -102,3 +102,36 @@ export function computeCars(data: AppData) {
 
   return { hrs28, monthlyCap, monthlyPct, minGapHrs, restCap, restPct, restLabel, operation: limits.label };
 }
+
+/* --------------------------- empty-dashboard preview ---------------------------
+ * A pilot who has just signed up sees every gauge at 0.0, which reads as "this
+ * app does nothing" rather than "you haven't logged anything yet". These example
+ * figures let the dashboard demonstrate its own shape.
+ *
+ * CRITICAL: this is presentation only. A logbook is a legal record, so nothing
+ * here is ever written to AppData — no sample flights are created, nothing can
+ * reach a CSV or PDF export, and the values vanish the moment a real flight
+ * exists. The UI must render them visibly marked as examples.
+ */
+export const PREVIEW_PRIMARY: Record<string, string> = {
+  totalTime: "412.6 hrs",
+  currentMonth: "14.2 hrs",
+  annualTotal: "96.4 hrs",
+  totalFlights: "248",
+};
+
+export const PREVIEW_SECONDARY: Record<string, string> = {
+  pic: "151.8",
+  dual: "260.8",
+  xc: "318.2",
+  day: "311.1",
+  night: "101.5",
+  ifr: "76.9",
+  routes: "27",
+};
+
+/** True when the current pilot has nothing logged, so the preview should show. */
+export function isDashboardPreview(data: AppData): boolean {
+  const pid = data.currentPilotId;
+  return data.flights.filter((x) => !pid || x.pilotId === pid).length === 0;
+}
