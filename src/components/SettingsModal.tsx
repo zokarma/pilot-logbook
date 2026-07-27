@@ -127,6 +127,14 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
           >
             Take the tour
           </button>
+          <a
+            href="/help"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="ml-2 text-sm font-medium text-slate-200 bg-slate-800 hover:bg-slate-700 px-3 py-1.5 rounded-lg transition inline-block"
+          >
+            Help &amp; guides
+          </a>
         </div>
 
         {cloud && (

@@ -99,6 +99,7 @@ export default function Pricing() {
             <Link className="link" href="/">Home</Link>
             <a className="link" href="#compare">Compare</a>
             <a className="link" href="#faq">FAQ</a>
+            <Link className="link" href="/help">Help</Link>
             <Link className="link" href="/demo">Live demo</Link>
             {/* Same login affordance as the landing page — a returning pilot
                 may well land straight here from a bookmark or a price search. */}

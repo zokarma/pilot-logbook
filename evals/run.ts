@@ -26,6 +26,7 @@ import * as claims from "./claims.eval";
 import * as recentErrors from "./recentErrors.eval";
 import * as notifications from "./notifications.eval";
 import * as demoData from "./demoData.eval";
+import * as help from "./help.eval";
 import { Suite } from "./harness";
 
 // Most important first. Some suites are async (they set env or stub browser
@@ -35,7 +36,7 @@ const runners: (() => Suite | Promise<Suite>)[] = [
   importMap.run, scan.run, currency.run, pilots.run, core.run,
   entitlement.run, dashboard.run, dutyLimits.run, pdf.run, fleet.run,
   logbook.run, flightColumns.run, airports.run, checkout.run, claims.run,
-  recentErrors.run, notifications.run, demoData.run,
+  recentErrors.run, notifications.run, demoData.run, help.run,
 ];
 
 async function main(): Promise<void> {
