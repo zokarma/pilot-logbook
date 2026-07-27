@@ -20,6 +20,7 @@ import { useData } from "@/context/DataContext";
 import { isNativeApp } from "@/lib/native";
 
 const APP_HREF = "/dashboard"; // the app opens on the dashboard
+const DEMO_HREF = "/demo";     // real app, seeded sample data, no sign-up
 const PRICING_HREF = "/pricing";
 const LOGIN_HREF = "/login";
 
@@ -38,8 +39,18 @@ const FEATURES: { title: string; body: string; icon: React.ReactNode }[] = [
   { title: "Yours, offline & exportable", body: "Works in the air with no signal, syncs everywhere, and exports to CSV or a TC-style PDF anytime.", icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /></svg> },
 ];
 
+// The same product at four stages of a licence — this is the "student to
+// airline" promise made concrete. Each line must describe something that
+// actually ships (see evals/claims.eval.ts).
+const AUDIENCES: { title: string; body: string }[] = [
+  { title: "Training", body: "Log circuits with the landings that count, watch dual and PIC time build, and keep your medical in view." },
+  { title: "Building time", body: "Cross-country, night and instrument time totalled automatically, with a route map of everywhere you've been." },
+  { title: "Commercial", body: "Duty and rest gauges for the 703/704/705 operation you fly, plus PPC/PCC and recurrent training tracked to the day." },
+  { title: "Airline", body: "Multi-crew legs, type-by-type totals, and a TC-style PDF whenever someone asks for your hours." },
+];
+
 const STEPS: { title: string; body: string }[] = [
-  { title: "Create your free account", body: "Sign up in seconds — no credit card. Your logbook is yours to keep, forever." },
+  { title: "Look around the demo", body: "Open a sample logbook with no sign-up and click through everything. When you're ready, create a free account." },
   { title: "Snap or import your flights", body: "Photograph paper pages, import a CSV, or log by hand. Everything lands in one place." },
   { title: "Fly current, stay compliant", body: "Your dashboard tracks totals, currency, duty, and document expiries in real time." },
 ];
@@ -69,7 +80,8 @@ export default function Landing() {
     if (signedIn) router.replace("/dashboard");
   }, [signedIn, router]);
 
-  const appCta = "Get started — it’s free";
+  const appCta = "Start free";
+  const demoCta = "Explore the live demo";
 
   // While a signed-in visitor is being redirected, render nothing so the
   // marketing page never flashes over their app.
@@ -86,10 +98,10 @@ export default function Landing() {
           </div>
           <div className="nav-links">
             <a className="link" href="#features">Features</a>
-            <a className="link" href="#how">How it works</a>
+            <a className="link" href="#who">Who it&apos;s for</a>
             <Link className="link" href={PRICING_HREF}>Pricing</Link>
             <Link className="link" href={LOGIN_HREF}>Log in</Link>
-            <Link className="btn btn-primary btn-sm" href={APP_HREF}>Get started</Link>
+            <Link className="btn btn-primary btn-sm" href={DEMO_HREF}>Live demo</Link>
           </div>
         </div>
       </nav>
@@ -99,15 +111,15 @@ export default function Landing() {
         <div className="wrap hero-grid">
           <div>
             <p className="eyebrow">Pilot logbook · currency · duty · documents</p>
-            <h1>Your logbook, <span className="accent">flown into the future.</span></h1>
-            <p className="sub">Photograph your paper logbook and let AI fill it in. Then Pilot Logbook tracks your hours, currency, duty limits, and document expiries automatically — on every device, online or off.</p>
+            <h1>Every hour you fly, <span className="accent">in one logbook.</span></h1>
+            <p className="sub">From your first circuit to your last leg of the month — hours, currency, duty and document expiries, all kept current for you. Works on your phone and the web, in the air or out of signal.</p>
             <div className="hero-cta">
-              <Link className="btn btn-primary btn-lg" href={APP_HREF}>{appCta} <Arrow /></Link>
-              <Link className="btn btn-ghost btn-lg" href={PRICING_HREF}>See pricing</Link>
+              <Link className="btn btn-primary btn-lg" href={DEMO_HREF}>{demoCta} <Arrow /></Link>
+              <Link className="btn btn-ghost btn-lg" href={APP_HREF}>{appCta}</Link>
             </div>
             <div className="reassure">
-              <span><Check /> Free to start</span>
-              <span><Check /> No credit card</span>
+              <span><Check /> No sign-up to look around</span>
+              <span><Check /> Free plan, no credit card</span>
               <span><Check /> Works offline</span>
             </div>
           </div>
@@ -154,6 +166,25 @@ export default function Landing() {
                 <div className="ic">{f.icon}</div>
                 <h4>{f.title}</h4>
                 <p>{f.body}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* WHO IT'S FOR — the same logbook grows with the licence. */}
+      <section id="who" style={{ paddingTop: 8 }}>
+        <div className="wrap">
+          <div className="sec-head">
+            <p className="eyebrow">Student to airline</p>
+            <h2>One logbook for the whole career</h2>
+            <p>You shouldn&apos;t have to start a new logbook every time your licence changes. Pilot Logbook shows what matters at each stage and keeps the rest out of the way.</p>
+          </div>
+          <div className="feat-grid">
+            {AUDIENCES.map((a) => (
+              <div className="feat" key={a.title}>
+                <h4>{a.title}</h4>
+                <p>{a.body}</p>
               </div>
             ))}
           </div>
@@ -210,11 +241,11 @@ export default function Landing() {
         <div className="wrap">
           <div className="final">
             <p className="eyebrow" style={{ justifyContent: "center" }}>Ready when you are</p>
-            <h2>Your next logbook entry could log itself.</h2>
-            <p>Open the app to start logging in seconds, or see the plans to find the right fit. No card to start. Cancel anytime.</p>
+            <h2>Have a look before you sign up.</h2>
+            <p>The demo is the real app, loaded with a sample logbook — click through the dashboard, currency and route map. Nothing to install, no card, no account.</p>
             <div className="btns">
-              <Link className="btn btn-primary btn-lg" href={APP_HREF}>{appCta} <Arrow /></Link>
-              <Link className="btn btn-ghost btn-lg" href={PRICING_HREF}>See pricing</Link>
+              <Link className="btn btn-primary btn-lg" href={DEMO_HREF}>{demoCta} <Arrow /></Link>
+              <Link className="btn btn-ghost btn-lg" href={APP_HREF}>{appCta}</Link>
             </div>
           </div>
         </div>

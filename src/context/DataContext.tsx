@@ -18,6 +18,8 @@ import { migrateData } from "@/lib/migrate";
 import { deepEqual, mergeAppData, sameStamp, stampChanges } from "@/lib/merge";
 import { getSupabaseClient, supabaseConfigured } from "@/lib/supabaseClient";
 import { isNativeApp } from "@/lib/native";
+import { buildDemoData } from "@/lib/demoData";
+import { isDemoSession, exitDemoSession } from "@/lib/demoSession";
 import {
   loadCache, saveCache, loadBase, saveBase, SyncBase, mergeScreenshots, stripScreenshots,
   loadLastUser, saveLastUser, clearLastUser,
@@ -25,6 +27,9 @@ import {
 } from "@/lib/clientStore";
 
 export type SyncState = "ok" | "syncing" | "offline" | "error" | null;
+
+// Shown as the account name while exploring the demo.
+export const DEMO_USER = "Demo pilot";
 
 interface AuthResult {
   error?: string;
@@ -35,6 +40,8 @@ interface DataCtx {
   ready: boolean;
   currentUser: string | null;
   cloud: boolean;
+  /** Demo mode: seeded sample data, nothing persisted (see lib/demoSession). */
+  demo: boolean;
   syncState: SyncState;
   data: AppData;
   mutate: (fn: (draft: AppData) => void) => void;
@@ -88,6 +95,9 @@ export function useData(): DataCtx {
 
 export function DataProvider({ children }: { children: ReactNode }) {
   const cloud = supabaseConfigured();
+  // Resolved at boot (below) rather than read inline: isDemoSession() touches
+  // sessionStorage, which doesn't exist during prerender.
+  const [demo, setDemo] = useState(false);
   const [ready, setReady] = useState(false);
   const [currentUser, setCurrentUser] = useState<string | null>(null);
   const [syncState, setSyncState] = useState<SyncState>(null);
@@ -329,8 +339,23 @@ export function DataProvider({ children }: { children: ReactNode }) {
     }
   }, [loadCloudState]);
 
-  // Bootstrap: cloud → subscribe to Supabase Auth; local → read localStorage.
+  // Bootstrap: demo → seeded sample data; cloud → subscribe to Supabase Auth;
+  // local → read localStorage.
   useEffect(() => {
+    // Demo mode short-circuits BOTH paths — it must work on the live site,
+    // where Supabase is configured. cacheKeyRef and uidRef stay null, so
+    // scheduleSync writes nothing: demo edits live in memory for the tab and
+    // vanish on reload. Nothing here can touch a real account's data.
+    if (isDemoSession()) {
+      const seeded = migrateData(buildDemoData());
+      dataRef.current = seeded;
+      setData(seeded);
+      setCurrentUser(DEMO_USER);
+      setDemo(true);
+      setSyncState(null); // nothing syncs in demo — no badge
+      setReady(true);
+      return;
+    }
     if (cloud) {
       const sb = getSupabaseClient();
       if (!sb) { setReady(true); return; }
@@ -483,6 +508,17 @@ export function DataProvider({ children }: { children: ReactNode }) {
   }, [cloud]);
 
   const logout = useCallback(async () => {
+    // Leaving the demo is a plain state reset — there is no session to end.
+    if (isDemoSession()) {
+      exitDemoSession();
+      setDemo(false);
+      setCurrentUser(null);
+      const empty = emptyData();
+      dataRef.current = empty;
+      setData(empty);
+      setSyncState(null);
+      return;
+    }
     if (cloud) {
       const sb = getSupabaseClient();
       try { await sb?.auth.signOut(); } catch { /* ignore */ }
@@ -526,7 +562,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
   return (
     <Ctx.Provider
-      value={{ ready, currentUser, cloud, syncState, data, mutate, replace, login, signup, logout, deleteAccount }}
+      value={{ ready, currentUser, cloud, demo, syncState, data, mutate, replace, login, signup, logout, deleteAccount }}
     >
       {children}
     </Ctx.Provider>

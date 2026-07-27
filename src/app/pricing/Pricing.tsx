@@ -96,52 +96,27 @@ export default function Pricing() {
             <span>Pilot Logbook<small>pilotlogbook.ca</small></span>
           </div>
           <div className="nav-links">
-            <a className="link" href="#pricing">Pricing</a>
+            <Link className="link" href="/">Home</Link>
             <a className="link" href="#compare">Compare</a>
             <a className="link" href="#faq">FAQ</a>
-            <Link className="btn btn-primary btn-sm" href={START_HREF}>Start free trial</Link>
+            <Link className="link" href="/demo">Live demo</Link>
+            <Link className="btn btn-primary btn-sm" href={START_HREF}>Start free</Link>
           </div>
         </div>
       </nav>
 
-      {/* HERO */}
-      <header className="hero">
-        <div className="wrap hero-grid">
-          <div>
-            <p className="eyebrow">AI logbook scanning · currency · duty</p>
-            <h1>Stop typing your logbook. <span className="accent">Photograph it.</span></h1>
-            <p className="sub">Snap a page and AI fills in every flight — dates, aircraft, routes, hours, crew. Then Pilot Logbook tracks your currency, duty limits, and document expiries automatically, on every device.</p>
-            <div className="hero-cta">
-              <Link className="btn btn-primary" href={START_HREF}>Start your 14-day free trial</Link>
-              <a className="btn btn-ghost" href="#compare">See what&apos;s included</a>
-            </div>
-            <div className="reassure">
-              <span><Check /> Free plan, no card needed</span>
-              <span><Check /> 14-day Pro trial</span>
-              <span><Check /> Cancel anytime</span>
-            </div>
-          </div>
-
-          {/* scanning device mock */}
-          <div className="device" aria-hidden="true">
-            <div className="screen-head">
-              <span className="dots"><i></i><i></i><i></i></span>
-              <span className="scan-tag"><i></i> Scanning page</span>
-            </div>
-            <div className="logsheet">
-              <div className="beam"></div>
-              <table className="log">
-                <thead><tr><th>Date</th><th>Type</th><th>Reg</th><th>Route</th><th className="hrs">Hrs</th></tr></thead>
-                <tbody>
-                  <tr><td>2026-05-04</td><td>C172</td><td>C-GABC</td><td>CYNJ→CYPK</td><td className="hrs">1.2</td></tr>
-                  <tr><td>2026-05-06</td><td>PA28</td><td>C-GXYZ</td><td>CYPK→CYNJ</td><td className="hrs">1.0</td></tr>
-                  <tr><td>2026-05-11</td><td>DA40</td><td>C-FLYW</td><td>CYYZ→CYOW</td><td className="hrs">1.4</td></tr>
-                  <tr><td>2026-05-18</td><td>C172</td><td>C-GABC</td><td>CYNJ→CYXX</td><td className="hrs">0.9</td></tr>
-                  <tr><td>2026-05-23</td><td>BE76</td><td>C-GMEL</td><td>CYVR→CYYJ</td><td className="hrs">1.6</td></tr>
-                </tbody>
-              </table>
-            </div>
-            <div className="caption"><Check /> 5 flights read · review &amp; save</div>
+      {/* PAGE HEAD — /pricing is a decision page, not a second pitch. The
+          product story lives on "/"; this page answers "which plan, and what
+          exactly do I get?" as directly as possible. */}
+      <header className="hero pp-head">
+        <div className="wrap">
+          <p className="eyebrow">Plans &amp; pricing</p>
+          <h1>Pick a plan. <span className="accent">Change it whenever.</span></h1>
+          <p className="sub">The free plan is a complete logbook you can keep forever. Pro adds the parts that save you time. Prices in CAD.</p>
+          <div className="reassure">
+            <span><Check /> Free plan, no card needed</span>
+            <span><Check /> 14-day Pro trial</span>
+            <span><Check /> Cancel anytime</span>
           </div>
         </div>
 
@@ -157,12 +132,6 @@ export default function Pricing() {
       {/* PRICING */}
       <section id="pricing">
         <div className="wrap">
-          <div className="sec-head">
-            <p className="eyebrow">Plans</p>
-            <h2>Fly free. Upgrade when it earns its keep.</h2>
-            <p>Start free and keep your logbook forever. Go Pro when you want it to fill itself in.</p>
-          </div>
-
           <div className="toggle-wrap">
             <div className="toggle" role="group" aria-label="Billing period">
               <button type="button" aria-pressed={!annual} onClick={() => setAnnual(false)}>Monthly</button>
