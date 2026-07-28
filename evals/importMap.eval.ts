@@ -217,6 +217,30 @@ export function run(): Suite {
     s.check("owner's PIC row re-pointed to their profile id", mine.picId === "me");
     s.check("non-owner crew name retained as the pic text mirror", other.pic === "Pearce, B");
     s.check("mapping saved as a reusable template", !!findTemplate(res.data, headers));
+    s.eq("a fresh import reports no duplicates", res.duplicates, 0);
+
+    // Re-running the SAME import must not double the logbook.
+    const again = applyMappedImport(clone(res.data), rows, 0, mapping, [normalizeName("Zoheb Karmali")]);
+    s.eq("re-importing the same rows adds nothing", again.added, 0);
+    s.eq("...and reports both as duplicates", again.duplicates, 2);
+    s.eq("the logbook still holds two flights", again.data.flights.length, 2);
+
+    // The owner-pinning loop walks back `added` rows from the end. With every
+    // row skipped as a duplicate it must not walk back at all — otherwise it
+    // re-pins flights the pilot already had.
+    s.check("a fully-duplicate import leaves existing crew ids untouched",
+      again.data.flights.find((f) => f.registration === "C-GXYZ")!.pic === "Pearce, B");
+
+    // A genuinely new row alongside duplicates still lands.
+    const mixed = applyMappedImport(
+      clone(res.data),
+      [...rows, ["2026-07-03", "C-GNEW", "Zoheb Karmali", "2.0"]],
+      0, mapping, [normalizeName("Zoheb Karmali")],
+    );
+    s.eq("only the new row imports", mixed.added, 1);
+    s.eq("the two repeats are flagged", mixed.duplicates, 2);
+    s.check("and the new flight is owned by the current pilot",
+      mixed.data.flights.find((f) => f.registration === "C-GNEW")!.pilotId === "me");
   }
   {
     // Re-importing the same shape replaces the template (no duplicate signature)

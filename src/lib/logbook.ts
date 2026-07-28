@@ -107,3 +107,51 @@ export function lookupRegistration(index: RegTypeIndex, input: string): { reg: s
   const suffix = Array.from(index.entries()).filter(([k]) => k.endsWith(q));
   return suffix.length === 1 ? suffix[0][1] : null;
 }
+
+/* ------------------------- duplicate-import detection -------------------------
+ * Re-importing the same CSV used to silently double a logbook. The scan path
+ * already flagged repeats; this is the shared, pure version so CSV import can
+ * too.
+ *
+ * Two subtleties a naive "have I seen this key?" check gets wrong:
+ *  - A pilot can legitimately fly the SAME leg twice in a day (two CYYZ→CYOW in
+ *    the same aircraft). So matching is COUNT-AWARE: if the logbook holds one
+ *    and the file brings two, exactly one is a duplicate and the other is a
+ *    real flight that must survive.
+ *  - Duration is part of the key, so two genuinely different legs on the same
+ *    route and date don't collapse into each other.
+ */
+
+export function flightDupKey(fl: Partial<Flight>): string {
+  const reg = (fl.registration || fl.civilIdent || "").trim().toUpperCase();
+  const hours = (num(fl.se) + num(fl.me)).toFixed(1);
+  return [
+    flightDateStr(fl as Flight),
+    reg,
+    (fl.from || "").trim().toUpperCase(),
+    (fl.to || "").trim().toUpperCase(),
+    hours,
+  ].join("|");
+}
+
+/**
+ * Indices in `incoming` that already exist in `existing`, honouring multiplicity
+ * (see the note above). Pure: neither list is modified.
+ */
+export function findDuplicateFlights(existing: Flight[], incoming: Partial<Flight>[]): Set<number> {
+  const remaining = new Map<string, number>();
+  for (const fl of existing) {
+    const k = flightDupKey(fl);
+    remaining.set(k, (remaining.get(k) ?? 0) + 1);
+  }
+  const dups = new Set<number>();
+  incoming.forEach((fl, i) => {
+    const k = flightDupKey(fl);
+    const left = remaining.get(k) ?? 0;
+    if (left > 0) {
+      dups.add(i);
+      remaining.set(k, left - 1);
+    }
+  });
+  return dups;
+}
