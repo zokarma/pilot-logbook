@@ -27,27 +27,30 @@ model call is live.
 
 ---
 
-## Last run: 2026-07-26 — 506/506 checks green, 33 probes across 21 suites
+## Last run: 2026-07-27 — 765/765 checks green, 32 probes across 26 suites
 
-Every feature now has a suite. This run added five: **#3 offline mirror & local
-auth**, **#17 flight columns**, **#19 checkout links**, **#20 plan promises vs
-product truth**, and **#21 bug-report error capture** — closing the last gaps in
-pure-module coverage (`clientStore`, `hash`, `flightColumns`, `checkout`, `seo`,
-`recentErrors`) and re-ranking all 21 suites into one honest importance order.
+Five suites added since the previous run: **#22 expiry reminders**, **#23 demo
+logbook**, **#24 help guides**, **#25 role defaults**, and the scan-scoring
+half of the accuracy harness. Six findings were closed in the same stretch —
+see the *Fixed* list below; they are no longer open items.
 
 **The logbook itself is in good shape.** Everything that touches flight data —
 merge, migration, expiry math, import, scan, currency, PDF — is green, and all
 three historical defects (D1–D3) stay regression-guarded by the checks that
 caught them.
 
-**The gap this run found is commercial, not aeronautical.** The new #20 suite
-compares what `/pricing` and the structured data *sell* against what the code
-*enforces*: **all five of the Professional tier's differentiators are unbuilt or
-unenforced** (roster import, company reports, advanced analytics, priority
-support — plus unlimited scanning, which isn't metered on any tier), and the FAQ
-that Google and the AI answer engines quote gets the device tiering backwards.
-Details in findings **F16–F21**. Nothing here is a code bug — it's a promise the
-build hasn't kept, and it's the highest-value thing on this page.
+**The commercial gap the previous run found is now closed.** Suite #20 compares
+what `/pricing` and the structured data *sell* against what the code *enforces*.
+It caught a Professional tier whose differentiators were unbuilt, a FAQ that got
+device tiering backwards, a "Basic" free PDF that didn't exist, and help copy
+implying free camera scanning. All are fixed (see **Fixed — closed 2026-07-27**),
+and each is now a hard check rather than a probe, so the copy cannot drift ahead
+of the build again without failing the run.
+
+**What's left is operator-side, not code.** The 14-day trial (**F19**) lives only
+in copy and in the Stripe dashboard — no code path starts or counts one down, so
+it holds only if every price is configured with it. That's a launch-checklist
+item no eval can watch.
 
 | # | Feature | Suite | Result | Why it ranks here |
 |---|---------|-------|--------|-------------------|
@@ -231,6 +234,42 @@ in. (The Instrument Rating still uses the same-day anchor — see F3.)
 ## Findings (probes) — decide, then fix or accept
 
 Ordered by what they'd cost you, not by suite number.
+
+### Fixed — closed 2026-07-27
+
+These were open findings in the previous run and are now resolved in code, each
+with checks added so they can't drift back. Left listed (not deleted) so the
+history of what was wrong stays readable.
+
+- **F5 · FIXED — crew matching had no length floor.** `ownerRoleForRow` did
+  bidirectional `includes()`, so an initial like `"K."` matched inside
+  `"zohebkarmali"` and claimed the row — wrong role, wrong crew slot, corrupted
+  PIC-vs-dual split. Exact matches still win; loose containment now needs 3+
+  characters on both sides. (PR #71)
+- **F6 · FIXED — CSV import had no dedupe.** Re-importing the same file doubled
+  the logbook. Both import paths now dedupe against the logbook as it was
+  *before* the import, count-aware and including duration, so a leg genuinely
+  flown twice in a day still imports twice. The count is reported to the pilot.
+  Severity was raised from LOW in practice because the empty-state rebuild
+  promoted CSV import to the headline first-run action. (PR #71)
+- **F13 · FIXED — `applyMerge(target ∈ sources)` deleted the target**, orphaning
+  its flights. Self-ids are filtered before the merge runs. (PR #71)
+- **F16 · FIXED — the Professional tier's headline features didn't exist.** The
+  tier was withdrawn from all customer-facing copy and `FEATURE_MIN_TIER` now
+  lists only the five capabilities the UI actually enforces. `"professional"`
+  remains in the `Tier` union so any subscription sold while it was listed keeps
+  resolving; it has no purchase path. (PR #59)
+- **F18 · FIXED — the FAQ contradicted the entitlement matrix on devices.** FAQ
+  rewritten; the Mac-app claim is gone (no macOS target ships) and the device
+  answer matches the comparison table. Guarded by `claims.eval`. (PR #59)
+- **F20 · FIXED — the "encrypted" claim needed a qualifier.** Now reads
+  "encrypted in transit and at rest in the cloud", with the local device copy
+  stated separately. Guarded by `claims.eval`. (PR #59)
+
+Also corrected in this stretch, though never tracked as findings: the pricing
+table advertised a "Basic" free PDF while PDF export is gated end-to-end (PR
+#65), and the help page implied on-device camera scanning was the free tier when
+all scanning is Pro (PR #67). Both now have `claims.eval` / `help.eval` checks.
 
 ### Commercial — the pitch is ahead of the build
 
