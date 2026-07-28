@@ -3,6 +3,7 @@
 // pilot must never be locked out by a clock blip, and a malformed row must
 // never accidentally grant premium.
 
+import { describeEntitlement, formatPeriodEnd } from "../src/lib/entitlement";
 import {
   effectiveTier, isPremium, hasFeature, tierHasFeature, entitlementFromRow,
   pickEffectiveSubscription, entitlementFromSubscriptions,
@@ -132,6 +133,49 @@ export function run(): Suite {
       s.check("the derived row survives entitlementFromRow unchanged",
         effectiveTier(roundTripped, NOW) === "professional");
     }
+  }
+
+  /* ---------------- plan description (the "Your plan" panel) ---------------- */
+  // On iOS the app cannot sell anything, so this panel is the ONLY evidence a
+  // paying pilot has that their subscription is live. It has to be right.
+  {
+    const at = (iso: string) => new Date(iso);
+    const now = at("2026-07-27T12:00:00Z");
+
+    const free = describeEntitlement({ tier: "free", status: "inactive", currentPeriodEnd: null }, now);
+    s.eq("free plan is named", free.label, "Free");
+    s.check("free plan needs no attention", !free.needsAttention);
+
+    const active = describeEntitlement(
+      { tier: "pro", status: "active", currentPeriodEnd: "2026-08-12T00:00:00Z" }, now);
+    s.eq("an active subscriber sees their tier", active.label, "Pro");
+    s.check("...and when it renews", /12 August 2026/.test(active.detail));
+    s.check("an active subscription needs no attention", !active.needsAttention);
+
+    const trial = describeEntitlement(
+      { tier: "pro", status: "trialing", currentPeriodEnd: "2026-08-05T00:00:00Z" }, now);
+    s.check("a trial is labelled as a trial", /trial/i.test(trial.label));
+    s.check("...with its end date, and flagged for attention", /5 August 2026/.test(trial.detail) && trial.needsAttention);
+
+    const pastDue = describeEntitlement(
+      { tier: "pro", status: "past_due", currentPeriodEnd: "2026-08-12T00:00:00Z" }, now);
+    s.check("a failed payment is surfaced, not hidden", pastDue.needsAttention && /payment/i.test(pastDue.detail));
+
+    const cancelled = describeEntitlement(
+      { tier: "pro", status: "canceled", currentPeriodEnd: "2026-07-29T00:00:00Z" }, now);
+    s.check("a cancelled-but-paid pilot is told what they keep and until when",
+      /29 July 2026/.test(cancelled.detail) && cancelled.needsAttention);
+
+    // An expired subscription must read as Free, never as lapsed Pro.
+    const expired = describeEntitlement(
+      { tier: "pro", status: "canceled", currentPeriodEnd: "2026-01-01T00:00:00Z" }, now);
+    s.eq("an expired subscription reads as Free", expired.label, "Free");
+
+    s.eq("null entitlement is Free, not a crash", describeEntitlement(null, now).label, "Free");
+    s.eq("a missing period end degrades gracefully", formatPeriodEnd(null), "");
+    s.eq("a junk period end degrades gracefully", formatPeriodEnd("not-a-date"), "");
+    s.check("every description has both a label and a detail",
+      [free, active, trial, pastDue, cancelled].every((d) => !!d.label.trim() && !!d.detail.trim()));
   }
 
   return s;
