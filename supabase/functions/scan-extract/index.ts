@@ -20,11 +20,23 @@
 // Deploy:
 //   supabase functions deploy scan-extract
 //   supabase secrets set ANTHROPIC_API_KEY=sk-ant-…
-// Optional: SCAN_MODEL to override the default model. An override must support
-// structured outputs (output_config.format) — the extraction schema below is
-// what keeps the response shape honest.
+// Optional: SCAN_MODEL to override the default model (must support structured
+// outputs — the schema in extraction.ts is what keeps the response shape
+// honest), and SCAN_EFFORT (low|medium|high|xhigh|max) to trade tokens for
+// accuracy. Both are settable without a code change so the winning combination
+// from `npx tsx evals/scanAccuracy.live.ts` can be adopted by secret alone.
+//
+// This file owns policy and transport — auth, entitlement, size caps, HTTP.
+// WHAT is asked of the model (prompts, schema, reply handling) lives in
+// extraction.ts, which the accuracy eval imports so it exercises this exact
+// request instead of a copy that drifts.
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
+import {
+  buildExtractionRequest,
+  readExtraction,
+  type ImagePart,
+} from "./extraction.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -75,116 +87,6 @@ function grantsPremium(row: Record<string, unknown> | null): boolean {
   return false;
 }
 
-// Field names the model may flag in `uncertain`. Mirrors FmFlight / FmDocument
-// in src/lib/scan.ts — the client re-checks the list against the same names.
-const FLIGHT_FIELDS = [
-  "date", "aircraftType", "registration", "loggedRole", "from", "to",
-  "se", "me", "xc", "dayHours", "nightHours", "ifrActual", "ifrSim",
-  "notes", "pic", "sic",
-] as const;
-const DOCUMENT_FIELDS = ["type", "number", "issueDate", "examDate", "expiryDate"] as const;
-
-const LOGGED_ROLES = [
-  "Captain", "First Officer", "Dual", "Student", "Dual Given", "Dual Received", "Instructor",
-];
-
-// Structured-output schemas. These make the response shape a guarantee rather
-// than a request — no prose, no code fences, no missing/renamed keys — so the
-// old "hope it's JSON and hunt for the braces" path can't silently lose a page.
-// Every property is required and nullable: the model says "couldn't read it"
-// with an explicit null instead of dropping the key. Note the schema vocabulary
-// is deliberately plain (types, enum, anyOf) — structured outputs rejects
-// numeric/string constraints like minimum or maxLength, so value bounds stay
-// where they already were, in the client's sanitizeFm* guards.
-// Nullability is spelled with anyOf rather than a `type: [...]` union: both are
-// valid JSON Schema, but anyOf is the form structured outputs documents as
-// supported, and a schema the API rejects would 400 every scan.
-const nullableStr = { anyOf: [{ type: "string" }, { type: "null" }] };
-const nullableNum = { anyOf: [{ type: "number" }, { type: "null" }] };
-
-const uncertainSchema = (fields: readonly string[]) => ({
-  type: "array",
-  description:
-    "Names of fields above whose values you are NOT confident in. The pilot is shown these for review before anything is saved.",
-  items: { type: "string", enum: [...fields] },
-});
-
-const FLIGHT_ITEM_SCHEMA = {
-  type: "object",
-  properties: {
-    date: { ...nullableStr, description: "YYYY-MM-DD" },
-    aircraftType: nullableStr,
-    registration: { ...nullableStr, description: "Aircraft ident, e.g. C-GABC or N12345" },
-    loggedRole: { anyOf: [{ type: "string", enum: LOGGED_ROLES }, { type: "null" }] },
-    from: { ...nullableStr, description: "ICAO code" },
-    to: { ...nullableStr, description: "ICAO code" },
-    se: { ...nullableNum, description: "Single-engine hours (decimal)" },
-    me: { ...nullableNum, description: "Multi-engine hours (decimal)" },
-    xc: { ...nullableNum, description: "Cross-country hours (decimal)" },
-    dayHours: nullableNum,
-    nightHours: nullableNum,
-    ifrActual: nullableNum,
-    ifrSim: nullableNum,
-    notes: nullableStr,
-    pic: nullableStr,
-    sic: nullableStr,
-    uncertain: uncertainSchema(FLIGHT_FIELDS),
-  },
-  required: [...FLIGHT_FIELDS, "uncertain"],
-  additionalProperties: false,
-};
-
-const FLIGHTS_SCHEMA = {
-  type: "object",
-  properties: { flights: { type: "array", items: FLIGHT_ITEM_SCHEMA } },
-  required: ["flights"],
-  additionalProperties: false,
-};
-
-const DOCUMENT_SCHEMA = {
-  type: "object",
-  properties: {
-    document: {
-      type: "object",
-      properties: {
-        type: nullableStr,
-        number: nullableStr,
-        issueDate: { ...nullableStr, description: "YYYY-MM-DD" },
-        examDate: { ...nullableStr, description: "Medical examination date, YYYY-MM-DD" },
-        expiryDate: { ...nullableStr, description: "YYYY-MM-DD" },
-        uncertain: uncertainSchema(DOCUMENT_FIELDS),
-      },
-      required: [...DOCUMENT_FIELDS, "uncertain"],
-      additionalProperties: false,
-    },
-  },
-  required: ["document"],
-  additionalProperties: false,
-};
-
-const FLIGHTS_PROMPT = `You are extracting rows from a photo of a pilot's paper logbook (often a Transport Canada layout: year/month printed once as a header, one flight per row).
-
-Rules:
-- One object per logbook row.
-- Use null for any field that is not present or that you genuinely cannot make out. Do NOT guess a value to fill a hole.
-- When you CAN read a field but are not confident in your reading — smudged digits, ambiguous handwriting, a column you had to infer — give your best reading anyway and list that field's name in "uncertain". The pilot reviews and confirms every scanned row before it is saved, so a flagged best guess is far more useful to them than a null.
-- Numbers are decimal hours. Dates are YYYY-MM-DD; derive year/month from page headers when rows only show the day.
-- registration is the aircraft ident (e.g. C-GABC, N12345); from/to are ICAO codes.
-- If a page contains no logbook rows, return an empty flights array.`;
-
-const DOCUMENT_PROMPT = `You are extracting fields from a photo of an aviation document (pilot licence, permit, medical certificate, or rating).
-
-Rules:
-- Use null for any field that is not present or that you genuinely cannot make out. Do NOT guess a value to fill a hole.
-- When you CAN read a field but are not confident in your reading, give your best reading anyway and list that field's name in "uncertain". The pilot confirms every scanned document before it is saved.
-- Prefer these exact type values when they match: Student Pilot Permit (SPP), Private Pilot Licence (PPL), Commercial Pilot Licence (CPL), Airline Transport Pilot Licence (ATPL), Category 1 Medical, Category 3 Medical, Category 4 Medical, Radio Operator Certificate, Restricted Operator Certificate (Aeronautical), Instrument Rating, Multi-Engine Rating, Instructor Rating, Type Rating, Dangerous Goods Training, CRM Training, Recurrent Training. Otherwise use the document's own title.
-- examDate is the medical examination date. Dates are YYYY-MM-DD.`;
-
-interface ImagePart {
-  media: string;
-  data: string;
-}
-
 const ALLOWED_MEDIA = ["image/jpeg", "image/png", "image/webp", "image/gif", "application/pdf"];
 // Strict base64: the alphabet plus optional padding, nothing else. Anything
 // that isn't valid base64 can only ever be rejected downstream by Anthropic —
@@ -202,25 +104,6 @@ function parseImage(raw: unknown): ImagePart | null {
   if (data.length * 3 / 4 > MAX_BYTES) return null;
   if (!BASE64_ONLY.test(data)) return null;
   return { media, data };
-}
-
-// Pull the first JSON object out of the model's reply (tolerates code fences).
-function extractJson(text: string): unknown {
-  const cleaned = text.replace(/```(json)?/gi, "");
-  const start = cleaned.indexOf("{");
-  if (start < 0) return null;
-  // Walk to the matching close brace so trailing prose doesn't break parsing.
-  let depth = 0;
-  for (let i = start; i < cleaned.length; i++) {
-    if (cleaned[i] === "{") depth++;
-    else if (cleaned[i] === "}") {
-      depth--;
-      if (depth === 0) {
-        try { return JSON.parse(cleaned.slice(start, i + 1)); } catch { return null; }
-      }
-    }
-  }
-  return null;
 }
 
 Deno.serve(async (req) => {
@@ -286,14 +169,13 @@ Deno.serve(async (req) => {
   }
   if (!images.length) return json({ error: "No usable images (JPEG/PNG/WebP/GIF or PDF, ≤8 MB each)." }, 400);
 
-  const content: unknown[] = images.map((img) =>
-    img.media === "application/pdf"
-      ? { type: "document", source: { type: "base64", media_type: img.media, data: img.data } }
-      : { type: "image", source: { type: "base64", media_type: img.media, data: img.data } },
-  );
-  content.push({ type: "text", text: mode === "flights" ? FLIGHTS_PROMPT : DOCUMENT_PROMPT });
+  // Request shape lives in extraction.ts so the accuracy eval can send exactly
+  // this body — see evals/scanAccuracy.live.ts.
+  const requestBody = buildExtractionRequest(mode, images, {
+    model: Deno.env.get("SCAN_MODEL") || undefined,
+    effort: Deno.env.get("SCAN_EFFORT") || undefined,
+  });
 
-  const model = Deno.env.get("SCAN_MODEL") || "claude-sonnet-5";
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
@@ -301,22 +183,7 @@ Deno.serve(async (req) => {
       "anthropic-version": "2023-06-01",
       "content-type": "application/json",
     },
-    body: JSON.stringify({
-      model,
-      // Thinking and response text share this budget, and thinking is on by
-      // default on current models. At the old 4096 a dense logbook page could
-      // spend the budget mid-JSON: the reply was then unparseable and the whole
-      // scan came back as "nothing readable" even though the page had been read
-      // correctly. Give both room, and see the max_tokens check below.
-      max_tokens: 16000,
-      output_config: {
-        format: {
-          type: "json_schema",
-          schema: mode === "flights" ? FLIGHTS_SCHEMA : DOCUMENT_SCHEMA,
-        },
-      },
-      messages: [{ role: "user", content }],
-    }),
+    body: JSON.stringify(requestBody),
   });
 
   if (!res.ok) {
@@ -328,30 +195,21 @@ Deno.serve(async (req) => {
     return json({ error: friendly }, 502);
   }
 
-  const payload = await res.json();
-
-  // A 200 does not mean we got an answer. Both of these used to fall through to
-  // the parser, fail there, and surface as the same generic "nothing readable"
-  // — which sent pilots off to re-photograph a page that had scanned fine.
-  if (payload?.stop_reason === "refusal") {
-    console.error("anthropic refusal", payload?.stop_details?.category ?? "unknown");
-    return json({ error: "Cloud AI declined to process that image. Try a different photo, or enter the details manually." }, 422);
-  }
-  if (payload?.stop_reason === "max_tokens") {
-    return json({ error: "That scan had more rows than one request can return — try one page at a time." }, 422);
-  }
-
-  const text = Array.isArray(payload?.content)
-    ? payload.content.filter((c: { type?: string }) => c?.type === "text").map((c: { text?: string }) => c.text ?? "").join("\n")
-    : "";
-  // The schema guarantees a bare JSON object, so this parses directly; the
-  // brace-walk stays as a belt-and-braces fallback (e.g. a SCAN_MODEL override
-  // on a model without structured-output support).
-  let parsed: { flights?: unknown; document?: unknown } | null = null;
-  try { parsed = JSON.parse(text); } catch { parsed = extractJson(text) as typeof parsed; }
-  if (!parsed || typeof parsed !== "object") {
+  const result = readExtraction(await res.json());
+  if (!result.ok) {
+    // A 200 does not mean we got an answer. These used to fall through to the
+    // parser, fail there, and surface as one generic "nothing readable" — which
+    // sent pilots off to re-photograph a page that had scanned fine.
+    if (result.reason === "refusal") {
+      console.error("anthropic refusal", result.detail ?? "unknown");
+      return json({ error: "Cloud AI declined to process that image. Try a different photo, or enter the details manually." }, 422);
+    }
+    if (result.reason === "truncated") {
+      return json({ error: "That scan had more rows than one request can return — try one page at a time." }, 422);
+    }
     return json({ error: "Cloud AI returned no readable data for that image." }, 422);
   }
+  const parsed = result.value;
 
   // The client re-sanitizes field-by-field (lib/scan sanitizers); this is just shape.
   return json(

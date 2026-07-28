@@ -8,6 +8,18 @@ pure and framework-free, so no app boot is needed):
 npx tsx evals/run.ts        # seconds, no network; exits non-zero on a failed check
 ```
 
+One eval is deliberately **outside** that sweep, because it needs the network,
+an API key and fixtures that can't be committed:
+
+```
+ANTHROPIC_API_KEY=… npx tsx evals/scanAccuracy.live.ts   # real logbook pages
+```
+
+It scores cloud-scan extraction field-by-field against photographs of real
+pages (`evals/fixtures/scans/`, gitignored — see the README there). Its
+*scoring* is pure and is covered by suite #26 in the normal sweep; only the
+model call is live.
+
 - **check** = hard assertion. A failing check is a defect in the app, kept red
   on purpose until the underlying bug is fixed.
 - **probe** = recorded behavior worth knowing (design limits, domain-accuracy
@@ -46,6 +58,7 @@ build hasn't kept, and it's the highest-value thing on this page.
 | 5 | CSV import/export (`csv.ts`) | `csv.eval.ts` | ✅ 31/31 | The de-facto backup/restore path; row corruption multiplies |
 | 6 | CSV Import Wizard (`importMap.ts`) | `importMap.eval.ts` | ✅ 50/50 | The live bulk-import path a new user meets on day one |
 | 7 | OCR scan parser (`scan.ts`) | `scan.eval.ts` | ✅ 50/50 | Newest data-entry path; heuristic accuracy + honest confidence flagging |
+| 26 | Scan-accuracy scorer (`evals/scanScoring.ts`) | `scanScoring.eval.ts` | ✅ 23/23 | The instrument behind every prompt/model decision — a miscount would be believed |
 | 8 | Currency math (`currency.ts`) | `currency.eval.ts` | ✅ 24/24 | Overstated recency is legal exposure in the cockpit |
 | 9 | Pilot dedupe & merge (`pilots.ts`) | `pilots.eval.ts` | ✅ 17/17 | Destructive ops that rewrite flight references |
 | 10 | IDs & flight mirrors (`id.ts`, `logbook.ts`) | `core.eval.ts` | ✅ 12/12 | Duplicate ids / drifting mirrors corrupt everything downstream |
@@ -377,9 +390,18 @@ Ranked by risk. Nothing below is covered by `npx tsx evals/run.ts`.
    on real pages, widget refresh, cold-launch `pilotlogbook://new-flight`.
    Everything downstream of OCR text is covered; the capture itself isn't. The
    on-device checklist in `TODO.md §2` is still the plan of record.
-5. **Scan accuracy on real logbooks.** The golden set is 29/29 on *synthetic,
-   clean* lines — a regression floor, not a claim about real scans (F10).
-   Anonymized photos of real pages would turn it into a real accuracy number.
+5. **Scan accuracy on real logbooks — harness built, fixtures outstanding.**
+   The golden set is 29/29 on *synthetic, clean* lines: a regression floor, not
+   a claim about real scans (F10). `evals/scanAccuracy.live.ts` now closes the
+   measurement half — it sends the deployed request (imported from
+   `extraction.ts`, not copied), runs the reply through the app's own
+   `sanitizeFm*` guards, and reports per-field precision/recall plus whether
+   the `uncertain` review flags land on the fields that are actually wrong.
+   What's missing is the golden set itself: **photographs of real pages with
+   hand-written truth files**, per `evals/fixtures/scans/README.md`. Until
+   those exist there is still no accuracy number — only the means to get one.
+   Aim for 15–25 pages weighted toward the hard ones (faded ink, cramped
+   columns, header-only years).
 6. **UI flows** — `FlightTable` bulk edit + range select, the Columns panel, the
    onboarding wizard, the scan confirm sheet, the Import Wizard end-to-end.
    *Close it with:* Playwright against the static export (`out/`) — no server
