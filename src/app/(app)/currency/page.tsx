@@ -13,6 +13,7 @@ import { flightsForCurrentPilot } from "@/lib/logbook";
 import { CurrencyRule, PilotDocument } from "@/lib/types";
 import { useUi } from "@/components/UiProvider";
 import { useEntitlement } from "@/hooks/useEntitlement";
+import { useCanPurchase } from "@/hooks/useCanPurchase";
 import Link from "next/link";
 
 // Most recent document of a given type (by expiry date), or null.
@@ -118,6 +119,7 @@ export default function CurrencyPage() {
   // only once `ready`, so subscribers never see a PRO flash.
   const rulesAllowed = has("advancedCurrency");
   const rulesGated = entReady && !rulesAllowed;
+  const canPurchase = useCanPurchase();
   const [form, setForm] = useState({ name: "", metric: "landings" as CurrencyMetric, threshold: "3", windowDays: "90", aircraftType: "" });
   const [msg, setMsg] = useState("");
   // The add-rule form is collapsed behind the header button (same pattern as
@@ -201,6 +203,7 @@ export default function CurrencyPage() {
         </div>
         {!showAdd && (
           rulesGated ? (
+            canPurchase ? (
             <Link
               href="/pricing"
               title="Custom currency rules are a Pro feature — upgrade to unlock them"
@@ -212,6 +215,19 @@ export default function CurrencyPage() {
               Add Rule
               <span className="text-[10px] font-semibold bg-white/20 px-1.5 py-0.5 rounded">PRO</span>
             </Link>
+            ) : (
+              // In the app: a dead chip. No link to an outside purchase.
+              <span
+                title="Included with Pro"
+                className="inline-flex items-center gap-2 bg-slate-800 text-slate-400 text-sm font-medium px-4 py-2 rounded-lg shrink-0 cursor-default"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="5" y="11" width="14" height="10" rx="2" /><path d="M8 11V7a4 4 0 0 1 8 0v4" />
+                </svg>
+                Add Rule
+                <span className="text-[10px] font-semibold bg-slate-700 px-1.5 py-0.5 rounded">PRO</span>
+              </span>
+            )
           ) : (
             <button
               onClick={() => setShowAdd(true)}
