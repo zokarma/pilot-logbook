@@ -1,0 +1,32 @@
+{
+  "_comment": "Format reference only — the eval skips files starting with 'example'. Copy this next to a real page photo and rename both to the same basename. See README.md for the labelling rules.",
+  "mode": "flights",
+  "note": "Describe the page: era, ink, damage, anything that makes it hard.",
+  "ignoreFields": ["notes"],
+  "flights": [
+    {
+      "date": "1998-06-14",
+      "aircraftType": "C172",
+      "registration": "C-GABC",
+      "from": "CYNJ",
+      "to": "CYPK",
+      "loggedRole": "Dual Received",
+      "se": 1.2,
+      "xc": 1.2,
+      "dayHours": 1.2,
+      "pic": "SMITH, J"
+    },
+    {
+      "date": "1998-06-14",
+      "aircraftType": "C172",
+      "registration": "C-GABC",
+      "from": "CYPK",
+      "to": "CYNJ",
+      "loggedRole": "Dual Received",
+      "se": 0.9,
+      "dayHours": 0.6,
+      "nightHours": 0.3,
+      "pic": "SMITH, J"
+    }
+  ]
+}

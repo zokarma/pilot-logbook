@@ -4,6 +4,13 @@
 # Personal flight data — never commit logbook exports
 *.csv
 
+# Scan-accuracy fixtures: photographs of real logbook pages, plus the truth
+# files transcribing them. Same rule as the CSVs. The README and the format
+# example are the only things here that belong in the repo.
+evals/fixtures/scans/*
+!evals/fixtures/scans/README.md
+!evals/fixtures/scans/example.json
+
 # OS junk
 .DS_Store
 Thumbs.db

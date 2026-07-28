@@ -20,9 +20,23 @@
 // Deploy:
 //   supabase functions deploy scan-extract
 //   supabase secrets set ANTHROPIC_API_KEY=sk-ant-…
-// Optional: SCAN_MODEL to override the default model.
+// Optional: SCAN_MODEL to override the default model (must support structured
+// outputs — the schema in extraction.ts is what keeps the response shape
+// honest), and SCAN_EFFORT (low|medium|high|xhigh|max) to trade tokens for
+// accuracy. Both are settable without a code change so the winning combination
+// from `npx tsx evals/scanAccuracy.live.ts` can be adopted by secret alone.
+//
+// This file owns policy and transport — auth, entitlement, size caps, HTTP.
+// WHAT is asked of the model (prompts, schema, reply handling) lives in
+// extraction.ts, which the accuracy eval imports so it exercises this exact
+// request instead of a copy that drifts.
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
+import {
+  buildExtractionRequest,
+  readExtraction,
+  type ImagePart,
+} from "./extraction.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -73,33 +87,6 @@ function grantsPremium(row: Record<string, unknown> | null): boolean {
   return false;
 }
 
-const FLIGHTS_PROMPT = `You are extracting rows from a photo of a pilot's paper logbook (often a Transport Canada layout: year/month printed once as a header, one flight per row).
-
-Return ONLY a JSON object, no prose, of the shape:
-{"flights":[{"date":"YYYY-MM-DD","aircraftType":"C172","registration":"C-GABC","from":"CYNJ","to":"CYPK","loggedRole":"Captain","se":1.2,"me":0,"xc":1.2,"dayHours":1.2,"nightHours":0,"ifrActual":0,"ifrSim":0,"pic":"LAST, F","sic":"","notes":""}]}
-
-Rules:
-- One object per logbook row. Omit any field you cannot read — never guess.
-- Numbers must be JSON numbers (decimal hours). Dates must be YYYY-MM-DD; derive year/month from page headers when rows only show the day.
-- registration is the aircraft ident (e.g. C-GABC, N12345); from/to are ICAO codes.
-- loggedRole one of: Captain, First Officer, Dual, Student, Dual Given, Dual Received, Instructor.
-- If a page contains no logbook rows, return {"flights":[]}.`;
-
-const DOCUMENT_PROMPT = `You are extracting fields from a photo of an aviation document (pilot licence, permit, medical certificate, or rating).
-
-Return ONLY a JSON object, no prose, of the shape:
-{"document":{"type":"Private Pilot Licence (PPL)","number":"A-123456","issueDate":"YYYY-MM-DD","examDate":"YYYY-MM-DD","expiryDate":"YYYY-MM-DD"}}
-
-Rules:
-- Omit any field you cannot read — never guess.
-- Prefer these exact type values when they match: Student Pilot Permit (SPP), Private Pilot Licence (PPL), Commercial Pilot Licence (CPL), Airline Transport Pilot Licence (ATPL), Category 1 Medical, Category 3 Medical, Category 4 Medical, Radio Operator Certificate, Restricted Operator Certificate (Aeronautical), Instrument Rating, Multi-Engine Rating, Instructor Rating, Type Rating, Dangerous Goods Training, CRM Training, Recurrent Training. Otherwise use the document's own title.
-- examDate is the medical examination date. Dates must be YYYY-MM-DD.`;
-
-interface ImagePart {
-  media: string;
-  data: string;
-}
-
 const ALLOWED_MEDIA = ["image/jpeg", "image/png", "image/webp", "image/gif", "application/pdf"];
 // Strict base64: the alphabet plus optional padding, nothing else. Anything
 // that isn't valid base64 can only ever be rejected downstream by Anthropic —
@@ -117,25 +104,6 @@ function parseImage(raw: unknown): ImagePart | null {
   if (data.length * 3 / 4 > MAX_BYTES) return null;
   if (!BASE64_ONLY.test(data)) return null;
   return { media, data };
-}
-
-// Pull the first JSON object out of the model's reply (tolerates code fences).
-function extractJson(text: string): unknown {
-  const cleaned = text.replace(/```(json)?/gi, "");
-  const start = cleaned.indexOf("{");
-  if (start < 0) return null;
-  // Walk to the matching close brace so trailing prose doesn't break parsing.
-  let depth = 0;
-  for (let i = start; i < cleaned.length; i++) {
-    if (cleaned[i] === "{") depth++;
-    else if (cleaned[i] === "}") {
-      depth--;
-      if (depth === 0) {
-        try { return JSON.parse(cleaned.slice(start, i + 1)); } catch { return null; }
-      }
-    }
-  }
-  return null;
 }
 
 Deno.serve(async (req) => {
@@ -201,14 +169,13 @@ Deno.serve(async (req) => {
   }
   if (!images.length) return json({ error: "No usable images (JPEG/PNG/WebP/GIF or PDF, ≤8 MB each)." }, 400);
 
-  const content: unknown[] = images.map((img) =>
-    img.media === "application/pdf"
-      ? { type: "document", source: { type: "base64", media_type: img.media, data: img.data } }
-      : { type: "image", source: { type: "base64", media_type: img.media, data: img.data } },
-  );
-  content.push({ type: "text", text: mode === "flights" ? FLIGHTS_PROMPT : DOCUMENT_PROMPT });
+  // Request shape lives in extraction.ts so the accuracy eval can send exactly
+  // this body — see evals/scanAccuracy.live.ts.
+  const requestBody = buildExtractionRequest(mode, images, {
+    model: Deno.env.get("SCAN_MODEL") || undefined,
+    effort: Deno.env.get("SCAN_EFFORT") || undefined,
+  });
 
-  const model = Deno.env.get("SCAN_MODEL") || "claude-sonnet-5";
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
@@ -216,11 +183,7 @@ Deno.serve(async (req) => {
       "anthropic-version": "2023-06-01",
       "content-type": "application/json",
     },
-    body: JSON.stringify({
-      model,
-      max_tokens: 4096,
-      messages: [{ role: "user", content }],
-    }),
+    body: JSON.stringify(requestBody),
   });
 
   if (!res.ok) {
@@ -232,12 +195,21 @@ Deno.serve(async (req) => {
     return json({ error: friendly }, 502);
   }
 
-  const payload = await res.json();
-  const text = Array.isArray(payload?.content)
-    ? payload.content.filter((c: { type?: string }) => c?.type === "text").map((c: { text?: string }) => c.text ?? "").join("\n")
-    : "";
-  const parsed = extractJson(text) as { flights?: unknown; document?: unknown } | null;
-  if (!parsed) return json({ error: "Cloud AI returned no readable data for that image." }, 422);
+  const result = readExtraction(await res.json());
+  if (!result.ok) {
+    // A 200 does not mean we got an answer. These used to fall through to the
+    // parser, fail there, and surface as one generic "nothing readable" — which
+    // sent pilots off to re-photograph a page that had scanned fine.
+    if (result.reason === "refusal") {
+      console.error("anthropic refusal", result.detail ?? "unknown");
+      return json({ error: "Cloud AI declined to process that image. Try a different photo, or enter the details manually." }, 422);
+    }
+    if (result.reason === "truncated") {
+      return json({ error: "That scan had more rows than one request can return — try one page at a time." }, 422);
+    }
+    return json({ error: "Cloud AI returned no readable data for that image." }, 422);
+  }
+  const parsed = result.value;
 
   // The client re-sanitizes field-by-field (lib/scan sanitizers); this is just shape.
   return json(

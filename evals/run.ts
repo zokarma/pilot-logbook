@@ -10,6 +10,7 @@ import * as documents from "./documents.eval";
 import * as csv from "./csv.eval";
 import * as importMap from "./importMap.eval";
 import * as scan from "./scan.eval";
+import * as scanScoring from "./scanScoring.eval";
 import * as currency from "./currency.eval";
 import * as pilots from "./pilots.eval";
 import * as core from "./core.eval";
@@ -34,7 +35,7 @@ import { Suite } from "./harness";
 // globals before importing the module under eval), so every runner is awaited.
 const runners: (() => Suite | Promise<Suite>)[] = [
   merge.run, migrate.run, clientStore.run, documents.run, csv.run,
-  importMap.run, scan.run, currency.run, pilots.run, core.run,
+  importMap.run, scan.run, scanScoring.run, currency.run, pilots.run, core.run,
   entitlement.run, dashboard.run, dutyLimits.run, pdf.run, fleet.run,
   logbook.run, flightColumns.run, airports.run, checkout.run, claims.run,
   recentErrors.run, notifications.run, roleDefaults.run, demoData.run, help.run,

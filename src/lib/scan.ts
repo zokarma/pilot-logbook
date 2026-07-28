@@ -67,15 +67,21 @@ export interface ScanPluginResult {
   fmFlights?: FmFlight[];
   fmDocument?: FmDocument;
 }
-// FM output carries no confidences — those are assigned in combine*() below.
+// FM output carries no per-field confidence — those are assigned in combine*()
+// below. What an extractor CAN tell us is which of its own readings it isn't
+// sure about: `uncertain` lists those field names, and combine*() drops them
+// under LOW_CONFIDENCE so the confirm sheet highlights them. The on-device
+// Foundation-Models path leaves it empty; the cloud scanner populates it.
 export interface FmFlight {
   date?: string; aircraftType?: string; registration?: string;
   loggedRole?: string; from?: string; to?: string;
   se?: number; me?: number; xc?: number; dayHours?: number; nightHours?: number;
   ifrActual?: number; ifrSim?: number; notes?: string; pic?: string; sic?: string;
+  uncertain?: string[];
 }
 export interface FmDocument {
   type?: string; number?: string; issueDate?: string; examDate?: string; expiryDate?: string;
+  uncertain?: string[];
 }
 
 /* ------------------------------ tokens ------------------------------ */
@@ -357,14 +363,23 @@ function firstDateIn(text: string): string | null {
 }
 
 /* --------------------- combine FM + heuristic candidates --------------------- */
-// Foundation-Models output is generally better at reading messy layouts but
-// carries no confidences: FM-only fields get 0.75; where the heuristic parser
-// AGREES the field is promoted to 0.95; heuristic-only fields keep their own
-// confidence. Disagreements keep the FM value at 0.55 — visibly "check me".
+// Model extraction is generally better at reading messy layouts but carries no
+// confidences: FM-only fields get 0.75; where the heuristic parser AGREES the
+// field is promoted to 0.95; heuristic-only fields keep their own confidence.
+// Disagreements keep the FM value at 0.55 — visibly "check me".
+//
+// A field the extractor itself flagged (`uncertain`) drops to UNSURE, below
+// LOW_CONFIDENCE. Without that flag there is nothing to differentiate on when
+// the model is the ONLY source — which is every website scan, since there is no
+// on-device OCR there to agree or disagree with. Those fields all landed on the
+// flat 0.75, a hair above the 0.7 review threshold, so the confirm sheet's
+// highlighting never fired on the very path that needs it most. Agreement with
+// an independent OCR read still wins: it stays 0.95 even if the model flagged it.
+const UNSURE = 0.5;
 
-function combineField<T>(fm: T | undefined, heur: CF<T> | undefined): CF<T> | undefined {
+function combineField<T>(fm: T | undefined, heur: CF<T> | undefined, unsure = false): CF<T> | undefined {
   if (fm === undefined || fm === null || (typeof fm === "string" && !fm.trim())) return heur;
-  if (!heur) return field(fm, 0.75);
+  if (!heur) return field(fm, unsure ? UNSURE : 0.75);
   const same = typeof fm === "string" && typeof heur.value === "string"
     ? fm.trim().toUpperCase() === heur.value.trim().toUpperCase()
     : fm === heur.value;
@@ -381,25 +396,26 @@ export function combineFlights(fm: FmFlight[] | undefined, heur: ScannedFlight[]
     if (hIdx < 0) hIdx = heur.findIndex((_, i) => !used.has(i) && i === idx);
     const h = hIdx >= 0 ? heur[hIdx] : undefined;
     if (hIdx >= 0) used.add(hIdx);
+    const u = new Set(m.uncertain ?? []);
     const f: ScannedFlight = {
       overall: 0,
       source: h?.source ?? "(Apple Intelligence extraction)",
-      date: combineField(m.date, h?.date),
-      aircraftType: combineField(m.aircraftType, h?.aircraftType),
-      registration: combineField(m.registration?.toUpperCase(), h?.registration),
-      loggedRole: combineField(m.loggedRole, h?.loggedRole),
-      from: combineField(m.from?.toUpperCase(), h?.from),
-      to: combineField(m.to?.toUpperCase(), h?.to),
-      se: combineField(m.se, h?.se),
-      me: combineField(m.me, h?.me),
-      xc: combineField(m.xc, h?.xc),
-      dayHours: combineField(m.dayHours, h?.dayHours),
-      nightHours: combineField(m.nightHours, h?.nightHours),
-      ifrActual: combineField(m.ifrActual, h?.ifrActual),
-      ifrSim: combineField(m.ifrSim, h?.ifrSim),
-      notes: combineField(m.notes, h?.notes),
-      pic: combineField(m.pic, h?.pic),
-      sic: combineField(m.sic, h?.sic),
+      date: combineField(m.date, h?.date, u.has("date")),
+      aircraftType: combineField(m.aircraftType, h?.aircraftType, u.has("aircraftType")),
+      registration: combineField(m.registration?.toUpperCase(), h?.registration, u.has("registration")),
+      loggedRole: combineField(m.loggedRole, h?.loggedRole, u.has("loggedRole")),
+      from: combineField(m.from?.toUpperCase(), h?.from, u.has("from")),
+      to: combineField(m.to?.toUpperCase(), h?.to, u.has("to")),
+      se: combineField(m.se, h?.se, u.has("se")),
+      me: combineField(m.me, h?.me, u.has("me")),
+      xc: combineField(m.xc, h?.xc, u.has("xc")),
+      dayHours: combineField(m.dayHours, h?.dayHours, u.has("dayHours")),
+      nightHours: combineField(m.nightHours, h?.nightHours, u.has("nightHours")),
+      ifrActual: combineField(m.ifrActual, h?.ifrActual, u.has("ifrActual")),
+      ifrSim: combineField(m.ifrSim, h?.ifrSim, u.has("ifrSim")),
+      notes: combineField(m.notes, h?.notes, u.has("notes")),
+      pic: combineField(m.pic, h?.pic, u.has("pic")),
+      sic: combineField(m.sic, h?.sic, u.has("sic")),
       takeoff: h?.takeoff,
       landing: h?.landing,
     };
@@ -411,14 +427,15 @@ export function combineFlights(fm: FmFlight[] | undefined, heur: ScannedFlight[]
 
 export function combineDocument(fm: FmDocument | undefined, heur: ScannedDocument | null): ScannedDocument | null {
   if (!fm) return heur;
+  const u = new Set(fm.uncertain ?? []);
   const doc: ScannedDocument = {
     overall: 0,
     source: heur?.source ?? "(Apple Intelligence extraction)",
-    type: combineField(fm.type, heur?.type),
-    number: combineField(fm.number, heur?.number),
-    issueDate: combineField(fm.issueDate, heur?.issueDate),
-    examDate: combineField(fm.examDate, heur?.examDate),
-    expiryDate: combineField(fm.expiryDate, heur?.expiryDate),
+    type: combineField(fm.type, heur?.type, u.has("type")),
+    number: combineField(fm.number, heur?.number, u.has("number")),
+    issueDate: combineField(fm.issueDate, heur?.issueDate, u.has("issueDate")),
+    examDate: combineField(fm.examDate, heur?.examDate, u.has("examDate")),
+    expiryDate: combineField(fm.expiryDate, heur?.expiryDate, u.has("expiryDate")),
   };
   doc.overall = overallOf([doc.type, doc.number, doc.issueDate, doc.examDate, doc.expiryDate]);
   return doc.type || doc.number || doc.issueDate || doc.expiryDate ? doc : heur;
@@ -448,6 +465,26 @@ function sDate(v: unknown): string | undefined {
   return t ? parseDateStr(t) ?? undefined : undefined;
 }
 
+// Field names the extractor is allowed to flag. Anything else in `uncertain` is
+// dropped, so a stray name can never bury a value the confirm sheet renders.
+const FM_FLIGHT_FIELDS = [
+  "date", "aircraftType", "registration", "loggedRole", "from", "to",
+  "se", "me", "xc", "dayHours", "nightHours", "ifrActual", "ifrSim",
+  "notes", "pic", "sic",
+];
+const FM_DOCUMENT_FIELDS = ["type", "number", "issueDate", "examDate", "expiryDate"];
+
+function sUncertain(v: unknown, allowed: string[]): string[] | undefined {
+  if (!Array.isArray(v)) return undefined;
+  const out = new Set<string>();
+  for (const item of v) {
+    if (typeof item !== "string") continue;
+    const name = item.trim();
+    if (allowed.includes(name)) out.add(name);
+  }
+  return out.size ? [...out] : undefined;
+}
+
 export function sanitizeFmFlight(raw: unknown): FmFlight | null {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
   const r = raw as Record<string, unknown>;
@@ -463,8 +500,12 @@ export function sanitizeFmFlight(raw: unknown): FmFlight | null {
     ifrActual: sNum(r.ifrActual, 24), ifrSim: sNum(r.ifrSim, 24),
     pic: sStr(r.pic, 60), sic: sStr(r.sic, 60), notes: sStr(r.notes, 200),
   };
-  const hasAny = Object.values(f).some((v) => v !== undefined);
-  return hasAny ? f : null;
+  // Checked before `uncertain` is attached — a row of nothing but flags is
+  // still an empty row.
+  if (!Object.values(f).some((v) => v !== undefined)) return null;
+  const uncertain = sUncertain(r.uncertain, FM_FLIGHT_FIELDS);
+  if (uncertain) f.uncertain = uncertain;
+  return f;
 }
 
 export function sanitizeFmFlights(raw: unknown): FmFlight[] {
@@ -482,7 +523,10 @@ export function sanitizeFmDocument(raw: unknown): FmDocument | undefined {
     examDate: sDate(r.examDate),
     expiryDate: sDate(r.expiryDate),
   };
-  return Object.values(d).some((v) => v !== undefined) ? d : undefined;
+  if (!Object.values(d).some((v) => v !== undefined)) return undefined;
+  const uncertain = sUncertain(r.uncertain, FM_DOCUMENT_FIELDS);
+  if (uncertain) d.uncertain = uncertain;
+  return d;
 }
 
 // Confidence below this ⇒ the confirm UI highlights the field for review.

@@ -147,6 +147,31 @@ export function run(): Suite {
     s.check("FM-only document fields arrive at 0.75", d?.type?.confidence === 0.75 && d?.number?.value === "A-123456");
   }
 
+  // ---- extractor-flagged fields (`uncertain`) reach the review threshold ----
+  // The website has no on-device OCR, so the model is the only source and every
+  // field used to land on a flat 0.75 — just above LOW_CONFIDENCE, meaning the
+  // confirm sheet highlighted nothing at all. Self-flagging is the signal.
+  {
+    const heur = parseFlightsFromOcr([ocrPage(["JULY 2026", "17 C-GABC C172 CYNJ CYPK 1.2"])]);
+
+    const cloudOnly = combineFlights(
+      [{ date: "2026-07-17", registration: "C-GABC", se: 1.2, uncertain: ["registration"] }],
+      [], // no heuristic rows — the website path
+    )[0];
+    s.check("unflagged cloud field stays above the review threshold", (cloudOnly?.se?.confidence ?? 0) > LOW_CONFIDENCE);
+    s.check("flagged cloud field drops under the review threshold", (cloudOnly?.registration?.confidence ?? 1) < LOW_CONFIDENCE);
+    s.check("a flagged field keeps its value for the pilot to confirm", cloudOnly?.registration?.value === "C-GABC");
+
+    const agreed = combineFlights([{ date: "2026-07-17", registration: "C-GABC", uncertain: ["registration"] }], heur)[0];
+    s.check("independent OCR agreement outranks the model's own doubt", agreed?.registration?.confidence === 0.95);
+
+    const doc = combineDocument({ type: "Category 1 Medical", number: "A-123456", uncertain: ["number"] }, null);
+    s.check(
+      "document flags are per-field, not all-or-nothing",
+      (doc?.number?.confidence ?? 1) < LOW_CONFIDENCE && (doc?.type?.confidence ?? 0) > LOW_CONFIDENCE,
+    );
+  }
+
   // ---- cloud-extraction sanitizers (untrusted model JSON → safe FmFlight) ----
   {
     const flights = sanitizeFmFlights([
@@ -165,6 +190,14 @@ export function run(): Suite {
 
     const big = sanitizeFmFlights(Array.from({ length: 200 }, () => ({ date: "2026-01-01" })));
     s.check("sanitizer: row count capped at 60", big.length === 60);
+
+    const flagged = sanitizeFmFlights([{ date: "2026-07-17", uncertain: ["date", "date", "nope", 7] }]);
+    s.eq("sanitizer: uncertain deduped and filtered to real field names", flagged[0]?.uncertain, ["date"]);
+    s.check(
+      "sanitizer: a non-array uncertain is ignored",
+      sanitizeFmFlights([{ date: "2026-07-17", uncertain: "date" }])[0]?.uncertain === undefined,
+    );
+    s.check("sanitizer: flags with no values are not a row", sanitizeFmFlights([{ uncertain: ["date"] }]).length === 0);
 
     const d = sanitizeFmDocument({ type: "Category 1 Medical", examDate: "02 Jul 2026", junk: 1 });
     s.check("sanitizer: document dates normalized, junk dropped", d?.examDate === "2026-07-02" && (d as Record<string, unknown>).junk === undefined);
