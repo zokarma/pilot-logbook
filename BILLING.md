@@ -1,9 +1,11 @@
 # Billing & Subscriptions
 
-**Status: web backend built (Stripe) and enforcement ON.** The following
-surfaces are now gated to the tier shown; everything else stays free. What
-exists now, and the operator steps to run it, are at the top; the original
-plan (incl. RevenueCat / native IAP for later) follows.
+**Status: web backend built (Stripe) and enforcement ON. iOS is compliant
+web-only (no in-app purchase path, no steering) — see "App Store note" for
+the reviewed decision to defer native IAP.** The following surfaces are now
+gated to the tier shown; everything else stays free. What exists now, and the
+operator steps to run it, are at the top; the original plan (incl.
+RevenueCat / native IAP for later) follows.
 
 | Surface | Feature | Min tier |
 |---|---|---|
@@ -11,12 +13,23 @@ plan (incl. RevenueCat / native IAP for later) follows.
 | Document OCR scanning (documents) | `docOcr` | Pro |
 | Professional PDF export (logger) | `proPdf` | Pro |
 | Custom currency rules (currency) | `advancedCurrency` | Pro |
-| Duty & rest analysis (whole page) | `dutyRest` | Professional |
+| Duty & rest analysis (whole page) | `dutyRest` | Pro |
+
+There is no Professional tier any more — it was withdrawn from every
+customer-facing surface (`/pricing`, the landing page, structured data) because
+its differentiators (roster import, company reports, advanced analytics,
+priority support, unlimited scanning) were never built. `dutyRest` moved to
+Pro. `"professional"` stays in the `Tier` union / `RANK` / webhook price map
+purely so any subscription sold while it was listed keeps resolving — it has
+no purchase path. See `claims.eval.ts` (#20), which fails the build if
+Professional reappears in copy or a declared feature has no enforcement site.
 
 A gradient **Upgrade** link appears in the sidebar for non-premium users
-(`useEntitlement().isPremium`). Multi-device, native apps, backup, unlimited
-reminders/scan quotas, roster import and company reports are **not** gated as
-single toggles — they're architectural or quota concepts to wire in later.
+(`useEntitlement().isPremium`) **on the web only** — see "App Store note"
+below for why it (and every other upgrade CTA) is hidden inside the iOS app.
+Multi-device, native apps, backup, unlimited reminders/scan quotas are **not**
+gated as single toggles — they're architectural or quota concepts to wire in
+later.
 
 **Client gates are UI only — they are not security.** Anyone can edit
 localStorage or the JS bundle, so a client check can never protect something
@@ -255,6 +268,54 @@ Full operator SQL/verify screenshots-era procedure was run for the sandbox on
 iOS may **honor** a web-purchased subscription but may not **sell** premium
 in-app without Apple IAP — keep the iOS app login-only for premium (the
 "Spotify method"). Add RevenueCat/native IAP later per the plan below.
+
+**Decision — reviewed 2026-07-27: web-only for launch, revisit once there's
+usage data.** Before this date the iOS app was in violation: `/pricing`
+shipped inside the app bundle with no native guard, so it contained a working
+Stripe checkout — selling a subscription outside IAP, in-app. Fixed (see
+below); the app now sells nothing anywhere.
+
+- **What's fixed:** a `useCanPurchase()` hook (`src/hooks/useCanPurchase.ts`)
+  is `false` in the native shell and fails closed until it resolves. Every
+  upgrade affordance — the sidebar Upgrade link, `PremiumGate`, the scan PRO
+  chip, the currency-rules PRO chip — gates on it; in the app they degrade to
+  a plain statement that the feature is Pro, with **no link and no mention of
+  where to buy** (naming the website is itself the steering Guideline 3.1.1
+  prohibits). `/pricing` itself redirects the native shell to `/logger`, so
+  checkout is unreachable even by URL. `claims.eval.ts` (#20) asserts all of
+  this structurally, so a future CTA can't quietly reopen the hole.
+- **What a Pro subscriber sees in the app:** Settings → **Your plan**
+  (`src/components/SettingsModal.tsx`, wording from the pure
+  `describeEntitlement()` in `entitlement.ts`) — tier, renewal/trial/past-due
+  state, and *"Subscriptions are managed wherever you signed up for them, not
+  in the app."* This is the only in-app evidence a subscription is live; there
+  is currently no way to reach a "Manage" screen from there because there is
+  nothing on Apple's side to manage.
+- **Why defer IAP rather than build it now:** the honest comparison isn't
+  85%/100% (Apple's Small Business Program is **15%** for developers under
+  ~$1M/yr, so $10/mo nets $8.50, not $7 — confirm current terms before
+  relying on this number). It's 85% vs **zero** — an iOS pilot who hits a Pro
+  wall today has no path forward at all, and in-app paywalls convert far
+  better than "go find our website" (which can't even be said out loud). But
+  IAP is a real project: StoreKit 2 behind a Capacitor bridge, App Store
+  Server Notifications v2 into a new Edge Function, receipt validation, the
+  Apple-required restore-purchases flow, and two billing systems to reconcile
+  forever (refunds/upgrades/proration differ on each side). Building it
+  without knowing whether App Store discovery is even a meaningful channel is
+  guessing.
+- **Revisit when:** analytics show a meaningful share of signups arriving via
+  the App Store rather than the website, or the Pro-wall dead-end is visibly
+  costing conversions. Until then, ship web-only and let real numbers decide.
+- **What's already ready for it:** the entitlement model needs no logic
+  change — `plb_entitlements.source` is already `'stripe' (later: 'apple' |
+  'google')`, and `entitlementFromSubscriptions` already picks the best grant
+  across multiple rows, so a pilot holding both a Stripe and an Apple
+  subscription would resolve correctly on day one. The one schema change
+  needed: `plb_subscriptions` is keyed `stripe_subscription_id text primary
+  key`; add a generic `id text primary key` + `source text not null default
+  'stripe'` (Stripe rows keep using their subscription id as `id`) before an
+  Apple row can be inserted. See the RevenueCat plan below for the rest of the
+  wiring.
 
 ---
 
