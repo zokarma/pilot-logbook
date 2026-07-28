@@ -6,6 +6,7 @@ import { useData } from "@/context/DataContext";
 import { showDutyForRole } from "@/lib/roleDefaults";
 import BugReporter from "./BugReporter";
 import { useEntitlement } from "@/hooks/useEntitlement";
+import { useCanPurchase } from "@/hooks/useCanPurchase";
 
 export const NAV: { href: string; label: string; icon: React.ReactNode }[] = [
   {
@@ -97,6 +98,7 @@ export default function Sidebar({ open, onClose }: { open: boolean; onClose: () 
     (n) => n.href !== "/duty" || pathname === "/duty" || showDutyForRole(data),
   );
   const { isPremium, ready: entReady } = useEntitlement();
+  const canPurchase = useCanPurchase();
 
   // On phones the sidebar is an overlay drawer — navigating should dismiss it.
   const onNavigate = () => {
@@ -137,7 +139,9 @@ export default function Sidebar({ open, onClose }: { open: boolean; onClose: () 
         ))}
       </nav>
 
-      {entReady && !isPremium && (
+      {/* Web only: an "Upgrade" button inside the iOS app steers to an outside
+          purchase, which is what Guideline 3.1.1 prohibits for a non-IAP app. */}
+      {entReady && !isPremium && canPurchase && (
         <div className="px-3 mt-4">
           <Link
             href="/pricing"

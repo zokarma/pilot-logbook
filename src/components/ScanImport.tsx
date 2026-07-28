@@ -22,6 +22,7 @@ import {
 import { scanAvailability, scanDocuments, scanImages, AiReason } from "@/lib/scanBridge";
 import { cloudScanAvailable, cloudExtract } from "@/lib/cloudScan";
 import { useEntitlement } from "@/hooks/useEntitlement";
+import { useCanPurchase } from "@/hooks/useCanPurchase";
 import Link from "next/link";
 
 // Read picked files to base64 (data-URL prefix included; the native side
@@ -172,6 +173,7 @@ export default function ScanImport({ mode }: { mode: Mode }) {
   // broken feature, not a free one. Reviewed and kept 2026-07-27 — don't
   // "improve" this by ungating the camera without re-testing that parser.
   const { has, ready: entReady } = useEntitlement();
+  const canPurchase = useCanPurchase();
   const scanFeature = mode === "flights" ? "aiScan" : "docOcr";
   // `has` is false until the entitlement resolves — guard the scan actions with
   // it so nothing can start on a half-loaded answer, but only swap in the PRO
@@ -352,17 +354,32 @@ export default function ScanImport({ mode }: { mode: Mode }) {
     <>
       <span className="inline-flex items-center gap-2 flex-wrap">
         {scanGated ? (
-          <Link
-            href="/pricing"
-            title="AI scanning is a Pro feature — upgrade to unlock it"
-            className="text-sm bg-brand-600 hover:bg-brand-700 text-white font-medium px-3 py-1.5 rounded-lg transition inline-flex items-center gap-1.5"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="5" y="11" width="14" height="10" rx="2" /><path d="M8 11V7a4 4 0 0 1 8 0v4" />
-            </svg>
-            {mode === "flights" ? "Scan Logbook (AI)" : "Scan Document (AI)"}
-            <span className="text-[10px] font-semibold bg-white/20 px-1.5 py-0.5 rounded">PRO</span>
-          </Link>
+          canPurchase ? (
+            <Link
+              href="/pricing"
+              title="AI scanning is a Pro feature — upgrade to unlock it"
+              className="text-sm bg-brand-600 hover:bg-brand-700 text-white font-medium px-3 py-1.5 rounded-lg transition inline-flex items-center gap-1.5"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="5" y="11" width="14" height="10" rx="2" /><path d="M8 11V7a4 4 0 0 1 8 0v4" />
+              </svg>
+              {mode === "flights" ? "Scan Logbook (AI)" : "Scan Document (AI)"}
+              <span className="text-[10px] font-semibold bg-white/20 px-1.5 py-0.5 rounded">PRO</span>
+            </Link>
+          ) : (
+            // In the app: a dead, self-explanatory chip. Says what the feature
+            // is and that it isn't included — links nowhere.
+            <span
+              title="Included with Pro"
+              className="text-sm bg-slate-800 text-slate-400 font-medium px-3 py-1.5 rounded-lg inline-flex items-center gap-1.5 cursor-default"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="5" y="11" width="14" height="10" rx="2" /><path d="M8 11V7a4 4 0 0 1 8 0v4" />
+              </svg>
+              {mode === "flights" ? "Scan Logbook (AI)" : "Scan Document (AI)"}
+              <span className="text-[10px] font-semibold bg-slate-700 px-1.5 py-0.5 rounded">PRO</span>
+            </span>
+          )
         ) : (
           <>
             {available && (

@@ -198,5 +198,36 @@ export function run(): Suite {
     );
   }
 
+  /* ---------------- no purchase path inside the native app ---------------- */
+  // The business model is web-only subscriptions: the iOS app honours whatever
+  // entitlement the account has and sells nothing. Apple's Guideline 3.1.1
+  // allows that ONLY if the app neither sells nor steers toward an outside
+  // purchase — so every upgrade affordance must be behind useCanPurchase(),
+  // and /pricing (which ships inside the app bundle) must bounce the native
+  // shell before its Stripe buttons render.
+  {
+    s.check("/pricing redirects the native shell away from checkout",
+      /isNativeApp\(\)/.test(pricing) && /router\.replace/.test(pricing));
+
+    // Every in-app surface that links to /pricing must gate on canPurchase.
+    const gated = [
+      "src/components/PremiumGate.tsx",
+      "src/components/Sidebar.tsx",
+      "src/components/ScanImport.tsx",
+      "src/app/(app)/currency/page.tsx",
+    ];
+    for (const f of gated) {
+      const src = read(f);
+      if (!src.includes('href="/pricing"')) continue; // no CTA here any more
+      s.check(`${f.split("/").pop()} gates its upgrade CTA on canPurchase`,
+        /useCanPurchase/.test(src) && /canPurchase/.test(src));
+    }
+
+    // The hook itself must key off the native shell, not something cosmetic.
+    const hook = read("src/hooks/useCanPurchase.ts");
+    s.check("useCanPurchase is driven by isNativeApp()", /isNativeApp/.test(hook));
+    s.check("useCanPurchase fails closed (false before it resolves)", /useState\(false\)/.test(hook));
+  }
+
   return s;
 }

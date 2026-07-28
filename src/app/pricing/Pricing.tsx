@@ -8,7 +8,9 @@
 // sent to /login first).
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { isNativeApp } from "@/lib/native";
 import { startCheckout, BillingPeriod } from "@/lib/checkout";
 import type { Tier } from "@/lib/entitlement";
 import { FAQS } from "@/lib/seo";
@@ -77,6 +79,16 @@ export default function Pricing() {
   // create-checkout surface here rather than only in the console.
   const [busyPlan, setBusyPlan] = useState<string | null>(null);
   const [checkoutErr, setCheckoutErr] = useState<{ plan: string; msg: string } | null>(null);
+
+  // The native shell must never reach a purchase flow. /pricing is part of the
+  // static bundle shipped inside the iOS app, so without this guard the app
+  // contains a working Stripe checkout — selling digital goods outside In-App
+  // Purchase, which Guideline 3.1.1 prohibits. Subscriptions are sold on the
+  // website only; the app just honours the entitlement on the account.
+  const router = useRouter();
+  useEffect(() => {
+    if (isNativeApp()) router.replace("/logger");
+  }, [router]);
 
   async function buy(tier: Exclude<Tier, "free">) {
     const period: BillingPeriod = annual ? "year" : "month";
