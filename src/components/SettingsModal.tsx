@@ -9,6 +9,10 @@ import { useData } from "@/context/DataContext";
 import { isNativeApp } from "@/lib/native";
 import { notificationsAvailable, requestNotificationPermission } from "@/lib/notificationsBridge";
 import { useUi } from "./UiProvider";
+import { useEntitlement } from "@/hooks/useEntitlement";
+import { useCanPurchase } from "@/hooks/useCanPurchase";
+import { describeEntitlement } from "@/lib/entitlement";
+import Link from "next/link";
 
 const LEAD_OPTIONS = [7, 14, 30, 60, 90];
 
@@ -16,6 +20,9 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
   const router = useRouter();
   const { data, mutate, cloud, currentUser, deleteAccount } = useData();
   const { confirmDialog } = useUi();
+  const { entitlement, isPremium, ready: entReady } = useEntitlement();
+  const canPurchase = useCanPurchase();
+  const plan = describeEntitlement(entitlement);
   const [deleting, setDeleting] = useState(false);
   const [deleteErr, setDeleteErr] = useState<string | null>(null);
   const [permMsg, setPermMsg] = useState<string | null>(null);
@@ -115,6 +122,36 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
           )}
           {permMsg && <p className="text-xs text-amber-300 mt-2">{permMsg}</p>}
         </div>
+
+        {/* Your plan — the only place a pilot can see what they're paying for.
+            On the web it links to the plans page; in the app it states where the
+            subscription is managed WITHOUT linking, because pointing at an
+            outside purchase is the steering Guideline 3.1.1 prohibits. */}
+        {entReady && (
+          <div className="mt-6 pt-5 border-t border-slate-800">
+            <h4 className="text-sm font-semibold text-slate-200 mb-1">Your plan</h4>
+            <p className="text-sm text-slate-300">
+              <span className={"font-semibold " + (plan.needsAttention ? "text-amber-300" : "text-brand-300")}>
+                {plan.label}
+              </span>
+              <span className="mx-2 text-slate-600">·</span>
+              <span className={plan.needsAttention ? "text-amber-200/90" : "text-slate-400"}>{plan.detail}</span>
+            </p>
+            {canPurchase ? (
+              <Link
+                href="/pricing"
+                onClick={onClose}
+                className="inline-block mt-3 text-sm font-medium text-slate-200 bg-slate-800 hover:bg-slate-700 px-3 py-1.5 rounded-lg transition"
+              >
+                {isPremium ? "Manage subscription" : "See plans"}
+              </Link>
+            ) : (
+              <p className="text-xs text-slate-500 mt-2">
+                Subscriptions are managed wherever you signed up for them, not in the app.
+              </p>
+            )}
+          </div>
+        )}
 
         <div className="mt-6 pt-5 border-t border-slate-800">
           <h4 className="text-sm font-semibold text-slate-200 mb-1">Guided tour</h4>

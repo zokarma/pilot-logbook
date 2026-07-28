@@ -174,3 +174,85 @@ export function entitlementFromSubscriptions(
     source: (best as Entitlement).source ?? null,
   };
 }
+
+/* ------------------------------ plan description ------------------------------
+ * Human-readable summary of where a pilot stands, for the "Your plan" panel.
+ *
+ * This matters more than it looks on iOS. Subscriptions are sold on the website
+ * only, so the app can't offer an upgrade — but it must still tell a paying
+ * pilot that they ARE paying, and when their access runs to. Without it a Pro
+ * subscriber opening the app sees no evidence their money did anything.
+ *
+ * Pure so the wording is eval-able; the UI decides what (if any) action to
+ * attach, since a purchase link is only legal on the web.
+ */
+
+const MONTHS = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
+];
+
+/**
+ * "2026-08-12T…" → "12 August 2026". Empty string when there's no date.
+ *
+ * Formatted in UTC on purpose. Stripe period ends land on midnight UTC, so
+ * local getters would show the day BEFORE for every pilot west of Greenwich —
+ * i.e. all of Canada — and the app would disagree with their invoice.
+ */
+export function formatPeriodEnd(iso: string | null): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return "";
+  return `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
+}
+
+export interface PlanDescription {
+  /** Plan name to show, already resolved through effectiveTier (expiry applied). */
+  label: string;
+  /** One line of context: renewal, trial end, or what Free includes. */
+  detail: string;
+  /** True when the pilot should do something (failed payment, ending trial). */
+  needsAttention: boolean;
+}
+
+export function describeEntitlement(
+  e: Entitlement | null | undefined,
+  now: Date = new Date(),
+): PlanDescription {
+  const tier = effectiveTier(e, now);
+  if (tier === "free") {
+    return {
+      label: TIER_LABEL.free,
+      detail: "Logging, currency, documents and exports — yours for good.",
+      needsAttention: false,
+    };
+  }
+  const label = TIER_LABEL[tier];
+  const when = formatPeriodEnd(e?.currentPeriodEnd ?? null);
+  switch (e?.status) {
+    case "trialing":
+      return {
+        label: `${label} trial`,
+        detail: when ? `Your trial runs to ${when}.` : "You're on a free trial.",
+        needsAttention: true,
+      };
+    case "past_due":
+      return {
+        label,
+        detail: "We couldn't take the last payment — update your card to keep it.",
+        needsAttention: true,
+      };
+    case "canceled":
+      return {
+        label,
+        detail: when ? `Cancelled — you keep ${label} until ${when}.` : `Cancelled.`,
+        needsAttention: true,
+      };
+    default:
+      return {
+        label,
+        detail: when ? `Renews ${when}.` : "Active.",
+        needsAttention: false,
+      };
+  }
+}
