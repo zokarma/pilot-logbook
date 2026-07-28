@@ -5,6 +5,7 @@
 import {
   toCSV, parseCSV, parseAnyDate, expandTwoDigitYear, importCSV, normalizeName, ownerRoleForRow,
 } from "../src/lib/csv";
+import { findDuplicateFlights, flightDupKey } from "../src/lib/logbook";
 import { Suite } from "./harness";
 import { mkData, mkFlight, mkPilot, clone } from "./fixtures";
 
@@ -166,6 +167,59 @@ export function run(): Suite {
       "structured import into an empty account",
       `currentPilotId lands on "${owner?.firstName} ${owner?.lastName}" — with no pre-existing owner pilot, the post-import ownership pass uses the first *crew name encountered* as "me", so an un-onboarded import attributes the logbook to a crew member. Onboarding-first (the real flow) avoids this.`,
     );
+  }
+
+  /* ---------------- duplicate-import protection ---------------- */
+  // Re-importing the same file used to silently double a logbook — a legal
+  // record. These pin both halves: repeats are caught, and a leg genuinely
+  // flown twice still survives.
+  {
+    const hdr = "Date,Aircraft Type,Civil Ident,From,To,SE,ME\n";
+    const row = "2026-07-20,C172,C-GABC,CYYZ,CYOW,1.4,0\n";
+
+    const first = importCSV(mkData(), hdr + row, []);
+    s.eq("first import adds the flight", first.added, 1);
+    s.eq("first import sees no duplicates", first.duplicates ?? 0, 0);
+
+    const second = importCSV(clone(first.data), hdr + row, []);
+    s.eq("re-importing the same file adds nothing", second.added, 0);
+    s.eq("...and reports it as a duplicate", second.duplicates, 1);
+    s.eq("the logbook still holds exactly one flight", second.data.flights.length, 1);
+
+    // A leg genuinely flown twice in one day must import twice.
+    const twice = importCSV(mkData(), hdr + row + row, []);
+    s.eq("the same leg twice in one file imports twice", twice.added, 2);
+
+    // Multiplicity: logbook has one, file brings two → exactly one is new.
+    const topUp = importCSV(clone(first.data), hdr + row + row, []);
+    s.eq("one already logged, two in the file → one new", topUp.added, 1);
+    s.eq("...and one flagged duplicate", topUp.duplicates, 1);
+
+    // Different duration on the same route/date is a different flight.
+    const diff = importCSV(clone(first.data), hdr + "2026-07-20,C172,C-GABC,CYYZ,CYOW,2.1,0\n", []);
+    s.eq("same route and date but different hours still imports", diff.added, 1);
+
+    s.check("dup key is stable and case/format-insensitive on registration",
+      flightDupKey({ date: "2026-07-20", registration: "c-gabc", from: "cyyz", to: "cyow", se: 1.4 })
+      === flightDupKey({ date: "2026-07-20", registration: "C-GABC", from: "CYYZ", to: "CYOW", se: 1.4 }));
+    s.check("findDuplicateFlights mutates neither list", (() => {
+      const existing = [mkFlight("a", { date: "2026-01-01", registration: "C-AAAA", se: 1 })];
+      const incoming = [{ date: "2026-01-01", registration: "C-AAAA", se: 1 }];
+      const before = JSON.stringify([existing, incoming]);
+      findDuplicateFlights(existing, incoming);
+      return JSON.stringify([existing, incoming]) === before;
+    })());
+  }
+
+  /* ---------------- owner matching needs a length floor ---------------- */
+  // A bare initial normalizes to one character, which is inside almost any
+  // name — it used to claim the row and corrupt the PIC-vs-dual split.
+  {
+    s.check("a single initial no longer claims a row", ownerRoleForRow("K.", "", ["zohebkarmali"]) === null);
+    s.check("two letters are still too few", ownerRoleForRow("Ka", "", ["zohebkarmali"]) === null);
+    s.eq("an exact name match still wins", ownerRoleForRow("Zoheb Karmali", "", ["zohebkarmali"]), "Captain");
+    s.eq("a real substring (3+) still matches", ownerRoleForRow("karmali", "", ["zohebkarmali"]), "Captain");
+    s.eq("the SIC slot matches on the same rule", ownerRoleForRow("Someone Else", "karmali", ["zohebkarmali"]), "Student");
   }
 
   return s;

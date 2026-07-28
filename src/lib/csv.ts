@@ -5,7 +5,7 @@
 
 import { AppData, DayNight, Flight } from "./types";
 import { migrateData } from "./migrate";
-import { num, pilotName } from "./logbook";
+import { num, pilotName, findDuplicateFlights } from "./logbook";
 import { uid } from "./id";
 
 // "None" = the pilot didn't perform the takeoff/landing (pilot monitoring);
@@ -243,10 +243,18 @@ export function ownerRoleForRow(picRaw: string, sicRaw: string, ownerNames: stri
   if (!ownerNames || !ownerNames.length) return null;
   const picN = normalizeName(picRaw);
   const sicN = normalizeName(sicRaw);
+  // Substring matching needs a floor: an initial like "K." normalizes to "k",
+  // which is inside almost any name ("zohebkarmali"), so the row would be
+  // claimed for the wrong pilot — wrong role, wrong crew slot, and a corrupted
+  // PIC-vs-dual split. Exact matches are always honoured; loose containment
+  // needs at least 3 characters on BOTH sides to mean anything.
+  const MIN_LOOSE = 3;
+  const loose = (a: string, b: string) =>
+    a.length >= MIN_LOOSE && b.length >= MIN_LOOSE && (a.includes(b) || b.includes(a));
   for (const n of ownerNames) {
     if (!n) continue;
-    if (picN && (picN === n || picN.includes(n) || n.includes(picN))) return "Captain";
-    if (sicN && (sicN === n || sicN.includes(n) || n.includes(sicN))) return "Student";
+    if (picN && (picN === n || loose(picN, n))) return "Captain";
+    if (sicN && (sicN === n || loose(sicN, n))) return "Student";
   }
   return null;
 }
@@ -255,6 +263,8 @@ export interface ImportResult {
   data: AppData;
   added: number;
   skipped: number;
+  /** Rows matching a flight already in the logbook, skipped rather than doubled. */
+  duplicates?: number;
   error?: string;
   format?: string;
   roleCounts?: { Captain: number; Student: number };
@@ -383,7 +393,13 @@ export function importCSV(data: AppData, text: string, ownerNames: string[]): Im
     };
   }
 
-  let added = 0, skipped = 0;
+  // Parse every row first, then dedupe the whole batch against the logbook AS
+  // IT WAS before this import. Comparing against rows added during this same
+  // run would flag the second of two identical legs — a leg genuinely flown
+  // twice in a day — as a duplicate and silently drop it.
+  const preExisting = [...data.flights];
+  const candidates: Flight[] = [];
+  let skipped = 0;
   for (let r = 1; r < rows.length; r++) {
     const cells = rows[r];
     const get = (f: string) => (idx[f] != null ? (cells[idx[f]] || "").trim() : "");
@@ -397,7 +413,7 @@ export function importCSV(data: AppData, text: string, ownerNames: string[]): Im
       if (!isNaN(y) && y < 100) y = expandTwoDigitYear(y);
     }
     if (isNaN(y) || isNaN(m) || isNaN(d) || y < 1900 || y > 2200 || m < 1 || m > 12 || d < 1 || d > 31) { skipped++; continue; }
-    data.flights.push({
+    const candidate = {
       id: uid("f"),
       year: y, month: m, day: d,
       date: `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`,
@@ -417,9 +433,17 @@ export function importCSV(data: AppData, text: string, ownerNames: string[]): Im
       ...(get("approaches") !== "" ? { approaches: num(get("approaches")) } : {}),
       loggedRole: get("loggedRole") || "Captain",
       notes: get("notes"),
-    } as Flight);
-    added++;
+    } as Flight;
+    candidates.push(candidate);
   }
-  if (added) return { data: migrateData(data), added, skipped };
-  return { data, added, skipped };
+
+  // Count-aware: if the logbook holds one matching flight and the file brings
+  // two, exactly one is a duplicate and the other is real.
+  const dupIdx = findDuplicateFlights(preExisting, candidates);
+  const duplicates = dupIdx.size;
+  candidates.forEach((fl, i) => { if (!dupIdx.has(i)) data.flights.push(fl); });
+  const added = candidates.length - duplicates;
+
+  if (added) return { data: migrateData(data), added, skipped, duplicates };
+  return { data, added, skipped, duplicates };
 }

@@ -35,6 +35,10 @@ export function flightRefCount(data: AppData, ids: string[]): number {
 export function applyMerge(draft: AppData, targetId: string, sourceIds: string[]): void {
   const tgt = draft.pilots.find((p) => p.id === targetId);
   if (!tgt) return;
+  // Merging a pilot into themselves would delete the target at the end of this
+  // function, leaving every flight pointing at an id that no longer exists. The
+  // UI never offers it; this makes it impossible however applyMerge is called.
+  sourceIds = sourceIds.filter((id) => id !== targetId);
   sourceIds.forEach((id) => {
     const src = draft.pilots.find((p) => p.id === id);
     if (!src) return;

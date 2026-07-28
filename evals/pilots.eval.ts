@@ -84,5 +84,31 @@ export function run(): Suite {
     );
   }
 
+  /* -------- merging a pilot into themselves must be a no-op, not a delete ------ */
+  // Previously the target was removed at the end, leaving every flight pointing
+  // at an id with no pilot behind it. The UI never offers this; the guard makes
+  // it impossible however applyMerge is reached.
+  {
+    const d = mkData({
+      pilots: [mkPilot("a", "Alex", "Reid"), mkPilot("b", "Sam", "Rivard")],
+      currentPilotId: "a",
+      flights: [mkFlight("f1", { pilotId: "a", picId: "a" })],
+    });
+    applyMerge(d, "a", ["a"]);
+    s.check("the target pilot still exists", d.pilots.some((p) => p.id === "a"));
+    s.check("flights still point at a real pilot", d.flights.every((f) => d.pilots.some((p) => p.id === f.picId)));
+
+    // Self-id mixed in with a real source: the real merge still happens.
+    const d2 = mkData({
+      pilots: [mkPilot("a", "Alex", "Reid"), mkPilot("b", "Alex", "Reid")],
+      currentPilotId: "a",
+      flights: [mkFlight("f1", { pilotId: "b", picId: "b" })],
+    });
+    applyMerge(d2, "a", ["a", "b"]);
+    s.check("the duplicate is still merged away", !d2.pilots.some((p) => p.id === "b"));
+    s.check("its flights moved to the target", d2.flights.every((f) => f.picId === "a"));
+    s.check("and the target survived", d2.pilots.some((p) => p.id === "a"));
+  }
+
   return s;
 }

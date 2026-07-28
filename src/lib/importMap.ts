@@ -19,7 +19,7 @@
 
 import { AppData, Flight, ImportTemplate } from "./types";
 import { migrateData } from "./migrate";
-import { pilotName } from "./logbook";
+import { pilotName, findDuplicateFlights } from "./logbook";
 import { parseAnyDate, expandTwoDigitYear, ownerRoleForRow } from "./csv";
 import { uid } from "./id";
 import { hashStr } from "./hash";
@@ -469,6 +469,8 @@ export interface MappedImportResult {
   data: AppData;
   added: number;
   skipped: number;
+  /** Rows that matched a flight already in the logbook and were not imported. */
+  duplicates: number;
   roleCounts: { Captain: number; Student: number };
 }
 
@@ -482,15 +484,26 @@ export function applyMappedImport(
   ownerNames: string[],
 ): MappedImportResult {
   const plan = planImport(rows, dataStart, mapping, ownerNames);
-  for (const p of plan.rows) if (p.ok && p.flight) data.flights.push(p.flight);
+
+  // Drop rows that already exist in the logbook, so re-importing the same file
+  // can't silently double it. Count-aware (see findDuplicateFlights): a leg
+  // genuinely flown twice in a day still imports twice.
+  const candidates = plan.rows.filter((p) => p.ok && p.flight).map((p) => p.flight!);
+  const dupIdx = findDuplicateFlights(data.flights, candidates);
+  const duplicates = dupIdx.size;
+  candidates.forEach((fl, i) => { if (!dupIdx.has(i)) data.flights.push(fl); });
+  const addedNew = candidates.length - duplicates;
 
   const migrated = migrateData(data); // back-fills picId/sicId from names, etc.
 
   // Imported flights belong to the logbook they were imported into; when the
   // owner identified themselves, also pin their crew slot to their profile.
   const myId = migrated.currentPilotId;
-  if (plan.added && myId) {
-    const start = migrated.flights.length - plan.added;
+  // addedNew, NOT plan.added: skipped duplicates were never pushed, so using
+  // the planned count would walk back past the new rows and re-pin flights the
+  // pilot already had.
+  if (addedNew && myId) {
+    const start = migrated.flights.length - addedNew;
     for (let i = migrated.flights.length - 1; i >= Math.max(0, start); i--) {
       const fl = migrated.flights[i];
       fl.pilotId = myId;
@@ -525,5 +538,7 @@ export function applyMappedImport(
     migrated.importTemplates = templates.slice(-MAX_TEMPLATES);
   }
 
-  return { data: migrated, added: plan.added, skipped: plan.skipped, roleCounts: plan.roleCounts };
+  // `added` reports what actually landed, so the UI never claims to have
+  // imported rows it skipped as duplicates.
+  return { data: migrated, added: addedNew, skipped: plan.skipped, duplicates, roleCounts: plan.roleCounts };
 }

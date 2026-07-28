@@ -50,7 +50,9 @@ export default function ImportWizard({
 }: {
   input: WizardInput;
   onClose: () => void;
-  onDone: (msg: { text: string; kind: "ok" | "error" }) => void;
+  // "info" covers an import that added nothing because every row was already
+  // in the logbook — not a success, but not a failure either.
+  onDone: (msg: { text: string; kind: "ok" | "error" | "info" }) => void;
 }) {
   const { data, replace } = useData();
   const { headers, rows, dataStart } = input;
@@ -109,7 +111,15 @@ export default function ImportWizard({
         msg += ` — ${res.roleCounts.Captain} as Captain, ${res.roleCounts.Student} as Student`;
       }
       if (res.skipped) msg += `, skipped ${res.skipped} row${res.skipped === 1 ? "" : "s"}`;
-      onDone({ text: msg + ".", kind: res.added ? "ok" : "error" });
+      // Say so plainly: a silent skip on a re-import looks like lost data,
+      // and a silent import looks like a doubled logbook.
+      if (res.duplicates) {
+        msg += `, and left out ${res.duplicates} already in your logbook`;
+      }
+      onDone({
+        text: msg + ".",
+        kind: res.added ? "ok" : res.duplicates ? "info" : "error",
+      });
     } catch {
       setBusy(false);
       onDone({ text: "Import failed — please check the file and try again.", kind: "error" });
