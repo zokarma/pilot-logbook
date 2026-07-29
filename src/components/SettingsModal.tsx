@@ -12,6 +12,7 @@ import { useUi } from "./UiProvider";
 import { useEntitlement } from "@/hooks/useEntitlement";
 import { useCanPurchase } from "@/hooks/useCanPurchase";
 import { describeEntitlement } from "@/lib/entitlement";
+import { openBillingPortal } from "@/lib/billingPortal";
 import Link from "next/link";
 
 const LEAD_OPTIONS = [7, 14, 30, 60, 90];
@@ -26,6 +27,18 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
   const [deleting, setDeleting] = useState(false);
   const [deleteErr, setDeleteErr] = useState<string | null>(null);
   const [permMsg, setPermMsg] = useState<string | null>(null);
+  const [portalBusy, setPortalBusy] = useState(false);
+  const [portalErr, setPortalErr] = useState<string | null>(null);
+
+  async function onManageSubscription() {
+    setPortalBusy(true);
+    setPortalErr(null);
+    const { error } = await openBillingPortal();
+    // On success the browser is already navigating away; only a failure
+    // returns here with the modal still mounted.
+    if (error) setPortalErr(error);
+    setPortalBusy(false);
+  }
 
   const prefs = data.notificationPrefs;
   const native = isNativeApp();
@@ -124,7 +137,9 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
         </div>
 
         {/* Your plan — the only place a pilot can see what they're paying for.
-            On the web it links to the plans page; in the app it states where the
+            On the web, a Pro subscriber opens the Stripe Billing Portal
+            (cancel, change plan, update card, invoices — all self-serve); a
+            free pilot sees the plans page. In the app it states where the
             subscription is managed WITHOUT linking, because pointing at an
             outside purchase is the steering Guideline 3.1.1 prohibits. */}
         {entReady && (
@@ -138,13 +153,26 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
               <span className={plan.needsAttention ? "text-amber-200/90" : "text-slate-400"}>{plan.detail}</span>
             </p>
             {canPurchase ? (
-              <Link
-                href="/pricing"
-                onClick={onClose}
-                className="inline-block mt-3 text-sm font-medium text-slate-200 bg-slate-800 hover:bg-slate-700 px-3 py-1.5 rounded-lg transition"
-              >
-                {isPremium ? "Manage subscription" : "See plans"}
-              </Link>
+              isPremium ? (
+                <>
+                  <button
+                    onClick={() => void onManageSubscription()}
+                    disabled={portalBusy}
+                    className="inline-block mt-3 text-sm font-medium text-slate-200 bg-slate-800 hover:bg-slate-700 disabled:opacity-60 px-3 py-1.5 rounded-lg transition"
+                  >
+                    {portalBusy ? "Opening…" : "Manage subscription"}
+                  </button>
+                  {portalErr && <p className="text-xs text-red-400 mt-2">{portalErr}</p>}
+                </>
+              ) : (
+                <Link
+                  href="/pricing"
+                  onClick={onClose}
+                  className="inline-block mt-3 text-sm font-medium text-slate-200 bg-slate-800 hover:bg-slate-700 px-3 py-1.5 rounded-lg transition"
+                >
+                  See plans
+                </Link>
+              )
             ) : (
               <p className="text-xs text-slate-500 mt-2">
                 Subscriptions are managed wherever you signed up for them, not in the app.
