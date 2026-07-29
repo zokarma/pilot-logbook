@@ -163,9 +163,19 @@ Currency is **CAD**: Pro $10/mo · $100/yr, Professional $15/mo · $150/yr
    ```
    supabase functions deploy stripe-webhook --no-verify-jwt
    supabase functions deploy create-checkout
+   supabase functions deploy create-portal-session
    ```
-   `create-checkout` keeps JWT verification **on** — that's what makes the
-   buyer's identity trustworthy.
+   `create-checkout` and `create-portal-session` both keep JWT verification
+   **on** — that's what makes the caller's identity trustworthy in each.
+   `create-portal-session` is what powers Settings → Your plan → **Manage
+   subscription**: it's the pilot's only self-serve way to cancel, change
+   plan, update a card, or see invoices, so "cancel anytime" is a real
+   promise. It needs the same three Stripe secrets as `create-checkout`
+   below, plus **one manual step Stripe requires**: Stripe Dashboard →
+   Settings → Billing → **Customer portal** → Activate. That screen is also
+   where you configure whether cancellation is immediate or end-of-period
+   (match the "no refunds, cancel anytime, keep access to period end" policy
+   below) and whether plan switching is offered in the portal.
    Register the function URL
    (`https://<ref>.supabase.co/functions/v1/stripe-webhook`) as a Stripe
    webhook endpoint subscribing to `checkout.session.completed`,
@@ -253,17 +263,45 @@ Full operator SQL/verify screenshots-era procedure was run for the sandbox on
   read `plb_subscriptions` (already read-your-own under RLS) and apply
   `entitlementFromSubscriptions` client-side, keeping `plb_entitlements` for
   `scan-extract`'s server-side gate.
-- **Plan changes create a second subscription rather than modifying the first.**
-  Checkout Sessions still start a *new* subscription each time, so upgrading
-  leaves the old one running until it's cancelled — the user is briefly billed
-  for both. The derived entitlement handles this correctly (they get the higher
-  tier), but nothing cancels the old subscription automatically. Adding the
-  Stripe **Customer Portal** for plan changes would modify the existing
-  subscription in place and settle it; until then an upgrade wants a manual
-  cancel, or a `create-checkout` step that cancels the caller's other active
-  subscriptions once the new one is confirmed.
+- **Plan changes still create a second subscription rather than modifying the
+  first, unless the Customer Portal is configured to allow switching.** The
+  `create-portal-session` function (below) gives pilots the Customer Portal,
+  which modifies a subscription in place and prorates it correctly — but only
+  if **Stripe Dashboard → Billing → Customer portal → "Switch plans" is turned
+  on** and the target prices are added to that portal's product list. Until
+  that's configured, an upgrade started from `create-checkout` still starts a
+  *new* subscription alongside the old one (the derived entitlement handles it
+  correctly — the pilot gets the higher tier — but nothing cancels the old
+  subscription automatically, so they're briefly billed for both).
 
-## App Store note
+## Refund & cancellation policy
+
+**Decided 2026-07-27: no refunds, cancel anytime.** Cancelling stops future
+billing; the pilot keeps Pro until the end of the period already paid for,
+then drops to Free (nothing is deleted — see the pricing FAQ). No prorated or
+money-back refunds for a partial period. The 14-day free trial is the actual
+try-before-you-pay mechanism, so a refund window on top of it would be
+redundant. Support may still issue a manual refund at its discretion for a
+genuine billing error (double charge, a bug that broke the app) — that's a
+judgment call, not a published guarantee.
+
+This is stated to pilots in two places, both sourced from `FAQS` in
+`src/lib/seo.ts` so they can't drift apart: **"Can I cancel anytime?"** and
+**"What's your refund policy?"** (also emitted as `FAQPage` structured data
+for search/AI answer engines — see `claims.eval.ts` #20).
+
+**Operational note — refund and cancel are separate Stripe actions.**
+Issuing a refund on a charge does **not** cancel the subscription. If support
+refunds a charge without also cancelling (or the portal's cancellation is set
+to end-of-period), the pilot keeps Pro access despite the refund. Whoever
+handles a refund request needs to do both: refund the charge **and** cancel
+the subscription (or set it not to renew) in the same pass.
+
+**Chargebacks bypass this policy entirely.** A cardholder can always dispute
+a charge with their bank regardless of what's published here — Stripe passes
+along a dispute fee when that happens. A clearly stated policy (which this
+now is) is what a payment processor expects and is the main defence against
+disputes, but it doesn't prevent them.
 
 iOS may **honor** a web-purchased subscription but may not **sell** premium
 in-app without Apple IAP — keep the iOS app login-only for premium (the

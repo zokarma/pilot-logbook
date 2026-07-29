@@ -229,5 +229,32 @@ export function run(): Suite {
     s.check("useCanPurchase fails closed (false before it resolves)", /useState\(false\)/.test(hook));
   }
 
+  /* ---------------- refund / cancellation policy is real, not just words ---------------- */
+  // "Cancel anytime" and a stated refund policy are meaningless if there's no
+  // actual way to cancel — this pins that the FAQ promise and the shipped
+  // self-serve mechanism (the Stripe Billing Portal) agree with each other.
+  {
+    const cancelFaq = FAQS.find((f) => /cancel anytime/i.test(f.q));
+    const refundFaq = FAQS.find((f) => /refund/i.test(f.q));
+    s.check("a cancellation FAQ exists", !!cancelFaq);
+    s.check("a refund-policy FAQ exists", !!refundFaq);
+    s.check("the cancel FAQ describes a REAL self-serve mechanism (Settings/Manage), not just a promise",
+      !!cancelFaq && /manage subscription/i.test(cancelFaq.a));
+    s.check("the cancel FAQ states access continues to the end of the paid period",
+      !!cancelFaq && /end of the period|until the end/i.test(cancelFaq.a));
+    s.check("the refund FAQ states the no-refunds-cancel-anytime policy plainly",
+      !!refundFaq && /don't offer refunds|no refunds/i.test(refundFaq.a) && /trial/i.test(refundFaq.a));
+
+    // The mechanism the FAQ promises must actually exist in the app.
+    const settings = read("src/components/SettingsModal.tsx");
+    s.check("Settings actually offers self-serve subscription management",
+      /openBillingPortal/.test(settings) && /Manage subscription/.test(settings));
+    const portalLib = read("src/lib/billingPortal.ts");
+    s.check("billing management goes through the create-portal-session edge function",
+      /create-portal-session/.test(portalLib));
+    s.check("the edge function that powers it exists",
+      fs.existsSync(path.join(ROOT, "supabase/functions/create-portal-session/index.ts")));
+  }
+
   return s;
 }
